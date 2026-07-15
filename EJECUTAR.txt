@@ -1,0 +1,21 @@
+node server.js
+npm start
+
+
+OPCIÓN 1 (RECOMENDADA): Cerrar el proceso que usa el puerto 4000
+
+Ejecutá en PowerShell:
+
+netstat -ano | findstr :4000
+
+
+Te va a salir algo así:
+
+TCP    0.0.0.0:4000    0.0.0.0:0      LISTENING     12345
+
+
+Ese 12345 es el PID.
+
+Luego matalo:
+
+taskkill /PID 12345 /F
