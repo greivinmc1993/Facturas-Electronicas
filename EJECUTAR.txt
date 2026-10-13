@@ -18,4 +18,5 @@ Ese 12345 es el PID.
 
 Luego matalo:
 
-taskkill /PID 12345 /F
+taskkill /PID 12345 /F  
+.
