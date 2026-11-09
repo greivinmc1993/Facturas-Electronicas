@@ -28,6 +28,7 @@ for(const name of ['express.mjs','sqlite.mjs'])fs.copyFileSync(path.join(__dirna
 fs.copyFileSync(path.join(root,'server','report-format.js'),path.join(staging,'report-format.js'));
 fs.copyFileSync(path.join(root,'server','cash.js'),path.join(staging,'cash.js'));
 fs.copyFileSync(path.join(root,'server','access-schema.js'),path.join(staging,'access-schema.js'));
+fs.copyFileSync(path.join(root,'server','auth.js'),path.join(staging,'auth.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -56,7 +57,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.55')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.56')});
   await check('Inicio y esquema SQLite en base nueva',async()=>{
    const sql=read();const tables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name);
    for(const name of ['companies','clients','products','sales','sale_lines','sale_payments','inventory_movements','quotations','quotation_lines','company_quote_settings','access_users','access_company_roles','access_permission_overrides','access_security_settings','access_audit_log'])assert.ok(tables.includes(name),name);
@@ -96,7 +97,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   });
   await check('Caja: reportes CSV y PDF aislados por empresa',async()=>{
     let r=await call('GET',`/api/companies/${a}/cash/export.html`);assert.equal(r.status,200);assert.ok(r.body.includes('Pasaje proveedor'));
-    r=await call('GET',`/api/companies/${a}/cash/export.csv`);assert.equal(r.status,200);assert.ok(String(r.body).includes('Transporte'));assert.ok(String(r.body).includes('Fondo inicial CRC'));assert.ok(String(r.body).includes('\"5000,00\"'));assert.ok(!String(r.body).includes('₡'));
+    r=await call('GET',`/api/companies/${a}/cash/export.csv`);assert.equal(r.status,200);assert.ok(String(r.body).includes('Transporte'));assert.ok(String(r.body).includes('Fondo inicial'));assert.ok(String(r.body).includes('\"5000,00\"'));assert.ok(!String(r.body).includes('₡'));for(const section of ['REPORTE DE CAJA','RESUMEN','CIERRE','GASTOS','Monto (CRC)'])assert.ok(String(r.body).includes(section),section);
     r=await call('GET',`/api/companies/${b}/cash/export.html`);assert.equal(r.status,404);
   });
   await check('Cliente registrado por empresa',async()=>{

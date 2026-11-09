@@ -1,15 +1,15 @@
-# FacturaCR v0.6.55 — Base de usuarios, permisos y CSV para Excel
+# FacturaCR v0.6.56 — Base de usuarios, permisos y CSV para Excel
 
 
-## Nuevo en v0.6.55 — Preparación segura de control de acceso
+## Nuevo en v0.6.56 — Inicio de sesión y Caja CSV mejorada
 
-- **Nueva migración SQLite aditiva** en `server/access-schema.js`: `access_users`, `access_company_roles`, `access_permission_overrides`, `access_security_settings`, `access_audit_log`. Conserva las empresas, ventas, movimientos, respaldos e inventario anteriores. La migración se aplica al inicio y al restaurar un respaldo compatible.
-- **Cuatro roles planificados:** propietario único de la instalación (`owner`), administrador de empresa (`company_admin`), supervisor y cajero. Los roles de empresa se asignan a un usuario por cada empresa, sin crear una cuenta de desarrollador ni contraseñas universales.
-- **Bloqueo planificado:** tiempo inicial de 15 minutos, personalizable entre 5, 15, 30 y 60 minutos, con opción excepcional de desactivación. El esquema guarda la preferencia de conservar borradores al bloquear. **En esta versión NO se ejecuta ningún bloqueo ni se habilita una página de acceso**.
-- **Importante sobre seguridad:** la base del control de acceso no protege por sí sola los endpoints. Hasta implementar la autenticación, la autorización del servidor y el asistente de propietario, **FacturaCR sigue funcionando como antes, sin login ni roles efectivos**. No distribuir como sistema multiusuario seguro todavía.
-- **CSV para Excel:** importes en cifras sin `₡` en las celdas y columnas rotuladas en CRC; los reportes PDF siguen mostrando `₡`. Se conserva UTF-16 LE con BOM y separador `;`, sin volver a incluir XLSX. Las exportaciones locales de créditos y ventas filtradas ahora protegen campos de texto contra fórmulas de hoja de cálculo.
-- **QA:** `node --no-warnings tests/qa-acceso-esquema.cjs` prueba migración repetible, propietario único, asignaciones por empresa, permisos y persistencia de la configuración; `npm test` comprueba las funciones previas.
-- **Siguiente etapa:** propietario inicial, hashing de contraseñas, inicio y cierre de sesión seguros, permisos aplicados por API, bloqueo real con restauración segura de ventas pendientes y reglas de recuperación. **Antes de habilitar usuarios, se deberá impedir que restaurar una base antigua elimine usuarios o comprometa los accesos.**
+- **Acceso real y obligatorio**: primera apertura crea una cuenta propietaria local (sin cuentas de desarrollador), mediante un asistente de configuración. Contraseñas con `scrypt` y sal criptográfica, sesiones con tokens aleatorios y cookies `HttpOnly`, `SameSite=Strict`.
+- **Protección de API**: todas las rutas comerciales, caja, datos, respaldos y configuración exigen sesión válida; solo las rutas de inicio y diagnóstico quedan públicas. **En esta etapa solamente puede iniciar sesión el propietario**: crear supervisores/cajeros y asignar permisos efectivos queda para la siguiente versión.
+- **Bloqueo automático**: 15 minutos predeterminados, configurables en la barra superior (5, 15, 30, 60 o sin bloqueo). La actividad real del usuario reinicia el temporizador. El carrito de venta continúa montado detrás del bloqueo y se recupera al desbloquear. Cerrar sesión o reiniciar la aplicación no garantiza persistir un carrito sin guardar.
+- **CSV de caja más legible**: misma tabla de cuatro columnas, con secciones `REPORTE DE CAJA`, `SESIÓN`, `RESUMEN`, `CIERRE` y `GASTOS`; fechas completas, detalles, categorías, importes numéricos CRC, sin caracteres `₡` ilegibles en Excel y sin `.xlsx`. Los PDF siguen mostrando ₡.
+- **Seguridad y límites**: sin usuarios ocultos ni claves maestras. La instalación requiere acceso físico a este equipo para configurar el propietario. El mecanismo formal de recuperación de contraseñas se entregará en una versión posterior. Si se restaura un respaldo antiguo sin cuentas, será necesario configurar nuevamente el propietario; realizar siempre un respaldo actualizado antes de restaurar.
+- **Pruebas**: `node --no-warnings tests/qa-auth.cjs` comprueba contraseñas, propietario único, sesiones, errores, expiración estructural, bloqueo de API y rechazo de orígenes externos. `npm test` conserva QA de módulos comerciales y de SQLite.
+- **Pendiente**: verificación final de compilación Vite/instalador y renderizado real en Windows; los permisos finos por empresa todavía no están habilitados.
 
 ## Funciones anteriores: Caja y gastos en efectivo
 
@@ -555,6 +555,6 @@ Desde el historial puedes seleccionar una proforma y usar **Eliminar proforma**.
 - El importe representa valor al costo, no ingresos, caja ni utilidad.
 - Sin exportación XLSX; se mantienen CSV y PDF.
 
-### Ajustes de v0.6.55
+### Ajustes de v0.6.56
 
 Los CSV de caja exportan cifras sin el símbolo ₡, con columnas identificadas en CRC. Los PDF conservan el formato monetario. Los campos monetarios de cobro en Ventas ocultan las flechas de incremento, pero aceptan valores escritos por teclado.

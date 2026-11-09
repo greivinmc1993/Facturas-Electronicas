@@ -1,3 +1,4 @@
+import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
 import {csvCell as formattedCsvCell, csvDocument, csvExcelBuffer, reportHtml} from './report-format.js';
@@ -210,6 +211,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({limit:'2mb'}));
+  const authentication=registerAuth(app,()=>db);
   // Limpieza tolerante a archivos temporalmente bloqueados en Windows.
   // Nunca permitir que una excepción en callbacks de descarga termine Electron.
   async function cleanTempDir(dir) {
@@ -413,6 +415,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       db=new Database(databasePath);
       db.pragma('journal_mode = WAL');db.pragma('foreign_keys = ON');
       migrateDatabase(); // Actualiza el esquema de respaldos anteriores sin perder registros.
+      authentication.invalidateSessions(); // El respaldo puede cambiar las credenciales.
       res.json({ok:true,previousBackup:previous.split(/[\\/]/).pop(),message:'Respaldo restaurado. La aplicación recargará los datos.'});
     }catch(err){
       console.error('Restore:',err);

@@ -105,24 +105,36 @@ export function registerCashRoutes(app,db,companyFromRequest){
     const company=db.prepare('SELECT * FROM companies WHERE id=?').get(id);
     const totals=summary(s);
     const exp=db.prepare('SELECT created_at,category,description,amount_cents FROM cash_expenses WHERE company_id=? AND session_id=? ORDER BY id').all(id,s.id);
-    const headers=['Fecha UTC','Categoría','Descripción','Gasto CRC'];
+    const headers=['Fecha UTC','Categoría','Descripción','Gasto (CRC)'];
     const rows=exp.map(e=>[e.created_at,e.category,e.description,(e.amount_cents/100).toFixed(2)]);
     const money=n=>'₡'+(Number(n)/100).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const stats=[['Fondo inicial',money(s.opening_cents)],['Cobros efectivos de ventas activas',money(totals.received_cents)],['Gastos registrados',money(totals.expense_cents)],['Esperado al cierre',money(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],['Estado',s.status]];
+    const stats=[['Fondo inicial',money(s.opening_cents)],['Cobros en efectivo',money(totals.received_cents)],['Gastos registrados',money(totals.expense_cents)],['Efectivo esperado',money(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],['Estado',s.status]];
     if(s.status==='cerrada')stats.push(['Efectivo contado',money(s.counted_cents)],['Diferencia',money(s.difference_cents)]);
     if(format==='csv'){
-      // CSV: cantidades en CRC como cifras, sin símbolo de moneda ni agrupación de miles.
-      // El PDF conserva el formato visual con ₡.
-      const decimalCRC=n=>(Number(n)/100).toFixed(2).replace('.',',');
-      const csvStats=[['Fondo inicial CRC',decimalCRC(s.opening_cents)],
-        ['Cobros efectivos de ventas activas CRC',decimalCRC(totals.received_cents)],
-        ['Gastos registrados CRC',decimalCRC(totals.expense_cents)],
-        ['Esperado al cierre CRC',decimalCRC(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],
-        ['Estado',s.status]];
-      if(s.status==='cerrada')csvStats.push(['Efectivo contado CRC',decimalCRC(s.counted_cents)],['Diferencia CRC',decimalCRC(s.difference_cents)]);
-      const csvRows=exp.map(e=>[e.created_at,e.category,e.description,decimalCRC(e.amount_cents)]);
-      const records=[['Sesión',s.id],['Empresa',company.trade_name||company.legal_name],['Fecha apertura UTC',s.opened_at],['Fecha cierre UTC',s.closed_at||'Abierta'],...csvStats,['',''],headers,...csvRows];
-      res.setHeader('Content-Type','text/csv; charset=utf-16le');res.setHeader('Content-Disposition',`attachment; filename="FacturaCR_caja_${id}_${s.id}.csv"`);return res.send(csvExcelBuffer(csvDocument([],records)));
+      // Una tabla de cuatro columnas estable, sin celdas combinadas ni símbolos
+      // dentro de montos: Excel permite sumar importes y leer el contexto CRC.
+      const amount=n=>(Number(n)/100).toFixed(2).replace('.',',');
+      const header=['Sección','Concepto / fecha (UTC)','Detalle / categoría','Monto (CRC)'];
+      const records=[
+        ['REPORTE DE CAJA','Empresa',company.trade_name||company.legal_name,''],
+        ['SESIÓN',String(s.id),'Estado',s.status],
+        ['SESIÓN','Apertura UTC',s.opened_at,''],
+        ['SESIÓN','Cierre UTC',s.closed_at||'Pendiente',''],
+        ['RESUMEN','Fondo inicial','Efectivo',amount(s.opening_cents)],
+        ['RESUMEN','Cobros recibidos','Solo efectivo · ventas activas',amount(totals.received_cents)],
+        ['RESUMEN','Gastos registrados',`${totals.expense_count} gasto(s)`,amount(totals.expense_cents)],
+        ['RESUMEN','Efectivo esperado','Fondo + cobros − gastos',amount(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],
+      ];
+      if(s.status==='cerrada')records.push(
+        ['CIERRE','Efectivo contado','Arqueo físico',amount(s.counted_cents)],
+        ['CIERRE','Diferencia','Contado − esperado',amount(s.difference_cents)]);
+      records.push(['GASTOS','Fecha UTC','Categoría / descripción','Monto (CRC)']);
+      for(const e of exp)records.push(['GASTO',e.created_at,`${e.category} · ${e.description}`,amount(e.amount_cents)]);
+      if(!exp.length)records.push(['GASTOS','Sin gastos registrados','','']);
+      records.push(['NOTA','Los montos son CRC, sin símbolo monetario para facilitar cálculos.','','']);
+      res.setHeader('Content-Type','text/csv; charset=utf-16le');
+      res.setHeader('Content-Disposition',`attachment; filename="FacturaCR_caja_${id}_${s.id}.csv"`);
+      return res.send(csvExcelBuffer(csvDocument(header,records)));
     }
     res.type('html').send(reportHtml({title:'Reporte de caja y gastos',company:company.trade_name||company.legal_name,subtitle:`Sesión #${s.id} · Apertura UTC: ${s.opened_at} · ${s.closed_at?`Cierre UTC: ${s.closed_at}`:'Abierta'}`,headers,rows,summary:stats,note:'Los cobros en efectivo se calculan a partir de pagos de ventas actualmente activas. No es un estado contable ni incluye métodos de pago electrónicos. No sustituye un arqueo físico.'}));
   };

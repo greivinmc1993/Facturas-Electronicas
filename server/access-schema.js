@@ -1,4 +1,4 @@
-// v0.6.55: preparación de autenticación SIN activar controles de acceso.
+// v0.6.56: preparación de autenticación SIN activar controles de acceso.
 // No crea credenciales ni rutas administrativas sin autenticación.
 // Una cuenta propietaria pertenece a la instalación, no al desarrollador.
 export const DEFAULT_IDLE_LOCK_MINUTES = 15;

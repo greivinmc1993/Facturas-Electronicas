@@ -1,9 +1,10 @@
-## v0.6.55 — Preparación de usuarios por empresa y compatibilidad CSV (2026-11-09)
+## v0.6.56 — Autenticación del propietario y CSV de Caja mejorado (2026-11-09)
 
-- Esquema SQLite aditivo para un propietario de instalación, usuarios, roles por empresa, permisos personalizados y auditoría. Sin cuentas iniciales ocultas y sin activar autenticación prematura.
-- Preferencia predeterminada de bloqueo de 15 minutos conservando ventas en preparación; solo configuración persistente, no temporizador activo todavía.
-- CSV: importes numéricos identificados como CRC; PDF conserva el símbolo ₡. Mayor protección contra fórmulas en exportaciones locales de créditos y ventas filtradas.
-- Pruebas automáticas de migración, roles y separación empresarial. Se mantienen QA, workflows Windows, instalador y datos existentes.
+- Creación inicial del único propietario, con contraseña `scrypt` y hash seguro; nunca se instala una credencial por defecto.
+- Inicio de sesión y cierre mediante cookie de sesión HttpOnly SameSite Strict, protección global de rutas comerciales y respaldos, bloqueo por inactividad ajustable (15 min predeterminados) y preservación de venta activa durante bloqueo.
+- CSV de Caja: tabla consistente de cuatro columnas, bloques de sesión, resumen, cierre y gastos, cifras numéricas en CRC; PDF permanece con colones ₡.
+- 7 pruebas adicionales de autenticación, pruebas generales e integración anteriores conservadas.
+- La asignación de cuentas de personal por empresa queda para la siguiente versión. Aún no es multiusuario.
 
 ## v0.6.54 — CSV sin símbolo monetario y campos de cobro sin flechas (2026-11-09)
 

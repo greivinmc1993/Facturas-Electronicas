@@ -925,4 +925,59 @@ function App(){
   <div className="dialogActions">{dialog.kind!=='success'&&dialog.kind!=='error'&&<button type="button" className="secondary" autoFocus onClick={closeDialog}>Cancelar</button>}<button type="button" autoFocus={dialog.kind==='success'||dialog.kind==='error'} className={dialog.danger?'danger':''} onClick={dialog.kind==='success'||dialog.kind==='error'?closeDialog:confirmDialog}>{dialog.confirmLabel||(dialog.kind==='success'||dialog.kind==='error'?'Aceptar':dialog.danger?'Eliminar':'Confirmar')}</button></div>
  </section></div>}</div>;
 }
-createRoot(document.getElementById('root')).render(<ScreenErrorBoundary><App/></ScreenErrorBoundary>);
+
+// Seguridad: las ventas en curso permanecen montadas debajo de la pantalla bloqueada.
+function SecureApp(){
+ const [state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const [username,setUsername]=useState(''),[displayName,setDisplayName]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState('');
+ const [locked,setLocked]=useState(false),[minutes,setMinutes]=useState(15),[settingsBusy,setSettingsBusy]=useState(false);
+ const activity=useRef(Date.now()),lastTouch=useRef(0);
+ const reload=async()=>{try{const r=await fetch('/api/auth/status',{cache:'no-store'});if(!r.ok)throw Error('No se pudo consultar la seguridad.');const v=await r.json();setState(v);setMinutes(v.idle_lock_minutes??15);if(v.authenticated)setLocked(false);}catch(e){setError(e.message);}};
+ useEffect(()=>{void reload()},[]);
+ useEffect(()=>{
+   if(!state?.authenticated||locked)return;
+   const onActivity=()=>{
+     activity.current=Date.now();
+     if(Date.now()-lastTouch.current>30000){lastTouch.current=Date.now();fetch('/api/auth/touch',{method:'POST'}).then(r=>{if(r.status===401){setLocked(true);setPassword('')}}).catch(()=>{});}
+   };
+   const monitor=()=>{if(minutes>0&&Date.now()-activity.current>=minutes*60000){setLocked(true);setPassword('')}};
+   for(const event of ['pointerdown','keydown','wheel','touchstart'])window.addEventListener(event,onActivity,{passive:true});
+   const timer=setInterval(monitor,3000);
+   return()=>{clearInterval(timer);for(const event of ['pointerdown','keydown','wheel','touchstart'])window.removeEventListener(event,onActivity)};
+ },[state?.authenticated,locked,minutes]);
+ const submit=async e=>{
+  e.preventDefault();setBusy(true);setError('');
+  try{
+    if(state?.setupRequired&&password!==confirm)throw Error('Las contraseñas no coinciden.');
+    if(state?.setupRequired){await api('/api/auth/setup',{method:'POST',body:JSON.stringify({username,displayName,password})});}
+    const result=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:state?.setupRequired?username:locked?state.user.username:username,password})});
+    setPassword('');setConfirm('');setUsername(result.user.username);activity.current=Date.now();lastTouch.current=Date.now();
+    await reload();
+  }catch(e){setError(e.message)}finally{setBusy(false)}
+ };
+ const logout=async()=>{await fetch('/api/auth/logout',{method:'POST'});setLocked(true);setPassword('');await reload();};
+ const saveMinutes=async()=>{
+  setSettingsBusy(true);setError('');try{const r=await api('/api/auth/settings',{method:'PUT',body:JSON.stringify({idle_lock_minutes:Number(minutes)})});setMinutes(r.idle_lock_minutes);activity.current=Date.now();}catch(e){setError(e.message)}finally{setSettingsBusy(false)}
+ };
+ const needsGate=!state||state.setupRequired||!state.authenticated||locked;
+ return <div className="secureRoot">
+  {state?.authenticated&&<div className="securityTop"><span>◈ Sesión: <strong>{state.user.displayName}</strong> · Propietario</span><div><label>Bloqueo:<select aria-label="Tiempo de bloqueo de sesión" value={minutes} onChange={e=>setMinutes(Number(e.target.value))}>{[5,15,30,60,0].map(n=><option key={n} value={n}>{n?n+' min':'Sin bloqueo'}</option>)}</select></label><button type="button" className="secondary" onClick={saveMinutes} disabled={settingsBusy}>Guardar</button><button type="button" className="secondary" onClick={()=>{setLocked(true);setPassword('')}}>Bloquear</button><button type="button" className="secondary" onClick={logout}>Salir</button></div></div>}
+  {state?.authenticated&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App/></div>}
+  {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':'Accede a las empresas y operaciones autorizadas.'}</p>
+   {state&&<form onSubmit={submit}>
+    {!locked&&<label>Usuario<input autoComplete="username" required minLength={3} maxLength={80} value={username} onChange={e=>setUsername(e.target.value)} placeholder="usuario"/></label>}
+    {state.setupRequired&&<label>Nombre del propietario<input required minLength={2} maxLength={160} value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Nombre completo"/></label>}
+    {locked&&<label>Cuenta<input readOnly value={state.user?.username||''}/></label>}
+    <label>Contraseña<input required autoFocus type="password" autoComplete={state.setupRequired?'new-password':'current-password'} minLength={state.setupRequired?12:1} value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    {state.setupRequired&&<label>Confirmar contraseña<input required type="password" autoComplete="new-password" minLength={12} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>}
+    {state.setupRequired&&<small>Usa 12 caracteres como mínimo, letras y números. Guarda estas credenciales en un lugar seguro.</small>}
+    {error&&<p className="authError" role="alert">{error}</p>}
+    <button disabled={busy} type="submit">{busy?'Comprobando…':state.setupRequired?'Crear propietario y entrar':locked?'Desbloquear':'Entrar a FacturaCR'}</button>
+   </form>}
+   {!state&&error&&<p className="authError">{error} <button onClick={reload}>Reintentar</button></p>}
+   <footer>Protegido en este equipo · Los datos permanecen locales</footer>
+  </section></div>}
+ </div>
+}
+
+createRoot(document.getElementById('root')).render(<ScreenErrorBoundary><SecureApp/></ScreenErrorBoundary>);
