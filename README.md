@@ -1,4 +1,13 @@
-# FacturaCR v0.6.51 — Exportaciones CSV y PDF
+# FacturaCR v0.6.53 — Caja y gastos por empresa
+
+
+## Nuevo en v0.6.53 — Caja y gastos en efectivo
+
+- **Caja y gastos** en el menú lateral, separada por empresa. Apertura con fondo inicial, un solo turno abierto por empresa, gastos con categoría y descripción y cierre con efectivo contado y diferencia.
+- Los ingresos de caja provienen únicamente de **pagos Efectivo** de ventas actualmente activas, incluyendo abonos a crédito; SINPE, tarjetas y transferencias no se suman al efectivo físico. Una sesión nueva inicia desde el último identificador de pago de la empresa y no recoge cobros previos.
+- Historial de 20 sesiones y exportación de la sesión seleccionada a **CSV compatible con Excel** y **PDF** de escritorio. Los gastos no cambian existencias, ventas ni abonos; la diferencia del cierre se conserva registrada.
+- **Limitación relevante:** la anulación posterior de una venta puede excluir sus cobros del resumen histórico recalculado; el saldo esperado y la diferencia al cerrar permanecen guardados. No se gestionan todavía devoluciones de efectivo ni transferencias de caja. Esto es un control operativo, no una conciliación contable formal.
+- QA: `npm test` cubre apertura, límites, gastos, cierre, exportaciones y aislamiento entre empresas. GitHub Actions verificará la compilación y el instalador Windows con el próximo push.
 
 **Corrección Excel para Windows:** los CSV se descargan con codificación UTF-16 LE y BOM, separador `;`, para que tildes y símbolos se interpreten correctamente al abrir directamente en Excel. Se retiraron todos los botones y endpoints `.xlsx`; se mantienen los PDF existentes.
 
@@ -69,7 +78,7 @@ La información continúa almacenada en la base SQLite habitual; no reemplaces n
   <p><strong>Punto de venta y gestión comercial de escritorio para Costa Rica</strong></p>
   <p>Empresas · Clientes · Artículos · Inventario · Ventas · Crédito · Respaldos</p>
   <p>
-    <img src="https://img.shields.io/badge/Versi%C3%B3n-0.6.51-blue" alt="Versión 0.6.51" />
+    <img src="https://img.shields.io/badge/Versi%C3%B3n-0.6.52-blue" alt="Versión 0.6.52" />
     <img src="https://img.shields.io/badge/Estado-En%20pruebas-orange" alt="En pruebas" />
     <img src="https://img.shields.io/badge/Plataforma-Windows-0078D4" alt="Windows" />
   </p>
@@ -526,3 +535,12 @@ En Inventario y servicios → Movimientos puedes establecer existencias finales 
 ### Proformas v0.6.49
 
 Desde el historial puedes seleccionar una proforma y usar **Eliminar proforma**. Requiere confirmar; elimina únicamente la proforma y sus conceptos en la empresa activa. No elimina ventas, pagos o existencias. La acción es irreversible: realiza un respaldo si necesitas conservar la información.
+
+
+## Novedades de la v0.6.52
+
+- Cada movimiento **nuevo** guarda una instantánea del costo unitario CRC conocido al registrarse (sin convertir USD).
+- Kardex con valoración estimada de entradas/salidas, cobertura y detalle en CSV/PDF.
+- Movimientos históricos anteriores quedan sin costo; **no se recalculan usando el costo actual**.
+- El importe representa valor al costo, no ingresos, caja ni utilidad.
+- Sin exportación XLSX; se mantienen CSV y PDF.

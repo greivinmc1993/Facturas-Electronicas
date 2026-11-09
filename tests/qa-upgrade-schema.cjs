@@ -16,6 +16,15 @@ function assertHistoricalRowsPreserved(previous, current) {
       }
     }
   }
+  // Los movimientos anteriores a esta versión no reciben costos inventados.
+  if (previous.inventory_movements && current.inventory_movements) {
+    for (const [i, movement] of current.inventory_movements.entries()) {
+      if (!Object.hasOwn(previous.inventory_movements[i], 'unit_cost_cents')) {
+        assert.ok(Object.hasOwn(movement, 'unit_cost_cents'), 'Falta migración inventory_movements.unit_cost_cents');
+        assert.equal(movement.unit_cost_cents, null, `Costo histórico inventado: inventory_movements[${i}]`);
+      }
+    }
+  }
   // La nueva columna de costo NO debe inventarse para ventas históricas.
   if (previous.sale_lines && current.sale_lines) {
     for (const [i, line] of current.sale_lines.entries()) {

@@ -1,3 +1,4 @@
+import {registerCashRoutes,ensureCashSchema} from './cash.js';
 import {csvCell as formattedCsvCell, csvDocument, csvExcelBuffer, reportHtml} from './report-format.js';
 import { registerInventoryValuationRoutes } from './inventory-valuation.js';
 import { buildInventoryAlerts } from './inventory-alerts.js';
@@ -84,6 +85,19 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_inventory_movements_company_product ON inventory_movements(company_id,product_id,created_at);`);
+  // Solo los movimientos NUEVOS reciben costo histórico conocido al momento de su alta.
+  // Un movimiento antiguo queda NULL: nunca estimarlo con el precio actual.
+  addColumn('inventory_movements','unit_cost_cents','INTEGER');
+  db.exec(`CREATE TRIGGER IF NOT EXISTS trg_inventory_movement_cost_snapshot
+    AFTER INSERT ON inventory_movements
+    FOR EACH ROW WHEN NEW.unit_cost_cents IS NULL
+    BEGIN
+      UPDATE inventory_movements SET unit_cost_cents=(
+        SELECT CASE WHEN p.currency='CRC' AND p.cost>0 AND p.cost<=100000000
+          THEN CAST(ROUND(p.cost*100) AS INTEGER) ELSE NULL END
+        FROM products p WHERE p.id=NEW.product_id AND p.company_id=NEW.company_id
+      ) WHERE id=NEW.id;
+    END;`);
   addColumn('products','alert_enabled','INTEGER NOT NULL DEFAULT 1');
   addColumn('products','is_deleted','INTEGER NOT NULL DEFAULT 0');
   db.exec(`CREATE TABLE IF NOT EXISTS product_bulk_price_changes (
@@ -187,6 +201,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     input_includes_tax:'INTEGER'
   })) addColumn('quotation_lines',field,definition);
   // Los códigos internos se validan por empresa en las operaciones nuevas.
+  ensureCashSchema(db);
   }
   migrateDatabase();
   const app = express();
@@ -803,6 +818,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     return id;
   };
   const paymentLabels=['Efectivo','Tarjeta','SINPE Móvil','Transferencia bancaria','Cheque','Otros'];
+  registerCashRoutes(app,db,saleCompany);
   app.get('/api/companies/:companyId/sales',(req,res)=>{
     try{
       const companyId=saleCompany(req),q=String(req.query.q||'').trim().slice(0,120);

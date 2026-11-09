@@ -21,10 +21,12 @@ fs.writeFileSync(path.join(staging,'index.mjs'),serverText);
 fs.copyFileSync(path.join(root,'server','dashboard.js'),path.join(staging,'dashboard.js'));
 fs.copyFileSync(path.join(root,'server','inventory-alerts.js'),path.join(staging,'inventory-alerts.js'));
 fs.copyFileSync(path.join(root,'server','kardex.js'),path.join(staging,'kardex.js'));
+fs.copyFileSync(path.join(root,'server','kardex-costs.js'),path.join(staging,'kardex-costs.js'));
 fs.copyFileSync(path.join(root,'server','inventory-valuation.js'),path.join(staging,'inventory-valuation.js'));
 for(const name of ['express.mjs','sqlite.mjs'])fs.copyFileSync(path.join(__dirname,'qa-adapters',name),path.join(staging,name));
 
 fs.copyFileSync(path.join(root,'server','report-format.js'),path.join(staging,'report-format.js'));
+fs.copyFileSync(path.join(root,'server','cash.js'),path.join(staging,'cash.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -53,7 +55,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.51')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.53')});
   await check('Inicio y esquema SQLite en base nueva',async()=>{
    const sql=read();const tables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name);
    for(const name of ['companies','clients','products','sales','sale_lines','sale_payments','inventory_movements','quotations','quotation_lines','company_quote_settings'])assert.ok(tables.includes(name),name);
@@ -65,6 +67,29 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    r=await call('POST','/api/companies',{legal_name:'QA Comercio B',identification:'987654321',avatar_color:'#0891b2'});assert.equal(r.status,201);b=r.body.id;
    r=await call('GET','/api/companies');assert.equal(r.body.find(x=>x.id===a).avatar_color,'#7c3aed');assert.equal(r.body.length,2);
    const sql=read();assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM companies WHERE identification=?').get('123456789').n,1);sql.close();
+  });
+  await check('Caja: apertura aislada y bloqueo de segunda sesión',async()=>{
+    let r=await call('POST',`/api/companies/${a}/cash/open`,{opening_amount:'5000',note:'QA turno inicial'});
+    assert.equal(r.status,201,JSON.stringify(r.body));assert.equal(r.body.active.opening_cents,500000);
+    r=await call('POST',`/api/companies/${a}/cash/open`,{opening_amount:'100'});assert.equal(r.status,400);
+    r=await call('GET',`/api/companies/${b}/cash`);assert.equal(r.status,200);assert.equal(r.body.active,null);
+  });
+  await check('Caja: gastos válidos, restricciones y diferencias',async()=>{
+    let r=await call('POST',`/api/companies/${a}/cash/expenses`,{category:'Transporte',description:'Pasaje proveedor',amount:'1500.50'});
+    assert.equal(r.status,201,JSON.stringify(r.body));assert.equal(r.body.active.summary.expense_cents,150050);
+    assert.equal(r.body.active.summary.expected_cents,349950);
+    r=await call('POST',`/api/companies/${a}/cash/expenses`,{category:'Otros',description:'',amount:'10'});assert.equal(r.status,400);
+    r=await call('POST',`/api/companies/${a}/cash/expenses`,{category:'Otros',description:'Gasto negativo',amount:'-1'});assert.equal(r.status,400);
+    r=await call('POST',`/api/companies/${a}/cash/close`,{counted_amount:'3400',note:'Diferencia QA'});
+    assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.closed.difference_cents,-9950);
+    assert.equal(r.body.active,null);
+    r=await call('POST',`/api/companies/${a}/cash/expenses`,{category:'Otros',description:'Sin caja',amount:'10'});assert.equal(r.status,400);
+    r=await call('POST',`/api/companies/${a}/cash/close`,{counted_amount:'5'});assert.equal(r.status,400);
+  });
+  await check('Caja: reportes CSV y PDF aislados por empresa',async()=>{
+    let r=await call('GET',`/api/companies/${a}/cash/export.html`);assert.equal(r.status,200);assert.ok(r.body.includes('Pasaje proveedor'));
+    r=await call('GET',`/api/companies/${a}/cash/export.csv`);assert.equal(r.status,200);assert.ok(String(r.body).includes('Transporte'));
+    r=await call('GET',`/api/companies/${b}/cash/export.html`);assert.equal(r.status,404);
   });
   await check('Cliente registrado por empresa',async()=>{
    const r=await call('POST',`/api/companies/${a}/clients`,{name:'Cliente QA',identification:'115460323',identification_type:'01',country_code:'506'});
@@ -347,6 +372,38 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(csv.status,200);assert.ok(csv.body.includes('Margen bruto estimado'));assert.ok(csv.body.includes('Comparación con período anterior'));
    const pdf=await call('GET',`/api/companies/${a}/dashboard/export.html?from=2026-05-04&to=2026-05-04&kind=resumen`);
    assert.equal(pdf.status,200);assert.ok(pdf.body.includes('Margen bruto estimado'));
+  });
+  await check('Kardex: snapshot de costo nuevo, cambios posteriores y exportaciones',async()=>{
+   const initial=read();
+   const first=initial.prepare('SELECT unit_cost_cents,delta FROM inventory_movements WHERE company_id=? AND product_id=? ORDER BY id LIMIT 1').get(a,prodId);
+   assert.equal(first.unit_cost_cents,30000,'Movimiento inicial debe guardar costo ₡300');initial.close();
+   let r=await call('POST',`/api/companies/${a}/inventory/movements`,{product_id:prodId,movement_type:'entrada',quantity:2,reason:'Compra para pruebas de costos'});
+   assert.equal(r.status,201,JSON.stringify(r.body));
+   const before=read();assert.equal(before.prepare('SELECT unit_cost_cents FROM inventory_movements WHERE id=?').get(r.body.id).unit_cost_cents,30000);before.close();
+   const modify=new DatabaseSync(dbPath);
+   modify.prepare('UPDATE products SET cost=500 WHERE company_id=? AND id=?').run(a,prodId);
+   modify.close();
+   r=await call('POST',`/api/companies/${a}/inventory/movements`,{product_id:prodId,movement_type:'entrada',quantity:1,reason:'Compra con nuevo costo registrado'});
+   assert.equal(r.status,201,JSON.stringify(r.body));
+   const verify=read();
+   assert.equal(verify.prepare('SELECT unit_cost_cents FROM inventory_movements WHERE id=?').get(r.body.id).unit_cost_cents,50000);
+   assert.equal(verify.prepare('SELECT unit_cost_cents FROM inventory_movements WHERE company_id=? AND product_id=? ORDER BY id LIMIT 1').get(a,prodId).unit_cost_cents,30000);
+   verify.close();
+   const k=await call('GET',`/api/companies/${a}/inventory/kardex?productId=${prodId}`);
+   assert.equal(k.status,200);assert.ok(k.body.summary.covered>=2);assert.ok(k.body.summary.incomingCents>=110000);
+   const csv=await call('GET',`/api/companies/${a}/inventory/kardex/export.csv?productId=${prodId}`);
+   assert.equal(csv.status,200);assert.ok(csv.body.includes('Costo unitario histórico CRC'));assert.ok(csv.body.includes('500.00'));
+   const pdf=await call('GET',`/api/companies/${a}/inventory/kardex/export.html?productId=${prodId}`);
+   assert.equal(pdf.status,200);assert.ok(pdf.body.includes('Movimientos sin costo histórico'));
+  });
+  await check('Kardex: filas anteriores sin costo siguen sin valorar',async()=>{
+   const old=new DatabaseSync(dbPath);
+   const id=old.prepare('SELECT id FROM inventory_movements WHERE company_id=? AND product_id=? ORDER BY id LIMIT 1').get(a,prodId).id;
+   old.prepare('UPDATE inventory_movements SET unit_cost_cents=NULL WHERE id=?').run(id);
+   old.close();
+   const r=await call('GET',`/api/companies/${a}/inventory/kardex?productId=${prodId}`);
+   assert.equal(r.status,200);assert.ok(r.body.summary.uncovered>=1);
+   assert.equal(r.body.rows.find(x=>x.id===id).movementCostCents,null);
   });
   await check('Dashboard rechaza fechas, clientes y filtros inválidos',async()=>{
    for(const suffix of ['from=2026-02-30&to=2026-03-01','from=2026-12-31&to=2026-01-01','from=2026-01-01&to=2026-12-31&type=incorrecto','from=2026-01-01&to=2026-12-31&method=Inexistente']){

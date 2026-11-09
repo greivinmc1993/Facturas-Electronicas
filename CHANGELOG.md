@@ -1,4 +1,19 @@
-## 0.6.51 — CSV compatible con Excel Windows
+## v0.6.53 — Control de caja y gastos (2026-11-09)
+
+- Nueva pantalla Caja y gastos con apertura, fondo inicial, registro de egresos en efectivo y cierre mediante arqueo físico.
+- Control por empresa, sesiones SQLite y protección transaccional para no abrir dos cajas a la vez.
+- Los cobros se leen de pagos en efectivo de ventas activas, aislados mediante identificadores de pago por sesión.
+- Reportes CSV (UTF-16 LE compatible con Excel) y PDF con totales, notas y detalle de gastos.
+- Regresión automatizada de apertura, cierre, validación de importes, exportaciones y aislamiento multiempresa.
+- Limitación documentada: anulaciones posteriores pueden cambiar resúmenes históricos recalculados; el cierre conserva su importe y diferencia.
+
+## 0.6.52 — Costo histórico en Kardex
+
+- Migración no destructiva `inventory_movements.unit_cost_cents` con disparador para registrar el costo conocido de movimientos nuevos.
+- Historial y exportaciones CSV/PDF con valores de entradas, salidas y cobertura de costos, distinguiendo movimientos no valorados.
+- Pruebas de regresión específicas de la captura histórica y protección de datos antiguos.
+
+## 0.6.52 — CSV compatible con Excel Windows
 - Exportaciones CSV en UTF-16 LE con BOM, manteniendo el separador regional `;`.
 - Retirada la exportación .xlsx; se conservan CSV y PDF.
 - Importación de catálogo compatible con UTF-16 LE, UTF-8 BOM y Windows-1252 antiguo.
