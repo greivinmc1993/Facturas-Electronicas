@@ -190,10 +190,22 @@ export function registerAuth(app,getDb){
         if(!['company_admin','supervisor','cashier'].includes(role)||!db.prepare('SELECT id FROM companies WHERE id=?').get(companyId))throw Error('Empresa o rol inválidos.');
         if(!manages(a,companyId)||!a.user.is_owner&&role==='company_admin')return res.status(403).json({error:'No puedes asignar este rol o empresa.'});
       }
-      if(req.body?.isActive!==undefined){db.prepare('UPDATE access_users SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(req.body.isActive?1:0,id);for(const [key,s] of sessions)if(s.userId===id)sessions.delete(key);}
-      if(req.body?.password!==undefined){const hash=passwordHash(req.body.password);db.prepare("UPDATE access_users SET password_hash=?,password_change_required=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(hash,id);for(const [key,s] of sessions)if(s.userId===id)sessions.delete(key);}
-      if(req.body?.companyId!==undefined){const companyId=Number(req.body.companyId),role=String(req.body.role||'');db.prepare('INSERT INTO access_company_roles(user_id,company_id,role,assigned_by) VALUES(?,?,?,?) ON CONFLICT(user_id,company_id) DO UPDATE SET role=excluded.role,assigned_by=excluded.assigned_by').run(id,companyId,role,a.user.id);for(const [key,s] of sessions)if(s.userId===id)sessions.delete(key);}
-      audit(a.user.id,'users.update','user',id);res.json({ok:true});
+      // Validar antes de escribir y confirmar todos los cambios juntos.
+      // Un error no debe suspender una cuenta a medias ni dejar roles inconsistentes.
+      const hash=req.body?.password!==undefined?passwordHash(req.body.password):null;
+      const isActive=req.body?.isActive;
+      const assignment=req.body?.companyId!==undefined?
+        {companyId:Number(req.body.companyId),role:String(req.body.role||'')}:null;
+      db.transaction(()=>{
+        if(isActive!==undefined)db.prepare('UPDATE access_users SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(isActive?1:0,id);
+        if(hash!==null)db.prepare("UPDATE access_users SET password_hash=?,password_change_required=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(hash,id);
+        if(assignment)db.prepare('INSERT INTO access_company_roles(user_id,company_id,role,assigned_by) VALUES(?,?,?,?) ON CONFLICT(user_id,company_id) DO UPDATE SET role=excluded.role,assigned_by=excluded.assigned_by').run(id,assignment.companyId,assignment.role,a.user.id);
+        audit(a.user.id,'users.update','user',id);
+      })();
+      if(isActive!==undefined||hash!==null||assignment){
+        for(const [key,s] of sessions)if(s.userId===id)sessions.delete(key);
+      }
+      res.json({ok:true});
     }catch(e){res.status(400).json({error:e.message});}
   });
   app.delete('/api/auth/users/:userId/companies/:companyId',localOriginOnly,(req,res)=>{
@@ -213,7 +225,17 @@ export function registerAuth(app,getDb){
     const a=auth(req,res);if(!a)return;
     const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
     if(!verifyPassword(req.body?.oldPassword,row.password_hash))return res.status(403).json({error:'Contraseña actual incorrecta.'});
-    try{db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(passwordHash(req.body?.newPassword),a.user.id);audit(a.user.id,'auth.password_change','user',a.user.id);res.json({ok:true});}catch(e){res.status(400).json({error:e.message});}
+    try{
+      const newHash=passwordHash(req.body?.newPassword);
+      db.transaction(()=>{
+        db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(newHash,a.user.id);
+        audit(a.user.id,'auth.password_change','user',a.user.id);
+      })();
+      // Mantener solo la sesión que acredita la contraseña actual. Revocar otras
+      // sesiones evita que equipos antiguos sigan autorizados tras el cambio.
+      for(const [key,s] of sessions)if(s.userId===a.user.id&&key!==a.key)sessions.delete(key);
+      res.json({ok:true});
+    }catch(e){res.status(400).json({error:e.message});}
   });
   // Es obligatorio validar todas las rutas /api restantes en el SERVIDOR.
   // La política por roles y empresas se activará después, ANTES de crear usuarios subordinados.

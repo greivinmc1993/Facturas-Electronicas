@@ -1,3 +1,15 @@
+## 0.6.59 — Arranque empaquetado autenticado y seguridad de sesiones (2026-11-09)
+
+- Corrección del `qa:packaged` que exigía menú de empresas en una instalación nueva sin propietario: ahora valida pantalla de configuración protegida, rechazos 428/401, creación de cuenta temporal por API normal, inicio de sesión, menú comercial, preload y salud del servidor.
+- El QA de Electron usa directorio temporal aislado y contraseña aleatoria; no desactiva controles de seguridad. Guarda captura también ante fallos de arranque cuando es posible y la evidencia del workflow sigue disponible como artefacto.
+- Cambio de contraseña transaccional y con auditoría; revoca otras sesiones del mismo usuario para evitar accesos obsoletos.
+- Actualizaciones de usuarios (activación, contraseña temporal y asignaciones) se validan y confirman en una transacción SQLite; revocación de sesiones posterior a confirmación.
+- Nuevas pruebas de seguridad (10 verificaciones) y contrato del ejecutable (6 verificaciones); caso adicional HTTP real para invalidación de sesiones.
+- Actualizados scripts, versiones, README y prueba de actualización NSIS desde v0.6.34. Sin cambios en el esquema SQLite y sin usuarios ocultos.
+- **Límite:** el inicio real de Electron empaquetado, compilación Vite y NSIS deben verificarse en Windows/GitHub Actions; la existencia de QA estática no equivale a haber pasado esas ejecuciones.
+
+---
+
 ## 0.6.58 — Bloqueo global, aviso de guardado y sesión null
 
 - La pantalla de inicio y las transiciones de sesión toleran `state` o `user` nulos sin romper el render de React.

@@ -58,6 +58,27 @@ async function main(){
   const companies=await request('GET','/api/companies');
   assert.equal(companies.status,200,JSON.stringify(companies.body));
  });
+ await test('Cambiar contraseña por HTTP invalida sesiones antiguas y mantiene la actual',async()=>{
+  const second=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({username:'qa_propietario',password:'ClaveTemporalQA12345'})});
+  assert.equal(second.status,200);
+  const otherCookie=(second.headers.get('set-cookie')||'').split(';',1)[0];
+  assert.match(otherCookie,/^facturacr_session=/);
+  const changed=await request('POST','/api/auth/password-change',{
+    oldPassword:'ClaveTemporalQA12345',newPassword:'ClavePropietarioQA67890'
+  });
+  assert.equal(changed.status,200,JSON.stringify(changed.body));
+  const oldState=await fetch(base+'/api/auth/status',{headers:{cookie:otherCookie}}).then(r=>r.json());
+  assert.equal(oldState.authenticated,false);
+  const activeState=await request('GET','/api/auth/status');
+  assert.equal(activeState.body.authenticated,true);
+  const invalid=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({username:'qa_propietario',password:'ClaveTemporalQA12345'})});
+  assert.equal(invalid.status,401);
+  const valid=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({username:'qa_propietario',password:'ClavePropietarioQA67890'})});
+  assert.equal(valid.status,200);
+ });
  await test('SQLite nativo crea empresa y la recupera por HTTP',async()=>{
   const r=await request('POST','/api/companies',{legal_name:'Comercio temporal QA',identification:'123456789'});
   assert.equal(r.status,201,JSON.stringify(r.body));

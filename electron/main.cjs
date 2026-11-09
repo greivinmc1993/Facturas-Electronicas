@@ -1,6 +1,7 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell} = require('electron');
 const fs=require('node:fs/promises');
 const path = require('node:path');
+const {randomBytes}=require('node:crypto');
 let server;
 let mainWindow;
 const dev = process.argv.includes('--dev');
@@ -25,41 +26,88 @@ async function writeSmokeResult(result){
   await fs.writeFile(qaResultFile,JSON.stringify({...result,version:app.getVersion(),errors:qaErrors},null,2));
  }catch(error){console.error('No se pudo guardar evidencia QA:',error)}
 }
+// QA del ejecutable REAL: comprobar pantalla protegida primero y luego interfaz autorizada.
+// Nunca se inyecta una sesión ni se desactiva la autenticación: se usan los endpoints normales.
 async function runPackagedSmoke(){
- const maxAttempts=30;
- let dom;
- for(let attempt=0;attempt<maxAttempts;attempt++){
-  dom=await mainWindow.webContents.executeJavaScript(`(() => {
-    const root=document.getElementById('root');
-    const text=(root?.innerText||'').trim();
-    return {
-      title: document.title,
-      rootPresent:!!root,
-      visibleCharacters:text.length,
-      hasBrand: text.includes('Factura') || text.includes('CR'),
-      navButtons:document.querySelectorAll('aside nav button').length,
-      hasCompanyNavigation:Array.from(document.querySelectorAll('aside nav button')).some(b=>b.innerText.includes('Empresas')),
-      preloadPrinter:typeof window.facturacrPrinter?.list==='function',
-      preloadReports:typeof window.facturacrReports?.savePdf==='function',
-      preloadBackups:typeof window.facturacrBackups?.openFolder==='function'
-    };
-  })()`,true);
-  if(dom.rootPresent&&dom.visibleCharacters>100&&dom.navButtons>=4&&dom.hasCompanyNavigation)break;
-  await new Promise(resolve=>setTimeout(resolve,300));
+ const inspect=`(() => {
+   const root=document.getElementById('root');
+   const text=(root?.innerText||'').trim();
+   const nav=Array.from(document.querySelectorAll('aside nav button'));
+   return {
+     title:document.title,rootPresent:!!root,visibleCharacters:text.length,
+     hasBrand:text.includes('FacturaCR')||text.includes('FACTURACR'),
+     authHeading:document.querySelector('.authPanel h1')?.innerText||'',
+     authFormVisible:!!document.querySelector('.authPanel form'),
+     navButtons:nav.length,
+     hasCompanyNavigation:nav.some(b=>b.innerText.includes('Empresas')),
+     preloadPrinter:typeof window.facturacrPrinter?.list==='function',
+     preloadReports:typeof window.facturacrReports?.savePdf==='function',
+     preloadBackups:typeof window.facturacrBackups?.openFolder==='function'
+   };
+ })()`;
+ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ async function waitFor(predicate,description){
+   let dom;
+   for(let i=0;i<50;i++){
+     dom=await mainWindow.webContents.executeJavaScript(inspect,true);
+     if(predicate(dom))return dom;
+     await pause(250);
+   }
+   throw Error(description+': '+JSON.stringify(dom));
  }
- if(!dom?.rootPresent||dom.visibleCharacters<=100||dom.navButtons<4||!dom.hasCompanyNavigation||!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups){
-   throw Error('La interfaz empaquetada no está lista o el preload no funciona: '+JSON.stringify(dom));
- }
- const health=await mainWindow.webContents.executeJavaScript(`fetch('/api/health').then(async r => ({status:r.status,body:await r.json()}))`,true);
- if(health.status!==200||health.body?.ok!==true||health.body.version!==app.getVersion()){
+ const request=async(method,url,body)=>mainWindow.webContents.executeJavaScript(`(async()=>{
+   const r=await fetch(${JSON.stringify(url)},{method:${JSON.stringify(method)},
+     credentials:'same-origin',headers:{'Content-Type':'application/json'},
+     ${body===undefined?'':`body:${JSON.stringify(JSON.stringify(body))},`}
+     cache:'no-store'});
+   return {status:r.status,body:await r.json()};
+ })()`,true);
+ const initial=await waitFor(d=>d.authHeading==='Configurar propietario'&&d.authFormVisible,
+   'No apareció el formulario seguro de configuración inicial');
+ if(initial.navButtons!==0)throw Error('El menú comercial no debe verse antes del acceso.');
+ if(!initial.preloadPrinter||!initial.preloadReports||!initial.preloadBackups)
+   throw Error('El preload de Electron no está disponible en el inicio protegido: '+JSON.stringify(initial));
+ const firstStatus=await request('GET','/api/auth/status');
+ if(firstStatus.status!==200||firstStatus.body.setupRequired!==true||firstStatus.body.authenticated!==false)
+   throw Error('Estado inicial de seguridad incorrecto: '+JSON.stringify(firstStatus));
+ const beforeSetup=await request('GET','/api/companies');
+ if(beforeSetup.status!==428||beforeSetup.body.code!=='OWNER_SETUP_REQUIRED')
+   throw Error('La API debe bloquear operaciones hasta crear propietario: '+JSON.stringify(beforeSetup));
+ // Cuenta temporal ALEATORIA, creada solo en --qa-data-dir y eliminada al terminar.
+ const owner={username:'qa_propietario',displayName:'Propietario temporal de QA',
+   password:'QaSeguro1234'+randomBytes(20).toString('hex')};
+ const setup=await request('POST','/api/auth/setup',owner);
+ if(setup.status!==201||setup.body.ok!==true)
+   throw Error('Configuración inicial del propietario falló: '+JSON.stringify(setup));
+ const beforeLogin=await request('GET','/api/companies');
+ if(beforeLogin.status!==401||beforeLogin.body.code!=='AUTH_REQUIRED')
+   throw Error('La API debe seguir protegida sin iniciar sesión: '+JSON.stringify(beforeLogin));
+ const login=await request('POST','/api/auth/login',{username:owner.username,password:owner.password});
+ if(login.status!==200||login.body.user?.isOwner!==true)
+   throw Error('No se pudo autenticar al propietario de QA: '+JSON.stringify(login));
+ // La cookie HttpOnly se establece normalmente por HTTP; nunca llega al reporte.
+ await mainWindow.loadURL(`http://127.0.0.1:${server.port}/`);
+ const dom=await waitFor(d=>d.rootPresent&&d.visibleCharacters>100&&d.navButtons>=4&&d.hasCompanyNavigation,
+   'El menú comercial no apareció después de autenticarse');
+ if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups)
+   throw Error('La interfaz autenticada perdió las APIs preload: '+JSON.stringify(dom));
+ const status=await request('GET','/api/auth/status');
+ if(status.status!==200||status.body.authenticated!==true||status.body.user?.isOwner!==true)
+   throw Error('La sesión autenticada no se restauró tras recargar: '+JSON.stringify(status));
+ const companyResponse=await request('GET','/api/companies');
+ if(companyResponse.status!==200||!Array.isArray(companyResponse.body))
+   throw Error('API comercial del propietario no respondió: '+JSON.stringify(companyResponse));
+ const health=await request('GET','/api/health');
+ if(health.status!==200||health.body?.ok!==true||health.body.version!==app.getVersion())
    throw Error('Servidor interno no respondió correctamente: '+JSON.stringify(health));
- }
  const shot=qaArg('--qa-screenshot');
  if(shot&&path.isAbsolute(shot)){
    await fs.mkdir(path.dirname(shot),{recursive:true});
    await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
  }
- return {success:true,dom,health:health.body,screenshot:shot||null};
+ return {success:true,dom,health:health.body,
+   security:{initialOwnerSetup:true,blockedBeforeSetup:true,blockedBeforeLogin:true,
+     authenticatedOwner:true,commercialScreenAfterLogin:true},screenshot:shot||null};
 }
 
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
@@ -135,7 +183,14 @@ app.whenReady().then(async () => {
     }
   } catch(err) {
     console.error('No se pudo iniciar FacturaCR:',err);
-    if(qaSmoke){await writeSmokeResult({success:false,error:String(err.stack||err)});process.exitCode=1}
+    if(qaSmoke){
+      const shot=qaArg('--qa-screenshot');
+      if(shot&&path.isAbsolute(shot)&&mainWindow&&!mainWindow.isDestroyed())try{
+        await fs.mkdir(path.dirname(shot),{recursive:true});
+        await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
+      }catch(e){qaErrors.push('Captura de fallo: '+e.message)}
+      await writeSmokeResult({success:false,error:String(err.stack||err)});process.exitCode=1
+    }
     app.quit();
   }
 });

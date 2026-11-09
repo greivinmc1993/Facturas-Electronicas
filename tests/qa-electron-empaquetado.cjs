@@ -34,10 +34,11 @@ async function main(){
   assert.ok(report.dom.visibleCharacters>100);
   assert.ok(report.dom.navButtons>=4);
   assert.ok(report.dom.preloadReports && report.dom.preloadPrinter && report.dom.preloadBackups);
+  assert.deepEqual(report.security,{initialOwnerSetup:true,blockedBeforeSetup:true,blockedBeforeLogin:true,authenticatedOwner:true,commercialScreenAfterLogin:true});
   fs.mkdirSync(evidence,{recursive:true});
   fs.copyFileSync(result,path.join(evidence,'smoke-result.json'));
   if(fs.existsSync(screenshot))fs.copyFileSync(screenshot,path.join(evidence,'smoke-pantalla.png'));
-  console.log('QA empaquetado OK: interfaz, API local, preload y captura de pantalla.');
+  console.log('QA empaquetado OK: pantalla protegida, propietario de QA, login, menú, API y preload.');
   await Promise.race([exitPromise,pause(8000)]);
 } 
 main().catch(error=>{

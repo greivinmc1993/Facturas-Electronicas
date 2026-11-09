@@ -1,3 +1,33 @@
+# FacturaCR v0.6.59 — Seguridad de sesiones y QA del ejecutable empaquetado
+
+**Versión vigente: 0.6.59 (9 de noviembre de 2026).** Esta actualización parte de v0.6.58 y conserva módulos comerciales, base SQLite e instalador NSIS.
+
+## Qué cambia en v0.6.59
+
+- **Corrección del fallo `qa:packaged` en GitHub Actions:** el ejecutable arranca con una base de prueba aislada, por lo que es normal que aparezca primero **Configurar propietario**, sin barra lateral. El QA ahora verifica esa pantalla protegida y los rechazos HTTP **428** antes de la configuración y **401** antes del inicio de sesión. Después crea un propietario aleatorio exclusivamente en esa base temporal, inicia sesión usando las rutas reales y comprueba que aparezca el menú comercial, que el preload de Electron funcione y que responda `/api/health`.
+- **Sin puertas traseras:** ninguna ruta se abre por ser un QA. La contraseña de prueba es aleatoria, no se registra en logs ni en los resultados y el directorio temporal se elimina al terminar. Los fallos capturan evidencia visual cuando es posible.
+- **Cambios de contraseña más seguros:** las demás sesiones abiertas del mismo usuario se revocan; la sesión que acaba de acreditar la contraseña anterior permanece activa. Suspender una cuenta o cambiar su contraseña temporal sigue invalidando sus sesiones.
+- **Gestión atómica de cuentas:** contraseña, activación y asignación a empresas se validan antes de escribir y se confirman mediante una transacción SQLite con auditoría; si una actualización falla, no debe dejar la cuenta modificada parcialmente.
+- **Recuperación administrada para personal:** se mantiene el restablecimiento mediante cuentas autorizadas (propietario/administrador según alcance), que impone el cambio de clave temporal al ingresar. **No existe recuperación desatendida del propietario**: no se añadió una clave maestra ni un acceso oculto. Proteger las credenciales y los respaldos sigue siendo indispensable.
+- **QA:** nuevas pruebas `qa-seguridad-sesiones.cjs` (sesiones, revocaciones, transacciones) y `qa-empaquetado-seguridad.cjs` (contrato del arranque Windows). La prueba `qa-servidor-real.cjs` también comprueba cambio de contraseña y cierre de sesiones antiguas contra HTTP/SQLite reales, al ejecutarse con dependencias instaladas.
+
+## Comprobación y publicación
+
+```bash
+npm ci
+npm test
+npm run qa:real-server
+npm run build
+npm run dist:win
+npm run qa:packaged
+```
+
+`qa:packaged` requiere **Windows** y el ejecutable generado en `release/win-unpacked/FacturaCR.exe`; GitHub Actions lo ejecuta automáticamente después del empaquetado. Las verificaciones de instalador y migración 0.6.34 → 0.6.59 se mantienen en `.github/workflows/windows-installer.yml`. Cuando una prueba no haya sido ejecutada en Windows no debe indicarse como aprobada.
+
+**Actualización segura:** realiza un respaldo SQLite, confirma que el propietario conoce su clave, instala la versión nueva y revisa carritos pendientes antes de continuar operaciones. No se modificó el esquema de SQLite.
+
+---
+
 # FacturaCR v0.6.58 — Seguridad y bloqueo para todos los usuarios
 
 - El tiempo de inactividad es **global**, puede configurarlo cualquier usuario autenticado (propietario, administrador, supervisor y cajero) y se aplica a todas las sesiones. Opciones: 5, 15, 30, 60 minutos o desactivado.
