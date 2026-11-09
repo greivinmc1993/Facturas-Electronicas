@@ -16,16 +16,47 @@ async function main(){
  const {startServer}=await import(pathToFileURL(path.join(root,'server/index.js')).href);
  server=await startServer({dataDir:dir,port:0});
  const base=`http://127.0.0.1:${server.port}`;
+ // El servidor real exige crear el propietario e iniciar sesión ANTES de
+ // permitir operaciones comerciales; la cookie es efímera, solo para este QA.
+ let sessionCookie='';
+ const authorizedHeaders=()=>sessionCookie?{cookie:sessionCookie}:{};
  const request=async(method,url,body)=>{
-  const options={method,headers:{}};
+  const options={method,headers:authorizedHeaders()};
   if(body!==undefined){options.headers['content-type']='application/json';options.body=JSON.stringify(body)}
   const res=await fetch(base+url,options);
-  return {status:res.status,body:await res.json()};
+  return {status:res.status,body:await res.json(),headers:res.headers};
  };
  await test('HTTP health responde versión actual',async()=>{
   const r=await request('GET','/api/health');
   const expected=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version;
   assert.equal(r.status,200);assert.equal(r.body.version,expected);assert.equal(r.body.ok,true);
+ });
+ await test('Sin propietario, la API comercial exige configuración inicial',async()=>{
+  const r=await request('GET','/api/companies');
+  assert.equal(r.status,428);assert.equal(r.body.code,'OWNER_SETUP_REQUIRED');
+ });
+ await test('Cuenta propietaria temporal creada solo para esta prueba',async()=>{
+  const r=await request('POST','/api/auth/setup',{
+   username:'qa_propietario',displayName:'Propietario de QA',password:'ClaveTemporalQA12345'
+  });
+  assert.equal(r.status,201,JSON.stringify(r.body));
+  const state=await request('GET','/api/auth/status');
+  assert.equal(state.status,200);assert.equal(state.body.setupRequired,false);
+ });
+ await test('Sin cookie, el acceso a operaciones comerciales está protegido',async()=>{
+  const r=await request('GET','/api/companies');
+  assert.equal(r.status,401);assert.equal(r.body.code,'AUTH_REQUIRED');
+ });
+ await test('Login real devuelve cookie HttpOnly de propietario y habilita API',async()=>{
+  const r=await request('POST','/api/auth/login',{username:'qa_propietario',password:'ClaveTemporalQA12345'});
+  assert.equal(r.status,200,JSON.stringify(r.body));
+  assert.equal(r.body.user.isOwner,true);
+  const setCookie=r.headers.get('set-cookie')||'';
+  assert.match(setCookie,/^facturacr_session=[a-f0-9]{64};/);
+  assert.match(setCookie,/HttpOnly/);assert.match(setCookie,/SameSite=Strict/);
+  sessionCookie=setCookie.split(';',1)[0];
+  const companies=await request('GET','/api/companies');
+  assert.equal(companies.status,200,JSON.stringify(companies.body));
  });
  await test('SQLite nativo crea empresa y la recupera por HTTP',async()=>{
   const r=await request('POST','/api/companies',{legal_name:'Comercio temporal QA',identification:'123456789'});
@@ -51,7 +82,7 @@ async function main(){
   finally{db.close()}
  });
  await test('Respaldo descargable es SQLite íntegro y contiene la empresa',async()=>{
-  const response=await fetch(base+'/api/backups/download');
+  const response=await fetch(base+'/api/backups/download',{headers:authorizedHeaders()});
   assert.equal(response.status,200);
   const bytes=Buffer.from(await response.arrayBuffer());
   assert.equal(bytes.subarray(0,16).toString('ascii'),'SQLite format 3\0');
@@ -80,7 +111,7 @@ async function main(){
  await test('Inspección previa acepta copia SQLite válida sin reemplazar los datos',async()=>{
   const backupPath=path.join(dir,'qa-backup-descargado.sqlite');
   const bytes=fs.readFileSync(backupPath);
-  const response=await fetch(base+'/api/backups/inspect',{method:'POST',headers:{'content-type':'application/octet-stream','content-length':String(bytes.length)},body:bytes});
+  const response=await fetch(base+'/api/backups/inspect',{method:'POST',headers:{...authorizedHeaders(),'content-type':'application/octet-stream','content-length':String(bytes.length)},body:bytes});
   const result=await response.json();
   assert.equal(response.status,200,JSON.stringify(result));
   assert.equal(result.compatible,true);
@@ -92,7 +123,7 @@ async function main(){
  });
  await test('Inspección rechaza archivo inválido sin eliminar las empresas',async()=>{
   const bytes=Buffer.alloc(2048,0x42);
-  const response=await fetch(base+'/api/backups/inspect',{method:'POST',headers:{'content-type':'application/octet-stream','content-length':String(bytes.length)},body:bytes});
+  const response=await fetch(base+'/api/backups/inspect',{method:'POST',headers:{...authorizedHeaders(),'content-type':'application/octet-stream','content-length':String(bytes.length)},body:bytes});
   assert.equal(response.status,400);
   const after=await request('GET','/api/companies');
   assert.equal(after.body.length,1);
@@ -104,7 +135,7 @@ async function main(){
  await test('Restauración inválida se rechaza sin alterar los datos',async()=>{
   const before=fs.statSync(path.join(dir,'facturacr.sqlite')).size;
   const invalid=Buffer.alloc(1024,0x41);
-  const response=await fetch(base+'/api/backups/restore',{method:'POST',headers:{'content-type':'application/octet-stream','content-length':String(invalid.length)},body:invalid});
+  const response=await fetch(base+'/api/backups/restore',{method:'POST',headers:{...authorizedHeaders(),'content-type':'application/octet-stream','content-length':String(invalid.length)},body:invalid});
   assert.equal(response.status,400);
   const r=await request('GET','/api/companies');
   assert.equal(r.status,200);assert.equal(r.body.length,1);
@@ -171,10 +202,10 @@ async function main(){
  await test('Dashboard avanzado exporta CSV completo y HTML imprimible',async()=>{
   const endpoint='/api/companies/1/dashboard/';
   const query='from=2026-03-01&to=2026-03-31&kind=detallado';
-  let response=await fetch(`${base}${endpoint}export.csv?${query}`);
+  let response=await fetch(`${base}${endpoint}export.csv?${query}`,{headers:authorizedHeaders()});
   assert.equal(response.status,200);const csvBytes=Buffer.from(await response.arrayBuffer());const csv=csvBytes[0]===255&&csvBytes[1]===254?csvBytes.subarray(2).toString('utf16le'):csvBytes.toString('utf8');
   assert.ok(csv.includes('Número venta'));assert.ok(csv.includes('Servicio QA'));
-  response=await fetch(`${base}${endpoint}export.html?${query}`);
+  response=await fetch(`${base}${endpoint}export.html?${query}`,{headers:authorizedHeaders()});
   assert.equal(response.status,200);const html=await response.text();
   assert.ok(html.includes('Detalle completo de ventas filtradas'));assert.ok(html.includes('Servicio QA')===false||html.includes('Reporte comercial'));
  });

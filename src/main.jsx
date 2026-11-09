@@ -1023,7 +1023,7 @@ function SecureApp(){
    const timer=setInterval(monitor,3000);
    return()=>{clearInterval(timer);for(const event of ['pointerdown','keydown','wheel','touchstart'])window.removeEventListener(event,onActivity)};
  },[hasSession,locked,savedMinutes]);
- // Cuando el propietario cambia el tiempo, las otras sesiones lo adoptan sin reiniciar.
+ // Cuando cualquier usuario cambia el tiempo global, las otras sesiones lo adoptan sin reiniciar.
  useEffect(()=>{
   if(!hasSession||locked)return;
   let cancelled=false;
@@ -1056,7 +1056,7 @@ function SecureApp(){
  };
  const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setState(null);await reload();}};
  const saveMinutes=async()=>{
-  if(!sessionUser?.isOwner||settingsBusy)return;
+  if(!hasSession||sessionUser?.passwordChangeRequired||settingsBusy)return;
   setSettingsBusy(true);setSettingsFeedback(null);
   try{
    const saved=await api('/api/auth/settings',{method:'PUT',body:JSON.stringify({idle_lock_minutes:Number(minutes)})});
@@ -1073,8 +1073,34 @@ function SecureApp(){
  };
  const needsGate=!state||!!state.setupRequired||!hasSession||locked||!!sessionUser?.passwordChangeRequired;
  return <div className="secureRoot">
-  {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button>{sessionUser.isOwner&&<button type="button" onClick={()=>{setMinutes(savedMinutes);setSettingsFeedback(null);setSecuritySettingsOpen(v=>!v);setAccountMenuOpen(false)}}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button>}<button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
-  {hasSession&&securitySettingsOpen&&sessionUser.isOwner&&<section className="securitySettingsPanel" aria-label="Seguridad y bloqueo"><div><strong><UiIcon name="clock" size={17}/> Bloqueo automático para todos</strong><p>El propietario elige el mismo tiempo de inactividad para todos los usuarios. Cada usuario puede bloquear su propia sesión en cualquier momento.</p></div><label>Tiempo para todos los usuarios <select aria-label="Tiempo de bloqueo de sesión para todos los usuarios" value={minutes} disabled={settingsBusy} onChange={e=>{setMinutes(Number(e.target.value));setSettingsFeedback(null)}}>{[5,15,30,60,0].map(n=><option key={n} value={n}>{n?n+' minutos':'Desactivado (no recomendado)'}</option>)}</select></label><button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button><button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false)}} disabled={settingsBusy}>Cerrar</button>{minutes!==savedMinutes&&<small className="securityPending">Hay cambios sin guardar.</small>}</section>}
+  {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button><button type="button" onClick={()=>{setMinutes(savedMinutes);setSettingsFeedback(null);setSecuritySettingsOpen(v=>!v);setAccountMenuOpen(false)}}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button><button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
+  {hasSession&&securitySettingsOpen&&!sessionUser.passwordChangeRequired&&(
+   <section className="securitySettingsPanel" aria-label="Seguridad y bloqueo">
+    <div className="securitySettingsInner">
+     <div className="securitySettingsIntro">
+      <span className="securitySettingsIcon" aria-hidden="true"><UiIcon name="clock" size={20}/></span>
+      <div className="securitySettingsCopy">
+       <strong>Bloqueo automático para todos</strong>
+       <p>Todos los usuarios pueden modificar el tiempo de inactividad. El cambio se aplica a todas las sesiones y queda registrado.</p>
+       <small className={minutes!==savedMinutes?'securityPending':'securityCurrent'} role="status">
+        {minutes!==savedMinutes?'Hay cambios sin guardar.':`Tiempo actual: ${savedMinutes?savedMinutes+' minutos':'desactivado'}.`}
+       </small>
+      </div>
+     </div>
+     <div className="securitySettingsControls">
+      <label htmlFor="global-idle-lock-minutes">Tiempo para todos los usuarios
+       <select id="global-idle-lock-minutes" aria-label="Tiempo de bloqueo de sesión para todos los usuarios" value={minutes} disabled={settingsBusy} onChange={e=>{setMinutes(Number(e.target.value));setSettingsFeedback(null)}}>
+        {[5,15,30,60,0].map(n=><option key={n} value={n}>{n?n+' minutos':'Desactivado (no recomendado)'}</option>)}
+       </select>
+      </label>
+      <div className="securitySettingsActions">
+       <button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button>
+       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false)}} disabled={settingsBusy}>Cerrar</button>
+      </div>
+     </div>
+    </div>
+   </section>
+  )}
    {settingsFeedback&&<div className={'securitySaveToast '+(settingsFeedback.type==='error'?'securitySaveToastError':'securitySaveToastSuccess')} role={settingsFeedback.type==='error'?'alert':'status'} aria-live={settingsFeedback.type==='error'?'assertive':'polite'}><UiIcon name={settingsFeedback.type==='error'?'close':'check'} size={18}/><span>{settingsFeedback.message}</span><button type="button" onClick={()=>setSettingsFeedback(null)} aria-label="Cerrar notificación"><UiIcon name="close" size={15}/></button></div>}
   {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser}/></div>}
   {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>

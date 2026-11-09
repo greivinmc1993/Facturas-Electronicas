@@ -137,10 +137,17 @@ export function registerAuth(app,getDb){
   app.get('/api/auth/settings',(req,res)=>{const a=auth(req,res);if(!a?.session)return;res.json(settings());});
   app.put('/api/auth/settings',localOriginOnly,(req,res)=>{
     const a=auth(req,res);if(!a?.session)return;
-    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario puede configurar la seguridad.'});
-    const minutes=Number(req.body?.idle_lock_minutes);
+    // La política de inactividad es compartida: todos los usuarios autenticados
+    // pueden modificarla, pero primero deben cambiar su contraseña temporal.
+    if(a.user.password_change_required)return res.status(403).json({error:'Cambia primero tu contraseña temporal.'});
+    const minutes=req.body?.idle_lock_minutes;
     if(!isValidIdleLockMinutes(minutes))return res.status(400).json({error:'Tiempo de bloqueo inválido.'});
-    db.prepare('UPDATE access_security_settings SET idle_lock_minutes=?,updated_at=CURRENT_TIMESTAMP WHERE id=1').run(minutes);
+    db.transaction(()=>{
+      const previous=settings().idle_lock_minutes;
+      if(previous===minutes)return;
+      db.prepare('UPDATE access_security_settings SET idle_lock_minutes=?,updated_at=CURRENT_TIMESTAMP WHERE id=1').run(minutes);
+      audit(a.user.id,'security.idle_lock_changed','security_settings',`${previous}->${minutes}`);
+    })();
     res.json(settings());
   });
   // Gestión delegada: administrador de empresa solo gestiona personal subordinado en sus empresas.

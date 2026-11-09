@@ -1,9 +1,11 @@
 ## 0.6.58 — Bloqueo global, aviso de guardado y sesión null
 
 - La pantalla de inicio y las transiciones de sesión toleran `state` o `user` nulos sin romper el render de React.
-- El propietario mantiene el selector de inactividad para todos los usuarios (5, 15, 30, 60 minutos y desactivado).
+- El selector de inactividad para todos los usuarios (5, 15, 30, 60 minutos y desactivado) ahora puede ser modificado por el propietario, administradores de empresa, supervisores y cajeros autenticados; su efecto es **global** y las sesiones abiertas lo sincronizan. Se registran los cambios de política en auditoría y se exige haber cambiado la contraseña temporal.
 - Se informa mediante notificación visible, con estado de éxito/error verificado por API, al guardar la configuración.
-- Se incorpora QA automatizada de permisos del cambio, persistencia global y render nulo.
+- Se reorganizó el panel de seguridad con diseño simétrico y adaptable: texto e indicador de tiempo guardado, selector de minutos, botones alineados y aviso de cambios pendientes. Se actualizó la leyenda para reflejar que todos los roles pueden cambiar el tiempo global.
+- QA HTTP nativo corregido: `qa-servidor-real.cjs` realiza bootstrap de propietario y login temporal antes de consultar rutas protegidas, preserva la autenticación por cookie HttpOnly en descargas y pruebas de API, y comprueba los rechazos 428/401 cuando corresponde. Se evitan usuarios o bases de datos de prueba permanentes.
+- Se incorpora QA automatizada de edición por los cuatro roles, persistencia global, auditoría, contraseñas temporales y render nulo.
 
 ---
 
