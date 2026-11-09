@@ -1,12 +1,12 @@
-// v0.6.56: preparación de autenticación SIN activar controles de acceso.
+// v0.6.57: usuarios por empresa, borradores de venta y controles de acceso.
 // No crea credenciales ni rutas administrativas sin autenticación.
 // Una cuenta propietaria pertenece a la instalación, no al desarrollador.
 export const DEFAULT_IDLE_LOCK_MINUTES = 15;
 export const ACCESS_ROLES = Object.freeze(['owner', 'company_admin', 'supervisor', 'cashier']);
 export const ACCESS_PERMISSIONS = Object.freeze([
   'sales.create','sales.read_all','sales.void','sales.payments.create',
-  'clients.manage','quotations.manage','quotations.delete',
-  'inventory.read','inventory.manage','inventory.adjust','inventory.costs.read','inventory.kardex.read',
+  'clients.manage','clients.delete','quotations.manage','quotations.delete',
+  'inventory.read','inventory.manage','inventory.delete','inventory.adjust','inventory.costs.read','inventory.kardex.read',
   'cash.open','cash.close_own','cash.expenses.create','cash.read_all','cash.reopen',
   'reports.operational','reports.financial','users.manage_company',
   'companies.manage_all','users.manage_all','permissions.manage_all',
@@ -93,5 +93,12 @@ export function ensureAccessSchema(db){
   );
   CREATE INDEX IF NOT EXISTS idx_access_audit_company_date ON access_audit_log(company_id,occurred_at);
   CREATE INDEX IF NOT EXISTS idx_access_audit_user_date ON access_audit_log(user_id,occurred_at);
+  CREATE TABLE IF NOT EXISTS sale_drafts (
+    user_id INTEGER NOT NULL REFERENCES access_users(id) ON DELETE CASCADE,
+    company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    draft_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id,company_id)
+  );
   INSERT OR IGNORE INTO access_security_settings(id,idle_lock_minutes,preserve_draft_on_lock) VALUES(1,15,1);`);
 }

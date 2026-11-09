@@ -23,5 +23,5 @@ check('CSV resumen y PDF incluyen tabla de márgenes',()=>{
  assert.ok(backend.includes('Rentabilidad por artículo'));
  assert.ok(backend.includes('Rentabilidad por producto (solo costos históricos)'));
 });
-check('Versión actualizada',()=>assert.equal(pkg.version,'0.6.56'));
+check('Versión actualizada',()=>assert.equal(pkg.version,'0.6.57'));
 console.log(`QA rentabilidad: ${checks}/${checks}`);

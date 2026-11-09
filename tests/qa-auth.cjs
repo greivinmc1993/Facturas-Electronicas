@@ -12,7 +12,7 @@ const path=require('node:path');
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON; CREATE TABLE companies(id INTEGER PRIMARY KEY);');ensureAccessSchema(db);
  db.transaction=fn=>()=>{db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r}catch(e){db.exec('ROLLBACK');throw e}};
  const routes=[],middleware=[];
- const app={get(p,...handlers){routes.push(['GET',p,handlers])},post(p,...handlers){routes.push(['POST',p,handlers])},put(p,...handlers){routes.push(['PUT',p,handlers])},use(p,cb){middleware.push([p,cb])}};
+ const app={get(p,...handlers){routes.push(['GET',p,handlers])},post(p,...handlers){routes.push(['POST',p,handlers])},put(p,...handlers){routes.push(['PUT',p,handlers])},delete(p,...handlers){routes.push(['DELETE',p,handlers])},use(p,cb){middleware.push([p,cb])}};
  const auth=registerAuth(app,()=>db);
  const call=(method,url,body={},cookie='',origin='http://127.0.0.1:3001')=>{
   const r=routes.find(x=>x[0]===method&&x[1]===url);assert.ok(r,url);

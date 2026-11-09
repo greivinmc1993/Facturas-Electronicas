@@ -18,7 +18,7 @@ const checks=[
  ['Validación de descuento alto en interfaz',()=>assert.ok(ui.includes('discountInvalid&&<p className="posDiscountError"'))],
  ['Validación de descuento negativo en API',()=>assert.ok(server.includes('requestedDiscount<0'))],
  ['Precio de carrito con IVA',()=>assert.ok(ui.includes('priceWithTaxCents(l)')&&ui.includes('Con IVA · antes de descuentos'))],
- ['Versión 0.6.56 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.56');assert.equal(l.version,'0.6.56');assert.equal(l.packages[''].version,'0.6.56')}],
+ ['Versión 0.6.57 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.57');assert.equal(l.version,'0.6.57');assert.equal(l.packages[''].version,'0.6.57')}],
 ];
 let pass=0;for(const [label,check]of checks){try{check();pass++;console.log('PASS',label)}catch(err){console.error('FAIL',label,err.message);process.exitCode=1}}
 console.log(`Resultado: ${pass}/${checks.length} pruebas estáticas`);

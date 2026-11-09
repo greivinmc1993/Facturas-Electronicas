@@ -1,3 +1,4 @@
+import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -212,6 +213,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   app.disable('x-powered-by');
   app.use(express.json({limit:'2mb'}));
   const authentication=registerAuth(app,()=>db);
+  registerSaleDraftRoutes(app,()=>db);
   // Limpieza tolerante a archivos temporalmente bloqueados en Windows.
   // Nunca permitir que una excepción en callbacks de descarga termine Electron.
   async function cleanTempDir(dir) {
@@ -433,7 +435,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     }finally{await cleanTempDir(dir)}
   });
   const companyColors=['#2563eb','#0891b2','#0f766e','#7c3aed','#d97706','#dc5265'];
-  app.get('/api/companies', (_req,res) => res.json(db.prepare('SELECT id,legal_name,identification,trade_name,phone,email,address,website,social,avatar_color FROM companies ORDER BY id DESC').all()));
+  app.get('/api/companies', (req,res) => {const rows=db.prepare('SELECT id,legal_name,identification,trade_name,phone,email,address,website,social,avatar_color FROM companies ORDER BY id DESC').all();res.json(req.authUser.is_owner?rows:rows.filter(c=>!!db.prepare('SELECT 1 FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser.id,c.id)))});
   app.post('/api/companies',(req,res)=>{
     const legal_name = String(req.body?.legal_name ?? '').trim();
     const identification = String(req.body?.identification ?? '').trim();
@@ -679,7 +681,10 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     app.get(prefix, (req,res) => {
       const id = company(req);
       if (!id) return res.status(404).json({error:'Empresa no encontrada.'});
-      res.json(db.prepare(`SELECT * FROM ${table} WHERE company_id=? ${table==='products'?'AND is_deleted=0':''} ORDER BY id DESC`).all(id));
+      const rows=db.prepare(`SELECT * FROM ${table} WHERE company_id=? ${table==='products'?'AND is_deleted=0':''} ORDER BY id DESC`).all(id);
+      // El cajero ve el precio de venta, nunca el costo de compra ni notas internas.
+      const cashier=table==='products'&&!req.authUser?.is_owner&&db.prepare('SELECT role FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser.id,id)?.role==='cashier';
+      res.json(cashier?rows.map(({cost,notes,...product})=>product):rows);
     });
     app.post(prefix, (req,res) => {
       const id = company(req);
@@ -1128,6 +1133,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
         }
         const addPayment=db.prepare('INSERT INTO sale_payments(sale_id,method,amount_cents) VALUES (?,?,?)');
         for(const pay of payments)addPayment.run(id,pay.method,pay.amount);
+        // Una venta confirmada elimina su borrador en la misma transacción.
+        if(req.authUser?.id)db.prepare('DELETE FROM sale_drafts WHERE user_id=? AND company_id=?').run(req.authUser.id,companyId);
         return {id,total_cents:total,balance_cents:total-paid};
       })();
       res.status(201).json(result);

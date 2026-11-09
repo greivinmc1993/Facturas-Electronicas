@@ -23,7 +23,7 @@ check('Se limpia el carrito después de guardar, antes de imprimir',()=>{
  assert.ok(segment.indexOf('setCart([])')<segment.indexOf('if(ticketSettings.autoPrint)'));
 });
 check('Botones inhabilitados mientras se registra',()=>{
- assert.ok(source.includes('disabled={operationBusy||!cart.length'));
+ assert.ok(source.includes('disabled={draftReadyCompany!==companyId||operationBusy||!cart.length'));
  assert.ok(source.includes('disabled={operationBusy||!Number.isFinite(Number(abonoAmount))'));
  assert.ok(source.includes('disabled={operationBusy||annulReason.trim().length<5}'));
  assert.ok(source.includes('aria-busy={operationBusy}'));

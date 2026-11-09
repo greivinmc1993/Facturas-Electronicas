@@ -1,7 +1,21 @@
-# FacturaCR v0.6.56 — Base de usuarios, permisos y CSV para Excel
+# FacturaCR v0.6.57 — Usuarios por empresa, ventas recuperables y sesión profesional
 
 
-## Nuevo en v0.6.56 — Inicio de sesión y Caja CSV mejorada
+## Nuevo en v0.6.57 — Usuarios, control de caja y recuperación de carritos
+
+- **Usuarios reales por empresa:** el propietario puede crear administradores de empresa, supervisores y cajeros; asignar y retirar acceso por empresa, suspender o reactivar cuentas y restablecer contraseñas temporales. El administrador de empresa solo puede crear o administrar subordinados dentro de sus empresas y no puede crear otros administradores ni administrar al propietario. La contraseña temporal debe cambiarse antes de usar rutas comerciales.
+- **Controles en servidor con denegación predeterminada:** cada petición de un usuario no propietario se valida por empresa, método y permiso; operaciones sin autorización explícita se rechazan. El propietario puede configurar el intervalo de inactividad, mientras que cualquier usuario puede bloquear su propia pantalla. El bloqueo inmediato revoca la cookie de sesión en el servidor. El cierre de sesión desmonta la interfaz del usuario anterior.
+- **Sesión rediseñada:** barra con avatar e icono, identidad y estado de conexión; menú **Mi sesión → Bloquear ahora / Seguridad y bloqueo (propietario) / Cerrar sesión**. Configuración de 15 minutos predeterminados, con 5/15/30/60 o desactivado. Configuración delegada a propietario, no a cajeros.
+- **Borrador persistente por usuario y empresa en SQLite:** carrito, cantidades, cliente, tipo de venta, descuentos y pagos en preparación; restaurar o descartar al ingresar de nuevo tras cerrar el programa. Se guardan cambios secuencialmente en SQLite y se intenta guardar el último estado al cerrar la ventana. Una venta confirmada elimina su borrador en la misma transacción. La restauración reconstruye artículos según el catálogo vigente: hay que verificar precio, stock y pago antes de confirmar. Los borradores no mueven inventario ni cobran. Un apagón instantáneo podría perder el último cambio no escrito.
+- **Caja por cajero:** las sesiones nuevas guardan quién abrió el turno; un cajero solo ve y cierra su propia sesión. Supervisores y administradores conservan el acceso a reportes y gastos según sus permisos. Los cierres antiguos mantienen usuario no asignado, sin inventar identidades.
+- **Privacidad:** en el catálogo del cajero la API no devuelve costos de compra ni notas internas. Los usuarios sin permisos para respaldos y configuración no obtienen acceso por llamar directamente a su API.
+- **QA:** `npm test` incluye pruebas de cuentas y roles, cambio obligatorio de contraseña, separación por empresa, borradores, control de acceso a reportes, caja por usuario y regresión de ventas.
+
+**Precauciones antes de actualizar:** haz un respaldo de `facturacr.sqlite` desde la instalación funcional previa. La aplicación funciona localmente, sin recuperación remota de credenciales. Conserva la clave del propietario. Por ahora el historial de ventas no identifica el vendedor de registros históricos previos a esta versión; el control de cajero se aplica a sesiones nuevas de caja. El envío al cerrar la ventana y el guardado de borradores no garantizan preservar un cambio escrito justo en el instante de un corte brusco de corriente.
+
+**Instalación / verificación:** `npm ci`, `npm test`, `npm run dist:win`. No elimina empresas, productos, clientes, ventas, créditos ni respaldos existentes. La compilación Vite y el instalador real requieren validación en Windows/GitHub Actions si no se dispone de dependencias en el entorno de trabajo.
+
+## Anterior: v0.6.56 — Inicio de sesión y Caja CSV mejorada
 
 - **Acceso real y obligatorio**: primera apertura crea una cuenta propietaria local (sin cuentas de desarrollador), mediante un asistente de configuración. Contraseñas con `scrypt` y sal criptográfica, sesiones con tokens aleatorios y cookies `HttpOnly`, `SameSite=Strict`.
 - **Protección de API**: todas las rutas comerciales, caja, datos, respaldos y configuración exigen sesión válida; solo las rutas de inicio y diagnóstico quedan públicas. **En esta etapa solamente puede iniciar sesión el propietario**: crear supervisores/cajeros y asignar permisos efectivos queda para la siguiente versión.

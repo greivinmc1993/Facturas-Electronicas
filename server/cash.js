@@ -30,6 +30,8 @@ export function ensureCashSchema(db){
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_cash_expenses_session ON cash_expenses(session_id,id DESC);`);
+  // Migración sin alterar los cierres históricos: sesiones antiguas sin operador.
+  if(!db.prepare('PRAGMA table_info(cash_sessions)').all().some(c=>c.name==='opened_by_user_id'))db.exec('ALTER TABLE cash_sessions ADD COLUMN opened_by_user_id INTEGER REFERENCES access_users(id)');
 }
 
 export function registerCashRoutes(app,db,companyFromRequest){
@@ -59,23 +61,27 @@ export function registerCashRoutes(app,db,companyFromRequest){
     return {received_cents:received.cents,received_count:received.entries,expense_cents:spent.cents,expense_count:spent.entries,
       expected_cents:session.opening_cents+received.cents-spent.cents};
   };
-  const payload=(companyId)=>{
+  const payload=(companyId,user=null)=>{
     const active=current(companyId),rows=db.prepare('SELECT * FROM cash_sessions WHERE company_id=? ORDER BY id DESC LIMIT 20').all(companyId);
-    const enriched=rows.map(s=>({...s,summary:summary(s)}));
-    const selected=active||rows[0]||null;
+    const scoped=user&&!user.is_owner&&user.role==='cashier'?rows.filter(s=>s.opened_by_user_id===user.id):rows;
+    const enriched=scoped.map(s=>({...s,summary:summary(s)}));
+    const selected=scoped.find(s=>s.status==='abierta')||scoped[0]||null;
     const expenses=selected?db.prepare('SELECT * FROM cash_expenses WHERE company_id=? AND session_id=? ORDER BY id DESC LIMIT 100').all(companyId,selected.id):[];
-    return {active:active?{...active,summary:summary(active)}:null,history:enriched,expenses,selected_id:selected?.id||null};
+    const ownActive=active&&(!user||user.is_owner||user.role!=='cashier'||active.opened_by_user_id===user.id)?active:null;
+    return {active:ownActive?{...ownActive,summary:summary(ownActive)}:null,otherCashOpen:!!active&&!ownActive,history:enriched,expenses,selected_id:selected?.id||null};
   };
+  const roleOf=req=>req.authUser?.is_owner?'owner':db.prepare('SELECT role FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser?.id,Number(req.params.companyId))?.role;
+  const asUser=req=>({...req.authUser,role:roleOf(req)});
   const route=(fn)=>(req,res)=>{try{fn(req,res)}catch(e){res.status(400).json({error:e.message})}};
-  app.get('/api/companies/:companyId/cash',route((req,res)=>res.json(payload(companyFromRequest(req)))));
+  app.get('/api/companies/:companyId/cash',route((req,res)=>res.json(payload(companyFromRequest(req),asUser(req)))));
   app.post('/api/companies/:companyId/cash/open',route((req,res)=>{
     const id=companyFromRequest(req),opening=asMoney(req.body?.opening_amount),openingNote=note(req.body?.note,300);
     const created=db.transaction(()=>{
       if(current(id))throw Error('Esta empresa ya tiene una caja abierta.');
       const watermark=db.prepare('SELECT COALESCE(MAX(p.id),0) AS id FROM sale_payments p JOIN sales s ON s.id=p.sale_id WHERE s.company_id=?').get(id).id;
-      return db.prepare('INSERT INTO cash_sessions(company_id,opening_cents,opening_note,opening_payment_id) VALUES(?,?,?,?)').run(id,opening,openingNote,watermark).lastInsertRowid;
+      return db.prepare('INSERT INTO cash_sessions(company_id,opening_cents,opening_note,opening_payment_id,opened_by_user_id) VALUES(?,?,?,?,?)').run(id,opening,openingNote,watermark,req.authUser?.id||null).lastInsertRowid;
     })();
-    res.status(201).json({id:created,...payload(id)});
+    res.status(201).json({id:created,...payload(id,asUser(req))});
   }));
   const categories=['Compra menor','Transporte','Servicios','Mantenimiento','Otros'];
   app.post('/api/companies/:companyId/cash/expenses',route((req,res)=>{
@@ -85,19 +91,20 @@ export function registerCashRoutes(app,db,companyFromRequest){
       const s=current(id);if(!s)throw Error('Abre una caja antes de registrar un gasto en efectivo.');
       return db.prepare('INSERT INTO cash_expenses(company_id,session_id,category,description,amount_cents) VALUES(?,?,?,?,?)').run(id,s.id,category,description,amount).lastInsertRowid;
     })();
-    res.status(201).json({id:expense,...payload(id)});
+    res.status(201).json({id:expense,...payload(id,asUser(req))});
   }));
   app.post('/api/companies/:companyId/cash/close',route((req,res)=>{
     const id=companyFromRequest(req),counted=asMoney(req.body?.counted_amount),closingNote=note(req.body?.note,300);
     const record=db.transaction(()=>{
       const s=current(id);if(!s)throw Error('No hay una caja abierta para cerrar.');
+      if(roleOf(req)==='cashier'&&s.opened_by_user_id!==req.authUser.id)throw Error('No puedes cerrar la caja de otro usuario.');
       const watermark=db.prepare('SELECT COALESCE(MAX(p.id),0) AS id FROM sale_payments p JOIN sales v ON v.id=p.sale_id WHERE v.company_id=?').get(id).id;
       const totals=summary({...s,closing_payment_id:watermark});
       db.prepare("UPDATE cash_sessions SET status='cerrada',closed_at=CURRENT_TIMESTAMP,counted_cents=?,expected_cents=?,difference_cents=?,closing_note=?,closing_payment_id=? WHERE id=? AND company_id=? AND status='abierta'")
         .run(counted,totals.expected_cents,counted-totals.expected_cents,closingNote,watermark,s.id,id);
       return {...s,...totals,counted_cents:counted,difference_cents:counted-totals.expected_cents};
     })();
-    res.json({closed:record,...payload(id)});
+    res.json({closed:record,...payload(id,asUser(req))});
   }));
   const report=(req,res,format)=>{
     const id=companyFromRequest(req),sessionId=Number(req.query.sessionId),s=Number.isSafeInteger(sessionId)&&sessionId>0?getSession(id,sessionId):current(id)||db.prepare('SELECT * FROM cash_sessions WHERE company_id=? ORDER BY id DESC LIMIT 1').get(id);

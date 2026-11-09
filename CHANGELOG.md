@@ -1,3 +1,12 @@
+## v0.6.57 — Roles multiempresa, carritos recuperables y barra de sesión (2026-11-09)
+
+- CRUD de cuentas de personal por empresa, administradores delegados con límites, contraseñas temporales obligatorias y revocación de acceso a empresas y suspensión que invalida sesiones existentes.
+- Restricciones de API por empresa/método/permiso con rechazo predeterminado y ocultamiento de costos y notas internas para cajeros.
+- Borradores del punto de venta persistidos en SQLite por cajero y empresa, con recuperación o descarte después de un cierre/reinicio; la venta solo se registra al confirmar.
+- Caja registra el usuario que abre una sesión nueva, impide a cajeros ver o cerrar turnos de otras personas y preserva sin asignación los historiales antiguos.
+- Rediseño profesional de la barra de sesión, iconos, menú de perfil y configuración de bloqueo reservada al propietario. Bloquear ahora invalida la sesión del servidor.
+- Nuevas suites QA para permisos, carritos y cajas por usuario, además de QA previo conservado.
+
 ## v0.6.56 — Autenticación del propietario y CSV de Caja mejorado (2026-11-09)
 
 - Creación inicial del único propietario, con contraseña `scrypt` y hash seguro; nunca se instala una credencial por defecto.

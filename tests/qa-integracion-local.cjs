@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(root,'server','report-format.js'),path.join(staging,'r
 fs.copyFileSync(path.join(root,'server','cash.js'),path.join(staging,'cash.js'));
 fs.copyFileSync(path.join(root,'server','access-schema.js'),path.join(staging,'access-schema.js'));
 fs.copyFileSync(path.join(root,'server','auth.js'),path.join(staging,'auth.js'));
+fs.copyFileSync(path.join(root,'server','sale-drafts.js'),path.join(staging,'sale-drafts.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -52,12 +53,12 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   routeParts.forEach((part,i)=>{if(part.startsWith(':'))params[part.slice(1)]=actualParts[i]});
   let status=200,result,completed=false;
   const chunks=[];const res={headersSent:false,write(v){chunks.push(Buffer.isBuffer(v)?v:Buffer.from(String(v)));return true},end(){const b=Buffer.concat(chunks);result=b[0]===255&&b[1]===254?b.subarray(2).toString('utf16le'):b.toString('utf8');completed=true;return this},status(s){status=s;return this},json(v){result=v;completed=true;return this},setHeader(){},type(){return this},send(v){result=Buffer.isBuffer(v)&&v[0]===255&&v[1]===254?v.subarray(2).toString('utf16le'):v;completed=true;return this}};
-  await route.handler({params,body,headers:{},query:Object.fromEntries(parsedUrl.searchParams),originalUrl:url},res);
+  await route.handler({params,body,headers:{},query:Object.fromEntries(parsedUrl.searchParams),originalUrl:url,authUser:{id:null,is_owner:1}},res);
   assert.equal(completed,true,`Sin respuesta ${method} ${url}`);
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.56')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.57')});
   await check('Inicio y esquema SQLite en base nueva',async()=>{
    const sql=read();const tables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name);
    for(const name of ['companies','clients','products','sales','sale_lines','sale_payments','inventory_movements','quotations','quotation_lines','company_quote_settings','access_users','access_company_roles','access_permission_overrides','access_security_settings','access_audit_log'])assert.ok(tables.includes(name),name);
