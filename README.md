@@ -1,3 +1,13 @@
+# FacturaCR v0.6.58 — Seguridad y bloqueo para todos los usuarios
+
+- El tiempo de inactividad es **global**, puede configurarlo cualquier usuario autenticado (propietario, administrador, supervisor y cajero) y se aplica a todas las sesiones. Opciones: 5, 15, 30, 60 minutos o desactivado.
+- La barra de seguridad conserva el aviso de cambios pendientes y muestra una confirmación únicamente después de recibir respuesta satisfactoria de la API.
+- **Diseño corregido:** el selector y los botones comparten altura de 42 px y línea inferior exacta; se eliminó el margen inferior heredado que desplazaba el selector 18 px por encima de los botones. Diseño adaptable a ventanas estrechas.
+- Se mantiene la protección de sesión nula y la prueba de servidor HTTP que inicia sesión antes de acceder a rutas protegidas.
+- La corrección visual no modifica SQLite, roles, ventas ni otras pantallas.
+
+---
+
 # FacturaCR v0.6.58 — Corrección de sesión y confirmación de seguridad
 
 ## Cambios en v0.6.58
