@@ -988,51 +988,101 @@ function App({account}){
 function SecureApp(){
  const [state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [username,setUsername]=useState(''),[displayName,setDisplayName]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[newPassword,setNewPassword]=useState('');
- const [locked,setLocked]=useState(false),[minutes,setMinutes]=useState(15),[settingsBusy,setSettingsBusy]=useState(false),[accountMenuOpen,setAccountMenuOpen]=useState(false),[securitySettingsOpen,setSecuritySettingsOpen]=useState(false);
+ const [locked,setLocked]=useState(false),[minutes,setMinutes]=useState(15),[savedMinutes,setSavedMinutes]=useState(15),[settingsBusy,setSettingsBusy]=useState(false),[accountMenuOpen,setAccountMenuOpen]=useState(false),[securitySettingsOpen,setSecuritySettingsOpen]=useState(false);
+ const [settingsFeedback,setSettingsFeedback]=useState(null);
+ const sessionUser=state?.authenticated && state?.user ? state.user : null;
+ const hasSession=!!sessionUser;
+ useEffect(()=>{if(!settingsFeedback)return;const timer=setTimeout(()=>setSettingsFeedback(null),6000);return()=>clearTimeout(timer)},[settingsFeedback]);
  const activity=useRef(Date.now()),lastTouch=useRef(0);
- const lockNow=()=>{setAccountMenuOpen(false);setLocked(true);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
- const reload=async()=>{try{const r=await fetch('/api/auth/status',{cache:'no-store'});if(!r.ok)throw Error('No se pudo consultar la seguridad.');const v=await r.json();setState(v);setMinutes(v.idle_lock_minutes??15);if(v.authenticated)setLocked(false);}catch(e){setError(e.message);}};
+ const lockNow=()=>{setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
+ const reload=async()=>{
+  try{
+   const r=await fetch('/api/auth/status',{cache:'no-store'});
+   if(!r.ok)throw Error('No se pudo consultar la seguridad.');
+   const v=await r.json();
+   // El estado inicial o una sesión vencida pueden no incluir usuario.
+   const authenticated=!!(v.authenticated&&v.user);
+   setState({...v,authenticated});
+   const currentMinutes=Number(v.idle_lock_minutes??15);
+   setMinutes(currentMinutes);setSavedMinutes(currentMinutes);
+   if(authenticated)setLocked(false);
+   else {setLocked(false);setSecuritySettingsOpen(false);setAccountMenuOpen(false)}
+   setError('');
+  }catch(e){setError(e.message)}
+ };
  useEffect(()=>{void reload()},[]);
  useEffect(()=>{
-   if(!state?.authenticated||locked)return;
+   if(!hasSession||locked)return;
    const onActivity=()=>{
      activity.current=Date.now();
      if(Date.now()-lastTouch.current>30000){lastTouch.current=Date.now();fetch('/api/auth/touch',{method:'POST'}).then(r=>{if(r.status===401){setLocked(true);setPassword('')}}).catch(()=>{});}
    };
-   const monitor=()=>{if(minutes>0&&Date.now()-activity.current>=minutes*60000)lockNow()};
+   // Solo el valor confirmado por SQLite rige el tiempo, no una selección pendiente.
+   const monitor=()=>{if(savedMinutes>0&&Date.now()-activity.current>=savedMinutes*60000)lockNow()};
    for(const event of ['pointerdown','keydown','wheel','touchstart'])window.addEventListener(event,onActivity,{passive:true});
    const timer=setInterval(monitor,3000);
    return()=>{clearInterval(timer);for(const event of ['pointerdown','keydown','wheel','touchstart'])window.removeEventListener(event,onActivity)};
- },[state?.authenticated,locked,minutes]);
+ },[hasSession,locked,savedMinutes]);
+ // Cuando el propietario cambia el tiempo, las otras sesiones lo adoptan sin reiniciar.
+ useEffect(()=>{
+  if(!hasSession||locked)return;
+  let cancelled=false;
+  const sync=async()=>{
+   try{
+    const response=await fetch('/api/auth/status',{cache:'no-store'});
+    if(!response.ok)return;
+    const current=await response.json();
+    if(cancelled)return;
+    if(!current.authenticated||!current.user){lockNow();return;}
+    const globalMinutes=Number(current.idle_lock_minutes);
+    if(![0,5,15,30,60].includes(globalMinutes))return;
+    setSavedMinutes(globalMinutes);
+    if(!securitySettingsOpen||minutes===savedMinutes)setMinutes(globalMinutes);
+   }catch{/* Sin conexión: volverá a comprobarse; no se informa guardado. */}
+  };
+  const timer=setInterval(sync,15000);
+  return()=>{cancelled=true;clearInterval(timer)};
+ },[hasSession,locked,securitySettingsOpen,minutes,savedMinutes]);
  const submit=async e=>{
   e.preventDefault();setBusy(true);setError('');
   try{
     if(state?.setupRequired&&password!==confirm)throw Error('Las contraseñas no coinciden.');
     if(state?.setupRequired){await api('/api/auth/setup',{method:'POST',body:JSON.stringify({username,displayName,password})});}
-    const result=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:state?.setupRequired?username:locked?state.user.username:username,password})});
+    const loginUsername=locked && sessionUser?.username ? sessionUser.username : username;
+    const result=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:loginUsername,password})});
     setPassword('');setConfirm('');setAccountMenuOpen(false);setUsername(result.user.username);activity.current=Date.now();lastTouch.current=Date.now();
     await reload();
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setState(null);await reload();}};
+ const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setState(null);await reload();}};
  const saveMinutes=async()=>{
-  setSettingsBusy(true);setError('');try{const r=await api('/api/auth/settings',{method:'PUT',body:JSON.stringify({idle_lock_minutes:Number(minutes)})});setMinutes(r.idle_lock_minutes);activity.current=Date.now();}catch(e){setError(e.message)}finally{setSettingsBusy(false)}
+  if(!sessionUser?.isOwner||settingsBusy)return;
+  setSettingsBusy(true);setSettingsFeedback(null);
+  try{
+   const saved=await api('/api/auth/settings',{method:'PUT',body:JSON.stringify({idle_lock_minutes:Number(minutes)})});
+   const confirmed=Number(saved.idle_lock_minutes);
+   if(!Number.isFinite(confirmed)||confirmed!==Number(minutes))throw Error('El servidor no confirmó el tiempo seleccionado.');
+   setMinutes(confirmed);setSavedMinutes(confirmed);activity.current=Date.now();
+   setSettingsFeedback({type:'success',message:`Configuración guardada: ${confirmed?confirmed+' minutos de inactividad':'bloqueo automático desactivado'} para todos los usuarios.`});
+  }catch(e){setSettingsFeedback({type:'error',message:'No se guardaron los cambios: '+e.message})}
+  finally{setSettingsBusy(false)}
  };
  const changeTemporaryPassword=async e=>{
    e.preventDefault();setBusy(true);setError('');
    try{if(newPassword!==confirm)throw Error('Las contraseñas no coinciden.');await api('/api/auth/password-change',{method:'POST',body:JSON.stringify({oldPassword:password,newPassword})});setPassword('');setNewPassword('');setConfirm('');await reload();}catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const needsGate=!state||state.setupRequired||!state.authenticated||locked||!!state.user?.passwordChangeRequired;
+ const needsGate=!state||!!state.setupRequired||!hasSession||locked||!!sessionUser?.passwordChangeRequired;
  return <div className="secureRoot">
-  {state?.authenticated&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{state.user.displayName}</strong><span>{state.user.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{state.user.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button>{state.user.isOwner&&<button type="button" onClick={()=>{setSecuritySettingsOpen(v=>!v);setAccountMenuOpen(false)}}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button>}<button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
-  {state?.authenticated&&securitySettingsOpen&&state.user.isOwner&&<section className="securitySettingsPanel"><div><strong><UiIcon name="clock" size={17}/> Bloqueo automático</strong><p>El propietario configura el tiempo. Todos los usuarios pueden bloquear su propia sesión.</p></div><label>Inactividad <select aria-label="Tiempo de bloqueo de sesión" value={minutes} onChange={e=>setMinutes(Number(e.target.value))}>{[5,15,30,60,0].map(n=><option key={n} value={n}>{n?n+' minutos':'Desactivado (no recomendado)'}</option>)}</select></label><button type="button" onClick={saveMinutes} disabled={settingsBusy}>Guardar configuración</button><button type="button" className="secondary" onClick={()=>setSecuritySettingsOpen(false)}>Cerrar</button>{error&&<p className="authError" role="alert">{error}</p>}</section>}
-  {state?.authenticated&&!state.user?.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={state.user.id} account={state.user}/></div>}
-  {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':state.user?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':state.user?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
-   {state?.authenticated&&state.user?.passwordChangeRequired&&!locked&&<form onSubmit={changeTemporaryPassword}><label>Contraseña temporal<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Nueva contraseña personal<input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></label><label>Confirmar nueva contraseña<input type="password" required minLength={12} maxLength={128} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>{error&&<p className="authError" role="alert">{error}</p>}<button disabled={busy}>Guardar contraseña personal</button></form>}
-   {state&&(!state.authenticated||locked)&&<form onSubmit={submit}>
-    {!locked&&<label>Usuario<input autoComplete="username" required minLength={3} maxLength={80} value={username} onChange={e=>setUsername(e.target.value)} placeholder="usuario"/></label>}
+  {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button>{sessionUser.isOwner&&<button type="button" onClick={()=>{setMinutes(savedMinutes);setSettingsFeedback(null);setSecuritySettingsOpen(v=>!v);setAccountMenuOpen(false)}}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button>}<button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
+  {hasSession&&securitySettingsOpen&&sessionUser.isOwner&&<section className="securitySettingsPanel" aria-label="Seguridad y bloqueo"><div><strong><UiIcon name="clock" size={17}/> Bloqueo automático para todos</strong><p>El propietario elige el mismo tiempo de inactividad para todos los usuarios. Cada usuario puede bloquear su propia sesión en cualquier momento.</p></div><label>Tiempo para todos los usuarios <select aria-label="Tiempo de bloqueo de sesión para todos los usuarios" value={minutes} disabled={settingsBusy} onChange={e=>{setMinutes(Number(e.target.value));setSettingsFeedback(null)}}>{[5,15,30,60,0].map(n=><option key={n} value={n}>{n?n+' minutos':'Desactivado (no recomendado)'}</option>)}</select></label><button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button><button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false)}} disabled={settingsBusy}>Cerrar</button>{minutes!==savedMinutes&&<small className="securityPending">Hay cambios sin guardar.</small>}</section>}
+   {settingsFeedback&&<div className={'securitySaveToast '+(settingsFeedback.type==='error'?'securitySaveToastError':'securitySaveToastSuccess')} role={settingsFeedback.type==='error'?'alert':'status'} aria-live={settingsFeedback.type==='error'?'assertive':'polite'}><UiIcon name={settingsFeedback.type==='error'?'close':'check'} size={18}/><span>{settingsFeedback.message}</span><button type="button" onClick={()=>setSettingsFeedback(null)} aria-label="Cerrar notificación"><UiIcon name="close" size={15}/></button></div>}
+  {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser}/></div>}
+  {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
+   {hasSession&&sessionUser?.passwordChangeRequired&&!locked&&<form onSubmit={changeTemporaryPassword}><label>Contraseña temporal<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Nueva contraseña personal<input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></label><label>Confirmar nueva contraseña<input type="password" required minLength={12} maxLength={128} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>{error&&<p className="authError" role="alert">{error}</p>}<button disabled={busy}>Guardar contraseña personal</button></form>}
+   {state&&(!hasSession||locked)&&<form onSubmit={submit}>
+    {(!locked||!sessionUser)&&<label>Usuario<input autoComplete="username" required minLength={3} maxLength={80} value={username} onChange={e=>setUsername(e.target.value)} placeholder="usuario"/></label>}
     {state.setupRequired&&<label>Nombre del propietario<input required minLength={2} maxLength={160} value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Nombre completo"/></label>}
-    {locked&&<label>Cuenta<input readOnly value={state.user?.username||''}/></label>}
+    {locked&&sessionUser&&<label>Cuenta<input readOnly value={sessionUser.username}/></label>}
     <label>Contraseña<input required autoFocus type="password" autoComplete={state.setupRequired?'new-password':'current-password'} minLength={state.setupRequired?12:1} value={password} onChange={e=>setPassword(e.target.value)}/></label>
     {state.setupRequired&&<label>Confirmar contraseña<input required type="password" autoComplete="new-password" minLength={12} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>}
     {state.setupRequired&&<small>Usa 12 caracteres como mínimo, letras y números. Guarda estas credenciales en un lugar seguro.</small>}

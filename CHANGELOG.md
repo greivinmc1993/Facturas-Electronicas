@@ -1,3 +1,12 @@
+## 0.6.58 — Bloqueo global, aviso de guardado y sesión null
+
+- La pantalla de inicio y las transiciones de sesión toleran `state` o `user` nulos sin romper el render de React.
+- El propietario mantiene el selector de inactividad para todos los usuarios (5, 15, 30, 60 minutos y desactivado).
+- Se informa mediante notificación visible, con estado de éxito/error verificado por API, al guardar la configuración.
+- Se incorpora QA automatizada de permisos del cambio, persistencia global y render nulo.
+
+---
+
 ## v0.6.57 — Roles multiempresa, carritos recuperables y barra de sesión (2026-11-09)
 
 - CRUD de cuentas de personal por empresa, administradores delegados con límites, contraseñas temporales obligatorias y revocación de acceso a empresas y suspensión que invalida sesiones existentes.

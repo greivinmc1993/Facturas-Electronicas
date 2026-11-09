@@ -1,3 +1,16 @@
+# FacturaCR v0.6.58 — Corrección de sesión y confirmación de seguridad
+
+## Cambios en v0.6.58
+
+- **Inicio de aplicación corregido:** la pantalla de acceso no intenta leer datos del usuario antes de recibir el estado de autenticación. Evita el error `Cannot read properties of null (reading 'user')` al iniciar o finalizar una sesión.
+- **Tiempo de bloqueo para todos:** el propietario conserva las opciones globales de **5, 15, 30, 60 minutos o desactivado**, con **15 minutos** como valor inicial. Los demás usuarios pueden bloquear su propia sesión, pero no alterar esta política.
+- **Confirmación real del guardado:** al guardar seguridad se muestra una notificación visible de éxito con el tiempo aplicado a todos los usuarios, únicamente después de recibir respuesta válida de la API. Los errores se informan como fallos; los cambios no guardados se advierten antes de guardar. El aviso se oculta automáticamente a los 6 segundos y permite cerrarlo manualmente.
+- **Pruebas:** caso `qa-seguridad-config.cjs` para selección global, permisos, valores inválidos y comprobación del estado nulo de la interfaz. Se conserva el resto del proyecto, sus pruebas y la compilación NSIS.
+
+**Actualización:** respaldar la base SQLite antes de instalar. No hay cambios al esquema ni borrado de datos. Si quedó un borrador de venta, revisarlo tras volver a iniciar sesión.
+
+---
+
 # FacturaCR v0.6.57 — Usuarios por empresa, ventas recuperables y sesión profesional
 
 
