@@ -5,6 +5,20 @@ export const htmlEscape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':
 export function csvCell(value,{identifier=false}={}){
   if(typeof value==='number'&&Number.isFinite(value))return '"'+String(value)+'"';
   const raw=String(value??'');
+  // Reportes heredados: si una celda monetaria viene formateada con ₡,
+  // convertirla a una cifra decimal para Excel sin modificar las etiquetas.
+  // Admite espacios, separadores de miles y decimales regionales.
+  const currency=raw.match(/^\s*([+-]?)\s*₡\s*([\d\s\u00a0\u202f.,]+)\s*$/);
+  if(currency){
+    const numberText=currency[2].replace(/[\s\u00a0\u202f]/g,'');
+    const comma=numberText.lastIndexOf(','),dot=numberText.lastIndexOf('.');
+    const decimalIndex=Math.max(comma,dot);
+    let numeric;
+    if(decimalIndex>=0 && numberText.length-decimalIndex-1===2){
+      numeric=numberText.slice(0,decimalIndex).replace(/[.,]/g,'')+','+numberText.slice(decimalIndex+1);
+    }else numeric=numberText.replace(/[.,]/g,'');
+    return '"'+currency[1]+numeric+'"';
+  }
   // Identificadores con ceros iniciales o muchos dígitos: Excel como texto.
   // La expresión es completamente numérica y nunca procede de una fórmula externa.
   if(identifier&&/^\d+$/.test(raw))return '"=""'+raw+'"""';

@@ -14,3 +14,12 @@ export function decodeCatalogCsv(bytes){
  // Sin BOM: compatibilidad con los CSV antiguos en Excel en español.
  return new TextDecoder('windows-1252').decode(raw);
 }
+
+// Exportaciones locales: números editables en Excel y protección de fórmulas
+// en campos de texto introducidos por clientes, sin alterar signos negativos.
+export function csvSafeCell(value){
+ const raw=String(value??'');
+ if(typeof value==='number'&&Number.isFinite(value))return '"'+raw+'"';
+ const dangerous=/^[\s\u0000-\u001f]*[=+@\-]/.test(raw);
+ return '"'+(dangerous?"'":'')+raw.replace(/"/g,'""')+'"';
+}

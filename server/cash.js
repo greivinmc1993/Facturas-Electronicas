@@ -111,7 +111,17 @@ export function registerCashRoutes(app,db,companyFromRequest){
     const stats=[['Fondo inicial',money(s.opening_cents)],['Cobros efectivos de ventas activas',money(totals.received_cents)],['Gastos registrados',money(totals.expense_cents)],['Esperado al cierre',money(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],['Estado',s.status]];
     if(s.status==='cerrada')stats.push(['Efectivo contado',money(s.counted_cents)],['Diferencia',money(s.difference_cents)]);
     if(format==='csv'){
-      const records=[['Sesión',s.id],['Empresa',company.trade_name||company.legal_name],['Fecha apertura UTC',s.opened_at],['Fecha cierre UTC',s.closed_at||'Abierta'],...stats,['',''],headers,...rows];
+      // CSV: cantidades en CRC como cifras, sin símbolo de moneda ni agrupación de miles.
+      // El PDF conserva el formato visual con ₡.
+      const decimalCRC=n=>(Number(n)/100).toFixed(2).replace('.',',');
+      const csvStats=[['Fondo inicial CRC',decimalCRC(s.opening_cents)],
+        ['Cobros efectivos de ventas activas CRC',decimalCRC(totals.received_cents)],
+        ['Gastos registrados CRC',decimalCRC(totals.expense_cents)],
+        ['Esperado al cierre CRC',decimalCRC(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],
+        ['Estado',s.status]];
+      if(s.status==='cerrada')csvStats.push(['Efectivo contado CRC',decimalCRC(s.counted_cents)],['Diferencia CRC',decimalCRC(s.difference_cents)]);
+      const csvRows=exp.map(e=>[e.created_at,e.category,e.description,decimalCRC(e.amount_cents)]);
+      const records=[['Sesión',s.id],['Empresa',company.trade_name||company.legal_name],['Fecha apertura UTC',s.opened_at],['Fecha cierre UTC',s.closed_at||'Abierta'],...csvStats,['',''],headers,...csvRows];
       res.setHeader('Content-Type','text/csv; charset=utf-16le');res.setHeader('Content-Disposition',`attachment; filename="FacturaCR_caja_${id}_${s.id}.csv"`);return res.send(csvExcelBuffer(csvDocument([],records)));
     }
     res.type('html').send(reportHtml({title:'Reporte de caja y gastos',company:company.trade_name||company.legal_name,subtitle:`Sesión #${s.id} · Apertura UTC: ${s.opened_at} · ${s.closed_at?`Cierre UTC: ${s.closed_at}`:'Abierta'}`,headers,rows,summary:stats,note:'Los cobros en efectivo se calculan a partir de pagos de ventas actualmente activas. No es un estado contable ni incluye métodos de pago electrónicos. No sustituye un arqueo físico.'}));

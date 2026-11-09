@@ -713,5 +713,10 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 /* v0.6.52: indicadores de costo histórico legibles en Kardex */
 .kardexStats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.kardexTableScroll table{min-width:1180px}.kardexStats article small:last-child{line-height:1.45}
 
-/* v0.6.53 · Caja y gastos por empresa */
+/* v0.6.54 · Caja y gastos por empresa */
 .cashWorkspace{display:grid;gap:16px;min-width:0}.cashHero{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;border:1px solid #bcded5;background:linear-gradient(110deg,#eefaf5,#f7fafc)}.cashHero h3{margin:6px 0}.cashEyebrow{color:#14796b;font-weight:800;letter-spacing:.12em}.cashMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.cashMetrics article{display:flex;flex-direction:column;gap:8px;padding:17px;border-radius:14px;border:1px solid #d5e8e3;background:linear-gradient(160deg,#f4fcf9,#fff)}.cashMetrics article>small{color:#536c66}.cashMetrics article>strong{font-size:clamp(1.25rem,2vw,1.7rem);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cashPositive{color:#087c5c}.cashNegative{color:#9d3443}.cashColumns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cashColumns .card{min-width:0}.cashColumns form{display:grid;gap:12px}.cashOpening{max-width:760px}.cashOpening form{display:grid;gap:12px}.cashConfirm{padding:15px;margin-top:15px;border:1px solid #a6d2c5;border-radius:12px;background:#ecf8f3}.cashHistoryHeading{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center}.cashSessionStats{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;padding:12px;border-radius:10px;background:#f3faf7;color:#31544c}.cashHistoryHeading .actions{flex-wrap:wrap}@media(max-width:940px){.cashMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.cashColumns,.cashMetrics{grid-template-columns:1fr}}
+
+/* v0.6.54 · Los montos de cobro se escriben manualmente: sin flechas spinner. */
+.salesModule input.posMoneyInput[type="number"]{-moz-appearance:textfield;appearance:textfield}
+.salesModule input.posMoneyInput[type="number"]::-webkit-outer-spin-button,
+.salesModule input.posMoneyInput[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}

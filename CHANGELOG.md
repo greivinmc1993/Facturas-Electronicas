@@ -1,3 +1,17 @@
+## v0.6.55 — Preparación de usuarios por empresa y compatibilidad CSV (2026-11-09)
+
+- Esquema SQLite aditivo para un propietario de instalación, usuarios, roles por empresa, permisos personalizados y auditoría. Sin cuentas iniciales ocultas y sin activar autenticación prematura.
+- Preferencia predeterminada de bloqueo de 15 minutos conservando ventas en preparación; solo configuración persistente, no temporizador activo todavía.
+- CSV: importes numéricos identificados como CRC; PDF conserva el símbolo ₡. Mayor protección contra fórmulas en exportaciones locales de créditos y ventas filtradas.
+- Pruebas automáticas de migración, roles y separación empresarial. Se mantienen QA, workflows Windows, instalador y datos existentes.
+
+## v0.6.54 — CSV sin símbolo monetario y campos de cobro sin flechas (2026-11-09)
+
+- En reportes CSV de caja, importes de CRC como cifras decimales (sin ₡ ni símbolos extraños); los PDF conservan la moneda visible.
+- Normalización general de valores monetarios prefijados por ₡ al serializarlos en los CSV compartidos, sin modificar productos, textos ni datos almacenados.
+- Eliminadas únicamente las flechas de aumento/disminución de los campos de efectivo recibido y otros pagos en Ventas. No cambia el control de cantidades ni las validaciones.
+- Pruebas de regresión para formatos monetarios, signos negativos, seguridad de fórmulas y campos de Ventas.
+
 ## v0.6.53 — Control de caja y gastos (2026-11-09)
 
 - Nueva pantalla Caja y gastos con apertura, fondo inicial, registro de egresos en efectivo y cierre mediante arqueo físico.

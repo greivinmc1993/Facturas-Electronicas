@@ -1,3 +1,4 @@
+import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
 import {csvCell as formattedCsvCell, csvDocument, csvExcelBuffer, reportHtml} from './report-format.js';
 import { registerInventoryValuationRoutes } from './inventory-valuation.js';
@@ -202,6 +203,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   })) addColumn('quotation_lines',field,definition);
   // Los códigos internos se validan por empresa en las operaciones nuevas.
   ensureCashSchema(db);
+  // Esquema inerte de acceso: no interfiere con las APIs hasta activar autenticación.
+  ensureAccessSchema(db);
   }
   migrateDatabase();
   const app = express();

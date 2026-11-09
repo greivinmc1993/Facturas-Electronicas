@@ -1,7 +1,17 @@
-# FacturaCR v0.6.53 — Caja y gastos por empresa
+# FacturaCR v0.6.55 — Base de usuarios, permisos y CSV para Excel
 
 
-## Nuevo en v0.6.53 — Caja y gastos en efectivo
+## Nuevo en v0.6.55 — Preparación segura de control de acceso
+
+- **Nueva migración SQLite aditiva** en `server/access-schema.js`: `access_users`, `access_company_roles`, `access_permission_overrides`, `access_security_settings`, `access_audit_log`. Conserva las empresas, ventas, movimientos, respaldos e inventario anteriores. La migración se aplica al inicio y al restaurar un respaldo compatible.
+- **Cuatro roles planificados:** propietario único de la instalación (`owner`), administrador de empresa (`company_admin`), supervisor y cajero. Los roles de empresa se asignan a un usuario por cada empresa, sin crear una cuenta de desarrollador ni contraseñas universales.
+- **Bloqueo planificado:** tiempo inicial de 15 minutos, personalizable entre 5, 15, 30 y 60 minutos, con opción excepcional de desactivación. El esquema guarda la preferencia de conservar borradores al bloquear. **En esta versión NO se ejecuta ningún bloqueo ni se habilita una página de acceso**.
+- **Importante sobre seguridad:** la base del control de acceso no protege por sí sola los endpoints. Hasta implementar la autenticación, la autorización del servidor y el asistente de propietario, **FacturaCR sigue funcionando como antes, sin login ni roles efectivos**. No distribuir como sistema multiusuario seguro todavía.
+- **CSV para Excel:** importes en cifras sin `₡` en las celdas y columnas rotuladas en CRC; los reportes PDF siguen mostrando `₡`. Se conserva UTF-16 LE con BOM y separador `;`, sin volver a incluir XLSX. Las exportaciones locales de créditos y ventas filtradas ahora protegen campos de texto contra fórmulas de hoja de cálculo.
+- **QA:** `node --no-warnings tests/qa-acceso-esquema.cjs` prueba migración repetible, propietario único, asignaciones por empresa, permisos y persistencia de la configuración; `npm test` comprueba las funciones previas.
+- **Siguiente etapa:** propietario inicial, hashing de contraseñas, inicio y cierre de sesión seguros, permisos aplicados por API, bloqueo real con restauración segura de ventas pendientes y reglas de recuperación. **Antes de habilitar usuarios, se deberá impedir que restaurar una base antigua elimine usuarios o comprometa los accesos.**
+
+## Funciones anteriores: Caja y gastos en efectivo
 
 - **Caja y gastos** en el menú lateral, separada por empresa. Apertura con fondo inicial, un solo turno abierto por empresa, gastos con categoría y descripción y cierre con efectivo contado y diferencia.
 - Los ingresos de caja provienen únicamente de **pagos Efectivo** de ventas actualmente activas, incluyendo abonos a crédito; SINPE, tarjetas y transferencias no se suman al efectivo físico. Una sesión nueva inicia desde el último identificador de pago de la empresa y no recoge cobros previos.
@@ -544,3 +554,7 @@ Desde el historial puedes seleccionar una proforma y usar **Eliminar proforma**.
 - Movimientos históricos anteriores quedan sin costo; **no se recalculan usando el costo actual**.
 - El importe representa valor al costo, no ingresos, caja ni utilidad.
 - Sin exportación XLSX; se mantienen CSV y PDF.
+
+### Ajustes de v0.6.55
+
+Los CSV de caja exportan cifras sin el símbolo ₡, con columnas identificadas en CRC. Los PDF conservan el formato monetario. Los campos monetarios de cobro en Ventas ocultan las flechas de incremento, pero aceptan valores escritos por teclado.

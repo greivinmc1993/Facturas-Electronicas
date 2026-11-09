@@ -1,4 +1,4 @@
-import {csvExcelBlob,decodeCatalogCsv} from './csv-export.js';
+import {csvExcelBlob,decodeCatalogCsv,csvSafeCell} from './csv-export.js';
 import React,{useEffect,useState,useRef} from 'react';
 import {createRoot} from 'react-dom/client';
 import './style.css';
@@ -243,14 +243,14 @@ function SalesPanel({companyId,company,askConfirm}){
  const exportCredits=()=>{
   const headers=creditTab==='ventas'?['Venta','Fecha','Cliente','Estado','Total CRC','Abonado CRC','Saldo CRC']:['Abono','Venta','Fecha','Cliente','Método','Monto CRC','Estado venta'];
   const rows=creditTab==='ventas'?filteredCredits.map(s=>[s.id,s.created_at,s.client_name,s.status,s.total_cents/100,s.paid_cents/100,s.balance_cents/100]):filteredCreditPayments.map(a=>[a.id,a.sale_id,a.created_at,a.client_name,a.method,a.amount_cents/100,a.status]);
-  const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-  const csv='\ufeffsep=;\r\n'+[headers,...rows].map(r=>r.map(quote).join(';')).join('\r\n');
+  const csv='\ufeffsep=;\r\n'+[headers,...rows].map(r=>r.map(csvSafeCell).join(';')).join('\r\n');
   const url=URL.createObjectURL(csvExcelBlob(csv));const link=document.createElement('a');link.href=url;link.download=creditTab==='ventas'?'FacturaCR_creditos.csv':'FacturaCR_abonos.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
  const exportCreditsPdf=async()=>{
   try{if(!window.facturacrReports?.savePdf)throw Error('El PDF requiere FacturaCR de escritorio.');
    const headers=creditTab==='ventas'?['Venta','Fecha','Cliente','Estado','Total CRC','Abonado CRC','Saldo CRC']:['Abono','Venta','Fecha','Cliente','Método','Monto CRC','Estado'];
-   const rows=creditTab==='ventas'?filteredCredits.map(s=>[s.id,s.created_at,s.client_name,s.status,s.total_cents/100,s.paid_cents/100,s.balance_cents/100]):filteredCreditPayments.map(a=>[a.id,a.sale_id,a.created_at,a.client_name,a.method,a.amount_cents/100,a.status]);
+   const moneyPdf=cents=>'₡'+(Number(cents||0)/100).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
+   const rows=creditTab==='ventas'?filteredCredits.map(s=>[s.id,s.created_at,s.client_name,s.status,moneyPdf(s.total_cents),moneyPdf(s.paid_cents),moneyPdf(s.balance_cents)]):filteredCreditPayments.map(a=>[a.id,a.sale_id,a.created_at,a.client_name,a.method,moneyPdf(a.amount_cents),a.status]);
    const clean=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
    const html=`<!doctype html><html lang="es"><head><meta charset="UTF-8"><style>@page{size:A4 landscape;margin:12mm}body{font:11px Arial;color:#233448}h1{color:#12695e}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:7px 5px;border-bottom:1px solid #dce8e4;text-align:left;overflow-wrap:anywhere;word-break:break-word}th{background:#e3f3ed}thead{display:table-header-group}tr{break-inside:avoid}</style></head><body><h1>${clean(creditTab==='ventas'?'Ventas a crédito':'Historial de abonos')}</h1><p>${clean(company?.trade_name||company?.legal_name||'FacturaCR')} · ${rows.length} registros · Filtro: ${clean(creditFilter)} · Fecha: ${clean(new Date().toLocaleString('es-CR'))}</p><table><thead><tr>${headers.map(h=>`<th>${clean(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${clean(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
    const result=await window.facturacrReports.savePdf(html,`FacturaCR_${creditTab}_credito.pdf`,{landscape:true});
@@ -351,7 +351,7 @@ function SalesPanel({companyId,company,askConfirm}){
  const reportRows=()=>filteredSales.map(s=>[s.id,s.created_at,s.client_name||'Consumidor final',s.sale_type,s.status,Math.round(Number(s.total_cents||0)/100),Math.round(Number(s.balance_cents||0)/100)]);
  const exportFilteredExcel=()=>{
   try{
-   const escapeCsv=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+   const escapeCsv=csvSafeCell;
    const headers=['Número','Fecha','Cliente','Tipo','Estado','Total (CRC)','Saldo (CRC)'];
    const rows=[headers,...reportRows()];
    const csv='\uFEFFsep=;\r\n'+rows.map(row=>row.map(escapeCsv).join(';')).join('\r\n');
@@ -403,11 +403,11 @@ function SalesPanel({companyId,company,askConfirm}){
    <div className="actions"><button type="button" className="secondary" disabled={payments.length>=10} onClick={()=>setPayments(old=>[...old,{method:'SINPE Móvil',amount:''}])}>Agregar otro pago</button></div>
    {payments.map((pay,i)=>pay.method==='Efectivo'?null:<div className="posCashBox posOtherPaymentBox" key={`payment-panel-${i}`}>
     <label htmlFor={`posOtherPayment-${i}`} className="posCashTitle">{pay.method} · Monto recibido (₡)</label>
-    <input id={`posOtherPayment-${i}`} aria-label={`Monto de ${pay.method}`} type="number" min="0" step="1" placeholder="Monto pagado por este método" value={pay.amount} onChange={e=>setPayments(old=>old.map((p,j)=>i===j?{...p,amount:e.target.value}:p))}/>
+    <input id={`posOtherPayment-${i}`} aria-label={`Monto de ${pay.method}`} className="posMoneyInput" type="number" min="0" step="1" placeholder="Monto pagado por este método" value={pay.amount} onChange={e=>setPayments(old=>old.map((p,j)=>i===j?{...p,amount:e.target.value}:p))}/>
     <p className="hint">Registra el monto pagado mediante {pay.method}. Este método no genera vuelto.</p>
     <div className="posCashResults"><span>Aplicado con {pay.method}: <strong>₡{saleMoney(roundCRC(Math.round((Number(pay.amount)||0)*100)))}</strong></span></div>
    </div>)}
-   {cashSelected&&<div className="posCashBox"><label htmlFor="posCashTendered" className="posCashTitle">Efectivo recibido (₡)</label><input id="posCashTendered" type="number" min="0" step="0.01" value={cashTendered} onChange={e=>setCashTendered(e.target.value)} placeholder="Monto entregado por el cliente"/><p className="hint">El sistema aplica únicamente lo necesario a la venta. El excedente se devuelve como vuelto.</p><div className="posCashResults"><span>Aplicado en efectivo: <strong>₡{saleMoney(cashApplied)}</strong></span><span className="posChange">Vuelto: <strong>₡{saleMoney(changeCents)}</strong></span></div></div>}
+   {cashSelected&&<div className="posCashBox"><label htmlFor="posCashTendered" className="posCashTitle">Efectivo recibido (₡)</label><input id="posCashTendered" className="posMoneyInput" type="number" min="0" step="0.01" value={cashTendered} onChange={e=>setCashTendered(e.target.value)} placeholder="Monto entregado por el cliente"/><p className="hint">El sistema aplica únicamente lo necesario a la venta. El excedente se devuelve como vuelto.</p><div className="posCashResults"><span>Aplicado en efectivo: <strong>₡{saleMoney(cashApplied)}</strong></span><span className="posChange">Vuelto: <strong>₡{saleMoney(changeCents)}</strong></span></div></div>}
    <p className="posPaidSummary"><strong>Pagado:</strong> ₡{saleMoney(paid)} · <strong>Saldo:</strong> ₡{saleMoney(Math.max(0,total-paid))}</p>
    {saleType==='credito'&&<p className="hint">Las ventas a crédito requieren un cliente registrado. Puedes registrar abonos posteriores desde el historial de ventas.</p>}
    <button type="submit" disabled={operationBusy||!cart.length||discountInvalid||total<=0||nonCashPaid>total||(saleType==='contado'&&paid!==total)||(saleType==='credito'&&(!clientId||paid>=total))}>{operationBusy?'Procesando operación…':'Confirmar venta'}</button>
