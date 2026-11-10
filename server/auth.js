@@ -62,6 +62,7 @@ export function registerAuth(app,getDb,options={}){
   const saveRecovery=(userId,code)=>db.prepare(`INSERT INTO access_owner_recovery(user_id,code_hash)
     VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, created_at=CURRENT_TIMESTAMP`)
     .run(userId,recoveryHash(normalizedRecoveryCode(code)));
+  const ownerResetAttempts=new Map(); // Solo limita errores de reautenticación; no registra contraseñas.
   const revokeUserSessions=(userId,exceptKey=null)=>{
     for(const [key,s] of sessions)if(s.userId===userId&&key!==exceptKey)sessions.delete(key);
   };
@@ -264,10 +265,51 @@ export function registerAuth(app,getDb,options={}){
       res.status(201).json({ok:true,id});
     }catch(e){res.status(400).json({error:String(e.message).includes('UNIQUE')?'El nombre de usuario ya está registrado.':e.message});}
   });
+  // Recuperación de cuentas ajenas: SOLO propietario, nunca delegada a administradores.
+  // Se confirma la contraseña propietaria para cada operación y se entrega una clave
+  // temporal una única vez. No modifica roles, empresas ni correos verificados.
+  app.post('/api/auth/users/:userId/owner-recovery',localOriginOnly,(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner||a.user.password_change_required)
+      return res.status(403).json({error:'Solo el propietario puede recuperar cuentas de otros usuarios.'});
+    const targetId=Number(req.params.userId);
+    if(!Number.isSafeInteger(targetId)||targetId<=0||targetId===a.user.id)
+      return res.status(400).json({error:'Selecciona una cuenta de personal válida.'});
+    const target=db.prepare('SELECT id,is_owner,is_active FROM access_users WHERE id=?').get(targetId);
+    if(!target||target.is_owner||!target.is_active)
+      return res.status(404).json({error:'La cuenta no existe o está suspendida.'});
+    const previous=ownerResetAttempts.get(a.user.id),now=Date.now();
+    if(previous&&previous.until>now&&previous.count>=5)
+      return res.status(429).json({error:'Demasiados intentos. Intenta más tarde.'});
+    const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
+    if(!verifyPassword(req.body?.currentPassword,row?.password_hash)){
+      if(!previous||now>=previous.until)ownerResetAttempts.set(a.user.id,{count:1,until:now+15*60*1000});
+      else previous.count++;
+      return res.status(403).json({error:'La contraseña del propietario no coincide.'});
+    }
+    ownerResetAttempts.delete(a.user.id);
+    // La contraseña se genera en servidor con aleatoriedad criptográfica y
+    // garantiza letras y números exigidos por passwordHash.
+    const temporaryPassword='FCR-9'+randomBytes(18).toString('hex');
+    const hashed=passwordHash(temporaryPassword);
+    try{
+      db.transaction(()=>{
+        db.prepare('UPDATE access_users SET password_hash=?,password_change_required=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_owner=0 AND is_active=1').run(hashed,targetId);
+        db.prepare('DELETE FROM access_email_tokens WHERE user_id=?').run(targetId);
+        audit(a.user.id,'auth.owner_assisted_recovery','user',targetId);
+      })();
+      revokeUserSessions(targetId);
+      return res.json({ok:true,temporaryPassword,message:'Contraseña temporal generada. Entrégala de forma privada. El usuario debe cambiarla al iniciar sesión.'});
+    }catch{return res.status(500).json({error:'No se pudo recuperar la cuenta.'});}
+  });
   app.put('/api/auth/users/:userId',localOriginOnly,(req,res)=>{
     const a=manager(req,res);if(!a)return;
     const id=Number(req.params.userId),target=db.prepare('SELECT id,is_owner FROM access_users WHERE id=?').get(id);
     if(!target||target.is_owner)return res.status(400).json({error:'No se puede modificar esta cuenta.'});
+    // Ni propietario ni administrador pueden saltarse la confirmación de contraseña
+    // del procedimiento de recuperación utilizando el endpoint de edición normal.
+    if(req.body?.password!==undefined)return res.status(403).json({error:'Para restablecer contraseñas utiliza la recuperación exclusiva del propietario.'});
     const assignments=userCompanies(id);
     if(!a.user.is_owner&&(!assignments.length||assignments.some(c=>!a.managed.includes(c.company_id)||c.role==='company_admin')))
       return res.status(403).json({error:'Solo el propietario puede modificar esta cuenta.'});
@@ -279,17 +321,15 @@ export function registerAuth(app,getDb,options={}){
       }
       // Validar antes de escribir y confirmar todos los cambios juntos.
       // Un error no debe suspender una cuenta a medias ni dejar roles inconsistentes.
-      const hash=req.body?.password!==undefined?passwordHash(req.body.password):null;
       const isActive=req.body?.isActive;
       const assignment=req.body?.companyId!==undefined?
         {companyId:Number(req.body.companyId),role:String(req.body.role||'')}:null;
       db.transaction(()=>{
         if(isActive!==undefined)db.prepare('UPDATE access_users SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(isActive?1:0,id);
-        if(hash!==null)db.prepare("UPDATE access_users SET password_hash=?,password_change_required=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(hash,id);
         if(assignment)db.prepare('INSERT INTO access_company_roles(user_id,company_id,role,assigned_by) VALUES(?,?,?,?) ON CONFLICT(user_id,company_id) DO UPDATE SET role=excluded.role,assigned_by=excluded.assigned_by').run(id,assignment.companyId,assignment.role,a.user.id);
         audit(a.user.id,'users.update','user',id);
       })();
-      if(isActive!==undefined||hash!==null||assignment){
+      if(isActive!==undefined||assignment){
         for(const [key,s] of sessions)if(s.userId===id)sessions.delete(key);
       }
       res.json({ok:true});

@@ -1002,11 +1002,15 @@ function SecureApp(){
  // Solo el propietario administra SMTP; nunca se devuelve la clave guardada al navegador.
  const [smtpStatus,setSmtpStatus]=useState(null),[smtpBusy,setSmtpBusy]=useState(false),[smtpFeedback,setSmtpFeedback]=useState(null);
  const [smtpForm,setSmtpForm]=useState({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});
+ // El propietario puede recuperar cuentas de personal, nunca otras personas.
+ // La contraseña temporal se muestra solo una vez y no se persiste en el navegador.
+ const [ownerUsers,setOwnerUsers]=useState([]),[ownerTarget,setOwnerTarget]=useState(''),[ownerAssistPassword,setOwnerAssistPassword]=useState('');
+ const [ownerAssistBusy,setOwnerAssistBusy]=useState(false),[ownerAssistError,setOwnerAssistError]=useState(''),[ownerTempCredential,setOwnerTempCredential]=useState(null);
  const sessionUser=state?.authenticated && state?.user ? state.user : null;
  const hasSession=!!sessionUser;
  useEffect(()=>{if(!settingsFeedback)return;const timer=setTimeout(()=>setSettingsFeedback(null),6000);return()=>clearTimeout(timer)},[settingsFeedback]);
  const activity=useRef(Date.now()),lastTouch=useRef(0);
- const lockNow=()=>{setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
+ const lockNow=()=>{setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
  const reload=async()=>{
   try{
    const r=await fetch('/api/auth/status',{cache:'no-store'});
@@ -1069,12 +1073,14 @@ function SecureApp(){
     await reload();
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoveryCode('');setRecoveryMode(false);setOwnerRecoveryPassword('');setEmailStatus(null);setEmailValue('');setEmailPassword('');setEmailVerifyCode('');setEmailVerifyPending(false);setEmailFeedback(null);setEmailRecoveryMode(false);setEmailResetRequested(false);setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setSmtpStatus(null);setSmtpFeedback(null);setSmtpForm({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});setState(null);await reload();}};
+ const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoveryCode('');setRecoveryMode(false);setOwnerRecoveryPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setEmailStatus(null);setEmailValue('');setEmailPassword('');setEmailVerifyCode('');setEmailVerifyPending(false);setEmailFeedback(null);setEmailRecoveryMode(false);setEmailResetRequested(false);setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setSmtpStatus(null);setSmtpFeedback(null);setSmtpForm({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});setState(null);await reload();}};
  const openSecurity=async()=>{
    setMinutes(savedMinutes);setSettingsFeedback(null);setAccountMenuOpen(false);
    const opening=!securitySettingsOpen;
    setSecuritySettingsOpen(opening);
    if(!opening){setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null)}
+   setOwnerTempCredential(null);setOwnerAssistPassword('');setOwnerAssistError('');
+   if(!opening){setOwnerUsers([]);setOwnerTarget('')}
    setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setEmailVerifyPending(false);
    if(opening){
      try{const email=await api('/api/auth/email/status');setEmailStatus(email);setEmailValue(email.email||'');setEmailVerifyPending(false);setEmailFeedback(null)}
@@ -1085,7 +1091,24 @@ function SecureApp(){
      catch(e){setSmtpStatus(null);setSmtpFeedback({type:'error',message:e.message})}
      try{const v=await api('/api/auth/recovery/status');setOwnerRecoveryConfigured(!!v.configured)}
      catch{setOwnerRecoveryConfigured(null)}
+     try{
+       const list=await api('/api/auth/users');
+       setOwnerUsers(list.filter(u=>!u.is_owner&&u.is_active));setOwnerTarget('');
+     }catch(e){setOwnerUsers([]);setOwnerAssistError('No se pudo consultar las cuentas: '+e.message)}
    }
+ };
+ const assistOwnerRecover=async e=>{
+   e.preventDefault();if(ownerAssistBusy)return;
+   setOwnerAssistBusy(true);setOwnerAssistError('');setOwnerTempCredential(null);
+   try{
+     if(!ownerTarget)throw Error('Selecciona la cuenta que deseas recuperar.');
+     if(!window.confirm('Se cerrarán las sesiones de la cuenta seleccionada y se emitirá una nueva contraseña temporal. ¿Continuar?'))return;
+     const result=await api(`/api/auth/users/${Number(ownerTarget)}/owner-recovery`,{method:'POST',body:JSON.stringify({currentPassword:ownerAssistPassword})});
+     const target=ownerUsers.find(u=>u.id===Number(ownerTarget));
+     setOwnerTempCredential({username:target?.username||'',password:result.temporaryPassword});
+     setOwnerAssistPassword('');
+     setSettingsFeedback({type:'success',message:'Cuenta recuperada. Entrega la contraseña temporal de forma privada; el usuario deberá cambiarla al iniciar sesión.'});
+   }catch(err){setOwnerAssistError(err.message)}finally{setOwnerAssistBusy(false)}
  };
  const rotateRecovery=async e=>{
    e.preventDefault();setBusy(true);setSettingsFeedback(null);
@@ -1210,7 +1233,7 @@ function SecureApp(){
       </label>
       <div className="securitySettingsActions">
        <button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button>
-       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null)}} disabled={settingsBusy}>Cerrar</button>
+       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setOwnerTempCredential(null);setOwnerAssistPassword('');setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('')}} disabled={settingsBusy}>Cerrar</button>
       </div>
      </div>
     </div>
@@ -1219,6 +1242,37 @@ function SecureApp(){
       <form onSubmit={rotateRecovery}><label htmlFor="owner-recovery-password">Contraseña actual
         <input id="owner-recovery-password" type="password" autoComplete="current-password" required value={ownerRecoveryPassword} onChange={e=>setOwnerRecoveryPassword(e.target.value)}/>
       </label><button disabled={busy} type="submit">{ownerRecoveryConfigured===false?'Crear código de recuperación':'Reemplazar código'}</button></form>
+    </div>}
+    {sessionUser?.isOwner&&<div className="ownerAssistedRecoveryTools" aria-label="Recuperación de cuentas por el propietario">
+      <div className="ownerAssistedHeading">
+       <strong>Recuperar cuentas del personal</strong>
+       <p>Solo el propietario puede recuperar la cuenta de otro usuario. Se genera una contraseña temporal sin cambiar el rol, las empresas asignadas ni el correo verificado.</p>
+       <small>La contraseña temporal se muestra una sola vez. Entrégala de forma privada.</small>
+      </div>
+      <div className="ownerAssistedContent">
+       <form className="ownerAssistedForm" onSubmit={assistOwnerRecover}>
+        <label>Cuenta que deseas recuperar
+         <select required value={ownerTarget} disabled={ownerAssistBusy} onChange={e=>{setOwnerTarget(e.target.value);setOwnerTempCredential(null);setOwnerAssistError('')}}>
+          <option value="">Seleccionar usuario…</option>
+          {ownerUsers.map(u=><option key={u.id} value={u.id}>{u.display_name} (@{u.username})</option>)}
+         </select>
+        </label>
+        <label>Confirma tu contraseña de propietario
+         <input required type="password" autoComplete="current-password" value={ownerAssistPassword} disabled={ownerAssistBusy} onChange={e=>setOwnerAssistPassword(e.target.value)}/>
+        </label>
+        <button disabled={ownerAssistBusy||!ownerTarget} type="submit">{ownerAssistBusy?'Comprobando…':'Generar contraseña temporal'}</button>
+       </form>
+       {ownerAssistError&&<p className="authError" role="alert">{ownerAssistError}</p>}
+       {ownerTempCredential&&<div className="ownerTemporaryNotice" role="status">
+        <strong>Contraseña temporal para @{ownerTempCredential.username}</strong>
+        <p>Este dato se mostrará una sola vez. El usuario deberá cambiarlo en su próximo inicio. No lo envíes por un canal público.</p>
+        <input readOnly aria-label="Nueva contraseña temporal" value={ownerTempCredential.password} onFocus={e=>e.target.select()}/>
+        <div className="actions">
+         <button type="button" className="secondary" onClick={()=>{navigator.clipboard?.writeText(ownerTempCredential.password).catch(()=>{});}}>Copiar</button>
+         <button type="button" onClick={()=>setOwnerTempCredential(null)}>Ya la entregué</button>
+        </div>
+       </div>}
+      </div>
     </div>}
     {sessionUser?.isOwner&&<div className="smtpAdminTools" aria-label="Correo emisor SMTP">
      <div className="smtpAdminHeading">
@@ -1234,6 +1288,7 @@ function SecureApp(){
        <label>Correo remitente<input required type="email" autoComplete="off" value={smtpForm.from} onChange={e=>editSmtp('from',e.target.value)} placeholder="correo@empresa.com"/></label>
        <label>Clave SMTP<input type="password" autoComplete="new-password" value={smtpForm.smtpPassword} onChange={e=>editSmtp('smtpPassword',e.target.value)} required={!smtpStatus?.passwordSaved} placeholder={smtpStatus?.passwordSaved?'Dejar vacío para conservar clave':'Clave o contraseña de aplicación'}/></label>
        <label>Contraseña del propietario<input type="password" autoComplete="current-password" required value={smtpForm.ownerPassword} onChange={e=>editSmtp('ownerPassword',e.target.value)} placeholder="Confirma para guardar o probar"/></label>
+       {smtpForm.host.trim().toLowerCase()==='smtp.gmail.com'&&<p className="smtpGmailHint">Para Gmail, utiliza una contraseña de aplicación de 16 caracteres, no la contraseña normal. Activa la verificación en dos pasos y genera la clave en <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Contraseñas de aplicaciones de Google</a>. Si ya guardaste otra clave, escribe aquí la nueva y pulsa Guardar SMTP cifrado.</p>}
        <div className="smtpAdminActions"><button type="submit" disabled={smtpBusy}>{smtpBusy?'Procesando…':'Guardar SMTP cifrado'}</button><button type="button" disabled={smtpBusy||!smtpStatus?.configured} className="secondary" onClick={removeSmtp}>Eliminar configuración</button></div>
       </form>
       {smtpStatus?.configured&&<form className="smtpTestForm" onSubmit={testSmtp}>

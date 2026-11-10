@@ -65,6 +65,13 @@ export function registerMailAdmin(app,{db,auth,localOriginOnly,audit,verifyPassw
      let info=String(e?.message||'Revisa usuario, clave y conexión.');
      const secret=current()?.password;
      if(secret)info=info.replaceAll(secret,'[oculto]');
+     const code=String(info.match(/\b(?:534|535)\b/)?.[0]||'');
+     if(current()?.host==='smtp.gmail.com'&&code==='534'){
+       return res.status(502).json({error:'Gmail rechazó la autenticación (534). Activa la verificación en dos pasos y crea una contraseña de aplicación de 16 caracteres en myaccount.google.com/apppasswords. Pega esa clave en «Clave SMTP» y vuelve a guardar; NO utilices la contraseña normal de Gmail.'});
+     }
+     if(current()?.host==='smtp.gmail.com'&&code==='535'){
+       return res.status(502).json({error:'Gmail rechazó el usuario o la clave SMTP (535). Verifica la dirección emisora y usa una contraseña de aplicación válida. Guarda de nuevo antes de probar.'});
+     }
      return res.status(502).json({error:`El servidor SMTP no aceptó el envío. ${info.slice(0,180)}`});
    }
  });

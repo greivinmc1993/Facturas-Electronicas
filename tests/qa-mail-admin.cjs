@@ -30,7 +30,7 @@ const {DatabaseSync}=require('node:sqlite');
   const mail=[];
   const routes=[];
   const app={get(p,...handlers){routes.push(['GET',p,handlers])},post(p,...handlers){routes.push(['POST',p,handlers])},put(p,...handlers){routes.push(['PUT',p,handlers])},delete(p,...handlers){routes.push(['DELETE',p,handlers])},use(){}};
-  registerAuth(app,()=>db,{mailStore:store,sendMail:async(content,cfg)=>{if(!cfg?.password)throw Error('Missing SMTP credentials');mail.push({content,cfg})}});
+  registerAuth(app,()=>db,{mailStore:store,sendMail:async(content,cfg)=>{if(!cfg?.password)throw Error('Missing SMTP credentials');if(content.to==='fallo@ejemplo.com')throw Error('Servidor SMTP rechazó la solicitud (534).');mail.push({content,cfg})}});
   const req=(method,route,body={},cookie='',origin='http://127.0.0.1:3001')=>new Promise((resolve,reject)=>{
    const entry=routes.find(([m,p])=>m===method&&p===route);if(!entry){reject(Error('Ruta inexistente: '+route));return}
    let status=200,payload,headers={};
@@ -70,6 +70,13 @@ const {DatabaseSync}=require('node:sqlite');
     assert.equal((await req('POST',send,{to:'destino@ejemplo.com',currentPassword:'incorrecta'},cookie)).status,403);
     assert.equal((await req('POST',send,{to:'destino@ejemplo.com',currentPassword:ownerPass},cookie)).status,200);
     assert.equal(mail.length,1);assert.equal(mail[0].content.to,'destino@ejemplo.com');assert.equal(mail[0].cfg.host,'smtp.office365.com');
+  });
+  await ok('Error Gmail 534 orienta sobre contraseña de aplicación, sin exponer claves',async()=>{
+    assert.equal((await req('PUT',settings,{...input,smtpPassword:'',host:'smtp.gmail.com'},cookie)).status,200);
+    const r=await req('POST',send,{to:'fallo@ejemplo.com',currentPassword:ownerPass},cookie);
+    assert.equal(r.status,502);assert.match(r.body.error,/Gmail.*534/);
+    assert.match(r.body.error,/contraseña de aplicación/);
+    assert.ok(!r.body.error.includes('Clave-smtp-123'));
   });
   await ok('Cajero no puede leer, cambiar, probar ni borrar SMTP',async()=>{
     const r=await req('POST','/api/auth/users',{username:'cajero62',displayName:'Cajero de prueba',password:'TemporalCajaSegura12345',companyId:1,role:'cashier'},cookie);

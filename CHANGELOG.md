@@ -1,3 +1,13 @@
+## Corrección adicional v0.6.62 — SMTP Gmail 534, selectores y recuperación exclusiva del propietario
+
+- Diagnóstico legible del rechazo SMTP 534/535 de Gmail con indicaciones de contraseña de aplicación y enlace oficial; nunca se exponen credenciales cifradas ni se desactiva TLS.
+- Estilo coherente y responsive de desplegables en Seguridad y Usuarios; altura uniforme, icono de flecha, focus visible, hover y deshabilitado.
+- Se conserva la recuperación propia por correo de cada usuario. Solo el propietario puede recuperar cuentas ajenas de personal activo desde Seguridad, confirmando su contraseña y recibiendo una clave temporal única y aleatoria que se muestra una sola vez. La recuperación registra auditoría y revoca sesiones sin alterar roles, empresas ni correo verificado.
+- El endpoint ordinario de editar usuarios ya no acepta contraseñas, para evitar que administradores de empresa eludan la autorización. La administración de empresas/usuarios se mantiene.
+- Nuevas pruebas regresivas para recuperación administrativa, límites de permiso, revocación, contraseña temporal y Gmail 534. Sin migración SQLite ni dependencias nuevas; pruebas Windows de instalación y envío SMTP real por verificar externamente.
+
+---
+
 # FacturaCR v0.6.62 — SMTP configurable desde la aplicación (2026-11-10)
 
 - Panel de configuración del correo emisor exclusivo del propietario en Mi sesión → Seguridad y bloqueo; guarda, elimina y permite probar el envío SMTP. Contraseña del propietario obligatoria, permisos verificados en servidor y registro de auditoría.

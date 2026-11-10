@@ -70,20 +70,30 @@ const path=require('node:path');
  check('Una actualización inválida de varias propiedades no suspende parcialmente al usuario',()=>{
   const oldAudit=count();
   const r=call('PUT','/api/auth/users/:userId',{isActive:false,password:'corta',companyId:2,role:'supervisor'},owner1,{userId:String(cashier)});
-  assert.equal(r.status,400);
+  assert.equal(r.status,403);
   const u=db.prepare('SELECT is_active FROM access_users WHERE id=?').get(cashier);
   assert.equal(u.is_active,1);
   assert.equal(db.prepare('SELECT role FROM access_company_roles WHERE user_id=? AND company_id=2').get(cashier),undefined);
   assert.equal(count(),oldAudit);
   assert.equal(call('GET','/api/auth/status',{},cashier1).body.authenticated,true);
  });
- check('Actualización válida cambia rol y revoca todas las sesiones del afectado',()=>{
-  const r=call('PUT','/api/auth/users/:userId',{isActive:true,password:'NuevaTemporal12345',companyId:2,role:'supervisor'},owner1,{userId:String(cashier)});
+ check('Actualización válida cambia rol, sin cambiar la contraseña, e invalida sesiones',()=>{
+  const r=call('PUT','/api/auth/users/:userId',{isActive:true,companyId:2,role:'supervisor'},owner1,{userId:String(cashier)});
   assert.equal(r.status,200);
   assert.equal(db.prepare('SELECT role FROM access_company_roles WHERE user_id=? AND company_id=2').get(cashier).role,'supervisor');
-  assert.equal(db.prepare('SELECT password_change_required FROM access_users WHERE id=?').get(cashier).password_change_required,1);
+  assert.equal(db.prepare('SELECT password_change_required FROM access_users WHERE id=?').get(cashier).password_change_required,0);
   assert.equal(call('GET','/api/auth/status',{},cashier1).body.authenticated,false);
-  assert.equal(login('cajero1','NuevaTemporal12345').startsWith('facturacr_session='),true);
+  assert.equal(login('cajero1','CajeroPersonal12345').startsWith('facturacr_session='),true);
+ });
+ let temporary;
+ check('Solo propietario recupera al usuario confirmando su contraseña',()=>{
+  const endpoint='/api/auth/users/:userId/owner-recovery',params={userId:String(cashier)};
+  assert.equal(call('POST',endpoint,{currentPassword:'falsa'},owner1,params).status,403);
+  const r=call('POST',endpoint,{currentPassword:secondPassword},owner1,params);
+  assert.equal(r.status,200);assert.ok(r.body.temporaryPassword.startsWith('FCR-9'));
+  temporary=r.body.temporaryPassword;
+  assert.equal(db.prepare('SELECT password_change_required FROM access_users WHERE id=?').get(cashier).password_change_required,1);
+  assert.equal(login('cajero1',temporary).startsWith('facturacr_session='),true);
  });
  check('No hay recuperación sin autenticar: ajustes de personal exigen propietario/administrador',()=>{
   const r=call('PUT','/api/auth/users/:userId',{password:'SinPermiso12345'},'',{userId:String(cashier)});
@@ -92,7 +102,7 @@ const path=require('node:path');
  check('Suspensión revoca todas las sesiones',()=>{
   const r=call('PUT','/api/auth/users/:userId',{isActive:false},owner1,{userId:String(cashier)});
   assert.equal(r.status,200);
-  assert.equal(call('POST','/api/auth/login',{username:'cajero1',password:'NuevaTemporal12345'}).status,401);
+  assert.equal(call('POST','/api/auth/login',{username:'cajero1',password:temporary}).status,401);
  });
  db.close();
  console.log(`QA v0.6.59 seguridad y sesiones: ${passed}/${passed} verificaciones`);
