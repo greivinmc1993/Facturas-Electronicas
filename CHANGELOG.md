@@ -1,3 +1,12 @@
+## Corrección v0.6.63 — Kardex operativo de cajeros y auditoría legible (10 de noviembre de 2026)
+- El menú «Ingresos / Tomas físicas» se reemplazó por **Kardex · Movimientos** para cajeros, con registro de entradas y ajustes de saldo físico, historial y filtros por artículo, SKU, tipo y fechas. El Kardex completo sigue reservado a roles con permiso.
+- El botón «Actualizar inventario y movimientos» recarga existencias y la tabla de movimientos, con notificación visible de éxito o error. Los movimientos se actualizan también después de registrar una operación.
+- Endpoints operativos exclusivos `inventory/kardex/operativo` y reportes `.csv`/`.html` sin campos monetarios, costos ni valorización; validación de permisos por empresa en servidor. Los cajeros no obtienen acceso al Kardex completo ni a salidas manuales.
+- CSV de auditoría del propietario corregido para Excel Windows: UTF-16 LE con BOM y `sep=;`, CRLF, escape de fórmulas y acentos íntegros. Se evita mostrar el JSON técnico de los eventos.
+- Los detalles de auditoría ahora describen en español operación, producto, cantidad y motivo. Cuando es posible, la API añade el nombre y SKU del artículo sin revelar datos sensibles.
+- Nuevo botón de **Guardar página PDF** en auditoría, solo para propietario, usando el mecanismo seguro de Electron (`facturacrReports.savePdf`); diseño profesional A4 horizontal, filtros, totales, tabla y cabeceras repetidas. Exporta la página visible (50 filas), no silenciosamente todo el historial.
+- QA correctiva de 12 pruebas; suite completa e integración comercial verificadas. Se conserva SQLite y no se añaden dependencias ni notas de versión nuevas.
+
 ## 0.6.63 — Usuarios delegados, baja lógica, inventario de caja y auditoría del propietario
 - Delegación individual para supervisores; creación/administración limitada de cajeros.
 - Eliminación lógica de perfiles para propietario y administradores autorizados, con confirmación fuerte y preservación histórica.

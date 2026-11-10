@@ -47,6 +47,40 @@ export function registerKardexRoutes(app,db){
   const rows=db.prepare(`SELECT ${FIELDS} ${BASE} WHERE ${f.where} ORDER BY m.id DESC LIMIT ? OFFSET ?`).all(...f.args,limit,offset).map(movementCost);
   res.json({rows,summary,page:f.page,pageSize:limit,totalPages:Math.max(1,Math.ceil(summary.count/limit))});
  });
+
+ // Kardex operativo del cajero: no comparte ningún campo monetario,
+ // costo histórico, precio de compra ni valoración de inventario.
+ const operationalFields=`m.id,m.created_at,m.product_id,p.description AS product_name,p.product_code,p.unit,m.movement_type,m.quantity,m.delta,m.stock_before,m.stock_after,m.reason,m.notes`;
+ const operationalColumns=['Movimiento','Fecha UTC','Artículo','SKU','Operación','Variación','Existencia anterior','Existencia final','Motivo','Observaciones'];
+ const operationalRow=r=>[r.id,r.created_at,r.product_name,r.product_code||'',r.movement_type,r.delta,r.stock_before,r.stock_after,r.reason||'',r.notes||''];
+ app.get('/api/companies/:companyId/inventory/kardex/operativo',(req,res)=>{
+  const f=core(req,res);if(!f)return;
+  const summary=db.prepare(`SELECT COUNT(*) AS count,COALESCE(SUM(CASE WHEN m.delta>0 THEN m.delta ELSE 0 END),0) AS increases,COALESCE(SUM(CASE WHEN m.delta<0 THEN -m.delta ELSE 0 END),0) AS decreases,COUNT(DISTINCT m.product_id) AS products ${BASE} WHERE ${f.where}`).get(...f.args);
+  const limit=50,offset=(f.page-1)*limit;
+  const rows=db.prepare(`SELECT ${operationalFields} ${BASE} WHERE ${f.where} ORDER BY m.id DESC LIMIT ? OFFSET ?`).all(...f.args,limit,offset);
+  res.setHeader('Cache-Control','no-store');res.json({rows,summary,page:f.page,pageSize:limit,totalPages:Math.max(1,Math.ceil(summary.count/limit))});
+ });
+ app.get('/api/companies/:companyId/inventory/kardex/operativo/export.csv',(req,res)=>{
+  const f=core(req,res);if(!f)return;
+  res.setHeader('Content-Type','text/csv; charset=utf-16le');
+  res.setHeader('Content-Disposition','attachment; filename="FacturaCR_kardex_operativo.csv"');
+  res.write(csvExcelBuffer('sep=;\r\n'+operationalColumns.map(x=>csvCell(x)).join(';')+'\r\n'));
+  const stmt=db.prepare(`SELECT ${operationalFields} ${BASE} WHERE ${f.where} AND m.id<? ORDER BY m.id DESC LIMIT 500`);
+  let last=Number.MAX_SAFE_INTEGER;
+  for(;;){const batch=stmt.all(...f.args,last);if(!batch.length)break;
+   for(const r of batch)res.write(Buffer.from(operationalRow(r).map(v=>csvCell(v)).join(';')+'\r\n','utf16le'));
+   last=batch[batch.length-1].id;if(batch.length<500)break;
+  }
+  res.end();
+ });
+ app.get('/api/companies/:companyId/inventory/kardex/operativo/export.html',(req,res)=>{
+  const f=core(req,res);if(!f)return;
+  const company=db.prepare('SELECT legal_name,trade_name,identification FROM companies WHERE id=?').get(Number(req.params.companyId));
+  const summary=db.prepare(`SELECT COUNT(*) AS count,COALESCE(SUM(CASE WHEN m.delta>0 THEN m.delta ELSE 0 END),0) AS increases,COALESCE(SUM(CASE WHEN m.delta<0 THEN -m.delta ELSE 0 END),0) AS decreases ${BASE} WHERE ${f.where}`).get(...f.args);
+  // Un PDF excesivamente grande ralentiza Electron; limitar y explicar la paginación.
+  const rows=db.prepare(`SELECT ${operationalFields} ${BASE} WHERE ${f.where} ORDER BY m.id DESC LIMIT 1000`).all(...f.args).map(operationalRow);
+  res.type('html').send(reportHtml({title:'Kardex operativo · Movimientos de inventario',company:company.trade_name||company.legal_name,subtitle:`Empresa ${company.identification||''} · Tipo ${f.type} · Desde ${f.from||'inicio'} hasta ${f.to||'actualidad'} (UTC)`,headers:operationalColumns,rows,summary:[['Movimientos filtrados',summary.count],['Unidades añadidas',summary.increases],['Unidades retiradas',summary.decreases]],note:`Reporte operativo sin costos ni valoración. ${summary.count>1000?'Se muestran los 1.000 movimientos recientes; para el historial completo utiliza CSV.':''} Documento interno de FacturaCR.`}));
+ });
  const reportRows=f=>db.prepare(`SELECT ${FIELDS} ${BASE} WHERE ${f.where} ORDER BY m.id DESC`).all(...f.args);
  const exportColumns=['ID','Fecha UTC','Artículo','SKU','Estado','Tipo','Cantidad','Variación','Existencia anterior','Existencia posterior','Unidad','Motivo','Observaciones','Costo unitario histórico CRC','Valor movimiento CRC','Cobertura de costo'];
  const exportRow=raw=>{const r=movementCost(raw);return [r.id,r.created_at,r.product_name,r.product_code,r.is_deleted?'Retirado':'Activo',r.movement_type,r.quantity,r.delta,r.stock_before,r.stock_after,r.unit,r.reason,r.notes,r.unitCostCents===null?'':(r.unitCostCents/100).toFixed(2),r.movementCostCents===null?'':(r.movementCostCents/100).toFixed(2),r.movementCostCents===null?'Sin costo histórico':'Con costo histórico']};

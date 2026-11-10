@@ -66,6 +66,11 @@ const {DatabaseSync}=require('node:sqlite');
   assert.equal(authAction('POST',path,{movement_type:'ajuste'},cashier).ok,true);
   assert.equal(authAction('POST',path,{movement_type:'salida'},cashier).code,403);
   assert.equal(authAction('POST','/companies/2/inventory/movements',{movement_type:'entrada'},cashier).code,403);
+  assert.equal(authAction('GET','/companies/1/inventory/kardex/operativo',{},cashier).ok,true);
+  assert.equal(authAction('GET','/companies/1/inventory/kardex/operativo/export.csv',{},cashier).ok,true);
+  assert.equal(authAction('GET','/companies/1/inventory/kardex/operativo/export.html',{},cashier).ok,true);
+  assert.equal(authAction('GET','/companies/1/inventory/kardex',{},cashier).code,403);
+  assert.equal(authAction('GET','/companies/2/inventory/kardex/operativo',{},cashier).code,403);
  });
  check('Administrador puede eliminar solo perfiles subordinados de empresas propias',()=>{
   const params={userId:String(members.cajero)},url='/api/auth/users/:userId';

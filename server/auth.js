@@ -110,6 +110,8 @@ export function registerAuth(app,getDb,options={}){
     if(/^\/companies\/\d+\/clients\/\d+$/.test(p))return method==='PUT'?'clients.manage':method==='DELETE'?'clients.delete':null;
     if(/^\/companies\/\d+\/sales\/\d+\/payments$/.test(p)&&method==='POST')return 'sales.payments.create';
     if(/^\/companies\/\d+\/sales\/\d+\/annul$/.test(p)&&method==='POST')return 'sales.void';
+    // Kardex operativo sin costos: disponible para cajeros, pero no abre el Kardex valorizado.
+    if(/^\/companies\/\d+\/inventory\/kardex\/operativo(?:\/export\.(?:csv|html))?$/.test(p)&&method==='GET')return 'inventory.read';
     if(/^\/companies\/\d+\/inventory\/movements$/.test(p)){if(method==='GET')return 'inventory.kardex.read';if(method==='POST')return reqMovementPermission;return null;}
     if(/^\/companies\/\d+\/inventory\/.*$/.test(p)&&method==='GET')return 'inventory.kardex.read';
     if(/^\/companies\/\d+\/(?:dashboard|reports|valuation|kardex|credit-history)(?:\/.*)?$/.test(p)&&method==='GET')return 'reports.operational';
@@ -412,7 +414,17 @@ export function registerAuth(app,getDb,options={}){
     if(dateTo){parts.push('l.occurred_at<?');params.push(new Date(Date.parse(dateTo+'T06:00:00Z')+86400000).toISOString().slice(0,19).replace('T',' '))}
     const where=parts.length?' WHERE '+parts.join(' AND '):'';
     const total=db.prepare('SELECT COUNT(*) n FROM access_audit_log l'+where).get(...params).n;
-    const rows=db.prepare(`SELECT l.id,l.occurred_at,l.event_type,l.object_type,l.object_id,l.details_json,l.user_id,l.company_id,u.username,u.display_name,c.trade_name,c.legal_name,t.username AS target_username,t.display_name AS target_name FROM access_audit_log l LEFT JOIN access_users u ON u.id=l.user_id LEFT JOIN companies c ON c.id=l.company_id LEFT JOIN access_users t ON l.object_type='user' AND t.id=CAST(l.object_id AS INTEGER) ${where} ORDER BY l.id DESC LIMIT 50 OFFSET ?`).all(...params,(page-1)*50).map(r=>{let details={};try{details=JSON.parse(r.details_json||'{}')}catch{}return {...r,details,details_json:undefined}});
+    const rows=db.prepare(`SELECT l.id,l.occurred_at,l.event_type,l.object_type,l.object_id,l.details_json,l.user_id,l.company_id,u.username,u.display_name,c.trade_name,c.legal_name,t.username AS target_username,t.display_name AS target_name FROM access_audit_log l LEFT JOIN access_users u ON u.id=l.user_id LEFT JOIN companies c ON c.id=l.company_id LEFT JOIN access_users t ON l.object_type='user' AND t.id=CAST(l.object_id AS INTEGER) ${where} ORDER BY l.id DESC LIMIT 50 OFFSET ?`).all(...params,(page-1)*50).map(r=>{
+      let details={};try{details=JSON.parse(r.details_json||'{}')}catch{}
+      let product_name=null,product_code=null;
+      if(r.event_type==='inventory.movement'&&Number.isSafeInteger(Number(details.productId))&&Number(details.productId)>0){
+        try{
+          const product=db.prepare('SELECT description,product_code FROM products WHERE id=? AND company_id=?').get(Number(details.productId),r.company_id);
+          product_name=product?.description||null;product_code=product?.product_code||null;
+        }catch{} // Una base mínima antigua puede no tener aún catálogo.
+      }
+      return {...r,details,product_name,product_code,details_json:undefined};
+    });
     res.setHeader('Cache-Control','no-store');res.json({rows,total,page,pageSize:50});
   });
   app.get('/api/auth/audit/actors',(req,res)=>{

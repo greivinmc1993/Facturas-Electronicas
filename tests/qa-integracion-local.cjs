@@ -156,6 +156,21 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(r.status,200);assert.ok(r.body.includes('Existencia anterior'));
    assert.ok(r.body.includes('Inventario inicial'));
   });
+  await check('Kardex operativo del cajero: historial sin costos y aislado por empresa',async()=>{
+   let r=await call('GET',`/api/companies/${a}/inventory/kardex/operativo?productId=${prodId}`);
+   assert.equal(r.status,200);assert.ok(r.body.rows.length>=1);
+   assert.ok(r.body.rows.every(x=>!Object.hasOwn(x,'unit_cost_cents')&&!Object.hasOwn(x,'unitCostCents')&&!Object.hasOwn(x,'movementCostCents')));
+   assert.ok(!JSON.stringify(r.body).includes('incomingCents'));
+   r=await call('GET',`/api/companies/${b}/inventory/kardex/operativo`);assert.equal(r.status,200);assert.equal(r.body.rows.length,0);
+  });
+  await check('Reportes operativos CSV y PDF contienen existencias sin cifras de costo',async()=>{
+   let r=await call('GET',`/api/companies/${a}/inventory/kardex/operativo/export.csv?productId=${prodId}`);
+   assert.equal(r.status,200);assert.ok(r.body.includes('Existencia anterior'));
+   assert.ok(!r.body.includes('Costo unitario histórico'));
+   r=await call('GET',`/api/companies/${a}/inventory/kardex/operativo/export.html?productId=${prodId}`);
+   assert.equal(r.status,200);assert.ok(r.body.includes('Kardex operativo'));
+   assert.ok(!r.body.includes('Costo unitario CRC'));
+  });
   await check('Alertas de inventario por empresa no mezclan artículos y validan compañía',async()=>{
    const aRes=await call('GET',`/api/companies/${a}/inventory/alerts`);
    assert.equal(aRes.status,200);assert.equal(aRes.body.summary.total,0);
