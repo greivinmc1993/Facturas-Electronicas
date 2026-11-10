@@ -2,6 +2,14 @@
 
 **Versión vigente: 0.6.59 (9 de noviembre de 2026).** Esta actualización parte de v0.6.58 y conserva módulos comerciales, base SQLite e instalador NSIS.
 
+## Corrección adicional de v0.6.59: migración real 0.6.34 → 0.6.59 (HTTP 401)
+
+- **Causa del fallo en Actions:** la migración conservaba correctamente empresas, ventas, proformas e inventario, pero `qa:version-upgrade` consultaba `/api/companies` **sin cookie** después de iniciar un servidor HTTP nuevo. El usuario creado durante el smoke de Electron persiste en SQLite, pero su sesión en memoria **no se comparte entre procesos**; por seguridad, la API responde HTTP 401.
+- **Corrección:** al arrancar el ejecutable nuevo, el QA entrega una contraseña temporal aleatoria mediante variable de entorno **solo al proceso de prueba**. El verificador HTTP consulta `/api/auth/status`, confirma que el propietario ya existe y que todavía no hay sesión, comprueba rechazo 401 sin cookie y realiza `POST /api/auth/login` con las credenciales efímeras. Utiliza la cookie `HttpOnly` / `SameSite=Strict` en las consultas de empresas, ventas, proformas y ajustes.
+- **Seguridad:** no se crean accesos ocultos ni se deshabilita la autenticación; la cookie y la contraseña no se agregan al JSON de evidencias, a los argumentos del `.exe` ni a los logs. También se verifica que las rutas comerciales sigan rechazando solicitudes sin sesión después del login.
+- **Cobertura:** seis pruebas nuevas ejecutables con `node tests/qa-version-auth-test.cjs`, incluidas en `npm test`, más verificación estática del contrato. El ensayo **real** entre instaladores v0.6.34 y v0.6.59 todavía debe aprobarse en **GitHub Actions Windows** para cerrar el incidente.
+- La corrección se mantiene en **v0.6.59**, sin cambiar el esquema SQLite ni alterar módulos comerciales. Ejecutar el workflow **QA Windows e instalador** después de subir el código.
+
 ## Corrección adicional de v0.6.59: prueba de reinstalación NSIS (9 de noviembre de 2026)
 
 - **Fallo corregido en `qa:install-upgrade`:** al reinstalar, el propietario creado durante el primer arranque **permanece en SQLite**. El QA del ejecutable ahora reconoce ambos estados seguros: `Configurar propietario` cuando no existe cuenta propietaria, e `Iniciar sesión` cuando ya existe.

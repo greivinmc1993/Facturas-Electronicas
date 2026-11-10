@@ -9,6 +9,7 @@ const fixture=path.join(root,'tests','fixtures','FacturaCR_v0.6.34_baseline.zip'
 const manifest=require('./fixtures/baseline-manifest.json');
 const flow=fs.readFileSync(path.join(root,'.github','workflows','windows-installer.yml'),'utf8');
 const test=fs.readFileSync(path.join(root,'tests','qa-version-upgrade.cjs'),'utf8');
+const auth=fs.readFileSync(path.join(root,'tests','qa-version-auth.cjs'),'utf8');
 let count=0;
 function check(name,fn){fn();count++;console.log('OK',name)}
 check('La fuente anterior está congelada y verificada por SHA256',()=>{
@@ -37,5 +38,10 @@ check('QA compara las tablas e inspecciona API posterior a la actualización',()
  for(const phrase of ['snapshot(db)','foreign_key_check','verifyApiAfterUpgrade','quote-settings','balance_cents','inventory_movements']){
   assert.ok(test.includes(phrase),phrase);
  }
+});
+check('La API migrada exige sesión nueva y verifica el rechazo 401',()=>{
+ for(const phrase of ['FACTURACR_QA_OWNER_PASSWORD','authenticateUpgradeApi','auth.verifyUnauthorized'])assert.ok(test.includes(phrase),phrase);
+ for(const phrase of ['/api/auth/status','/api/auth/login',"'/api/companies'",'AUTH_REQUIRED','HttpOnly','SameSite=Strict','facturacr_session'])assert.ok(auth.includes(phrase),phrase);
+ assert.ok(!test.includes('sessionCookie='),'No incorporar cookies estáticas al ensayo');
 });
 console.log(`QA contrato de upgrade: ${count}/${count}`);

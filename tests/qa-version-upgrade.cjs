@@ -8,6 +8,7 @@ const path=require('node:path');
 const {spawn}=require('node:child_process');
 const crypto=require('node:crypto');
 const {assertHistoricalRowsPreserved}=require('./qa-upgrade-schema.cjs');
+const {authenticateUpgradeApi}=require('./qa-version-auth.cjs');
 const root=path.resolve(__dirname,'..');
 const release=path.join(root,'release');
 const evidence=path.join(release,'qa-evidence');
@@ -34,6 +35,10 @@ const dbFile=path.join(dataDir,'facturacr.sqlite');
 const exe=path.join(installDir,'FacturaCR.exe');
 const report={previousVersion,currentVersion,passed:false,steps:[],previousSha256:null,currentSha256:null};
 const marker='QA_VERSION_'+process.pid+'_'+Date.now();
+// El smoke del .exe crea el propietario. La contraseña se comparte solo con los
+// procesos temporales de QA, para iniciar una NUEVA sesión en la API posterior.
+const ownerUsername='qa_propietario';
+const ownerPassword='QaTemporal'+crypto.randomBytes(24).toString('hex')+'9';
 const sleep=ms=>new Promise(ok=>setTimeout(ok,ms));
 fs.mkdirSync(evidence,{recursive:true});
 fs.mkdirSync(dataDir,{recursive:true});
@@ -49,7 +54,8 @@ function mark(name,details={}){report.steps.push({name,ok:true,...details});cons
 async function smoke(stage,expected){
  const resultFile=path.join(tempRoot,stage+'.json');
  const shot=path.join(tempRoot,stage+'.png');
- const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${dataDir}`,`--qa-result=${resultFile}`,`--qa-screenshot=${shot}`],{cwd:root,windowsHide:false,stdio:'ignore'});
+ const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${dataDir}`,`--qa-result=${resultFile}`,`--qa-screenshot=${shot}`],{cwd:root,windowsHide:false,stdio:'ignore',
+   env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:ownerPassword}});
  let exited=false;
  child.once('exit',()=>{exited=true});
  try{
@@ -123,9 +129,14 @@ async function verifyApiAfterUpgrade(){
  const active=await startServer({dataDir,port:0});
  try{
   const base=`http://127.0.0.1:${active.port}`;
-  async function get(p){const r=await fetch(base+p);assert.equal(r.status,200,p);return r.json()}
+  // El login de Electron pertenece a otro proceso. La nueva API requiere
+  // una sesión propia, creada por el endpoint normal y cookie HttpOnly.
+  const auth=await authenticateUpgradeApi(base,{username:ownerUsername,password:ownerPassword});
+  const get=auth.get;
   const health=await get('/api/health');assert.equal(health.version,currentVersion);
   const companies=await get('/api/companies');
+  // También después del login, las solicitudes sin cookie deben seguir bloqueadas.
+  await auth.verifyUnauthorized('/api/companies');
   assert.equal(companies.length,2,'Las empresas no aparecen en la API actualizada');
   const company=companies.find(c=>c.identification===marker);
   assert.ok(company,'No aparece la empresa principal');

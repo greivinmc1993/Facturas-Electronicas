@@ -1,3 +1,12 @@
+## Corrección adicional v0.6.59 — QA migración entre versiones y autenticación HTTP
+
+- `qa:version-upgrade` deja de consultar `/api/companies` sin autenticación después de la migración real desde v0.6.34. El proceso de Electron conserva el propietario en SQLite, pero un servidor HTTP nuevo requiere iniciar una sesión nueva.
+- El QA comparte solo durante la ejecución una contraseña QA aleatoria por variable de entorno con el smoke empaquetado y usa `/api/auth/status`, `/api/auth/login` y la cookie `HttpOnly; SameSite=Strict` para consultar empresas, ventas, proformas y configuración. Comprueba explícitamente que el acceso sin cookie continúe devolviendo 401.
+- Nuevo helper `tests/qa-version-auth.cjs` y 6 pruebas de regresión `tests/qa-version-auth-test.cjs` incorporadas a `npm test`, además de una comprobación del contrato de actualización. No se guardan secretos de QA en evidencias ni se desactiva autenticación.
+- Se mantienen versión 0.6.59, permisos, módulos comerciales, esquema SQLite, instalador Windows, README unificado y las pruebas existentes. Ejecución real de la migración NSIS en Windows Actions: pendiente de revalidación.
+
+---
+
 ## Corrección adicional v0.6.59 — QA de reinstalación NSIS
 
 - `qa:install-upgrade` ya no exige erróneamente el formulario **Configurar propietario** en la segunda ejecución. Comprueba el inicio de sesión cuando la cuenta propietaria persiste en SQLite.
