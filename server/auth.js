@@ -75,7 +75,7 @@ export function registerAuth(app,getDb,options={}){
     if(!s)return null;
     const now=Date.now(),idle=Number(settings().idle_lock_minutes);
     if(now>s.expires||idle>0&&now-s.lastActivity>idle*60000){sessions.delete(key);return null;}
-    const user=db.prepare('SELECT id,username,display_name,is_owner,is_active,password_change_required FROM access_users WHERE id=?').get(s.userId);
+    const user=db.prepare('SELECT id,username,display_name,is_owner,is_active,password_change_required FROM access_users WHERE id=? AND is_deleted=0').get(s.userId);
     if(!user?.is_active){sessions.delete(key);return null;}
     return {key,session:s,user};
   };
@@ -83,7 +83,8 @@ export function registerAuth(app,getDb,options={}){
   const smtpMailer=options.sendMail||((mail,cfg)=>sendSecurityMail(mail,cfg||options.mailStore?.read()));
   const publicState=()=>({setupRequired:ownerCount()===0,emailRecoveryAvailable:smtpConfigured(),...settings()});
   const userCompanies=userId=>db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(userId);
-  const displayUser=user=>({id:user.id,username:user.username,displayName:user.display_name,isOwner:!!user.is_owner,passwordChangeRequired:!!user.password_change_required,companies:user.is_owner?[]:userCompanies(user.id)});
+  const delegatedCashiers=user=>user.is_owner?[]:db.prepare("SELECT r.company_id FROM access_company_roles r JOIN access_permission_overrides o ON o.user_id=r.user_id AND o.company_id=r.company_id AND o.permission='users.manage_cashiers' AND o.allowed=1 WHERE r.user_id=? AND r.role='supervisor'").all(user.id).map(x=>x.company_id);
+  const displayUser=user=>({id:user.id,username:user.username,displayName:user.display_name,isOwner:!!user.is_owner,passwordChangeRequired:!!user.password_change_required,companies:user.is_owner?[]:userCompanies(user.id),delegatedCashierCompanies:delegatedCashiers(user)});
   const audit=(userId,type,objectType='',objectId='',companyId=null)=>db.prepare('INSERT INTO access_audit_log(user_id,company_id,event_type,object_type,object_id) VALUES (?,?,?,?,?)').run(userId,companyId,type,objectType,String(objectId));
   function can(user,companyId,permission){
     if(user.is_owner)return true;
@@ -94,8 +95,9 @@ export function registerAuth(app,getDb,options={}){
     return defaultPermissionsFor(assignment.role).includes(permission);
   }
   // Política de denegación predeterminada: las rutas sin clasificación NO quedan abiertas.
-  function permissionFor(method,relative){
+  function permissionFor(method,relative,body={}){
     const p=relative;
+    const reqMovementPermission=body?.movement_type==='entrada'?'inventory.receive':body?.movement_type==='ajuste'?'inventory.count':'inventory.adjust';
     if(method==='GET'&&p==='/companies')return 'companies.list';
     if(method==='GET'&&p==='/geography')return 'companies.list';
     if(/^\/companies\/\d+\/sales\/draft(?:\/beacon)?$/.test(p))return ['GET','PUT','DELETE','POST'].includes(method)?'sales.create':null;
@@ -108,7 +110,7 @@ export function registerAuth(app,getDb,options={}){
     if(/^\/companies\/\d+\/clients\/\d+$/.test(p))return method==='PUT'?'clients.manage':method==='DELETE'?'clients.delete':null;
     if(/^\/companies\/\d+\/sales\/\d+\/payments$/.test(p)&&method==='POST')return 'sales.payments.create';
     if(/^\/companies\/\d+\/sales\/\d+\/annul$/.test(p)&&method==='POST')return 'sales.void';
-    if(/^\/companies\/\d+\/inventory\/movements$/.test(p))return method==='GET'?'inventory.kardex.read':method==='POST'?'inventory.adjust':null;
+    if(/^\/companies\/\d+\/inventory\/movements$/.test(p)){if(method==='GET')return 'inventory.kardex.read';if(method==='POST')return reqMovementPermission;return null;}
     if(/^\/companies\/\d+\/inventory\/.*$/.test(p)&&method==='GET')return 'inventory.kardex.read';
     if(/^\/companies\/\d+\/(?:dashboard|reports|valuation|kardex|credit-history)(?:\/.*)?$/.test(p)&&method==='GET')return 'reports.operational';
     if(/^\/companies\/\d+\/cash$/.test(p)&&method==='GET')return 'cash.open';
@@ -196,26 +198,28 @@ export function registerAuth(app,getDb,options={}){
     const username=String(req.body?.username||'').trim().toLowerCase(),key=username.slice(0,80);
     const fail=failures.get(key)||{n:0,until:0};
     if(Date.now()<fail.until)return res.status(429).json({error:'Demasiados intentos. Inténtalo más tarde.'});
-    const row=db.prepare('SELECT * FROM access_users WHERE username=? AND is_active=1').get(username);
+    const row=db.prepare('SELECT * FROM access_users WHERE username=? AND is_active=1 AND is_deleted=0').get(username);
     let valid=false;
     try{valid=!!row&&verifyPassword(req.body?.password,row.password_hash);}catch{}
     if(!valid){
       fail.n+=1;fail.until=Date.now()+Math.min(LOGIN_DELAY_MAX,Math.max(0,fail.n-4)*30000);
       failures.set(key,fail);
+      if(row)try{audit(row.id,'auth.login_failed','user',row.id)}catch{}
       return res.status(401).json({error:'Usuario o contraseña incorrectos.'});
     }
     failures.delete(key);
+    audit(row.id,'auth.login','user',row.id);
     const token=randomBytes(32).toString('hex');
     sessions.set(tokenHash(token),{userId:row.id,lastActivity:Date.now(),expires:Date.now()+TOKEN_TTL});
     res.setHeader('Set-Cookie',cookie(token,Math.ceil(TOKEN_TTL/1000)));
     res.json({ok:true,user:displayUser(row),...settings()});
   });
   app.post('/api/auth/lock',localOriginOnly,(req,res)=>{
-    const a=credentials(req);if(a)sessions.delete(a.key);
+    const a=credentials(req);if(a){audit(a.user.id,'auth.lock','user',a.user.id);sessions.delete(a.key);}
     res.setHeader('Set-Cookie',cookie('',0));res.json({ok:true});
   });
   app.post('/api/auth/logout',localOriginOnly,(req,res)=>{
-    const a=credentials(req);if(a)sessions.delete(a.key);
+    const a=credentials(req);if(a){audit(a.user.id,'auth.logout','user',a.user.id);sessions.delete(a.key);}
     res.setHeader('Set-Cookie',cookie('',0));res.json({ok:true});
   });
   app.post('/api/auth/touch',localOriginOnly,(req,res)=>{
@@ -238,15 +242,24 @@ export function registerAuth(app,getDb,options={}){
     })();
     res.json(settings());
   });
-  // Gestión delegada: administrador de empresa solo gestiona personal subordinado en sus empresas.
+  // La delegación de supervisores se limita a cajeros de sus empresas.
   const adminCompanies=user=>user.is_owner?null:db.prepare("SELECT company_id FROM access_company_roles WHERE user_id=? AND role='company_admin'").all(user.id).map(r=>r.company_id);
-  function manager(req,res){const a=auth(req,res);if(!a?.session)return null;if(a.user.password_change_required){res.status(403).json({error:'Cambia primero tu contraseña temporal.'});return null;}const managed=adminCompanies(a.user);if(managed&&!managed.length){res.status(403).json({error:'No tienes permisos para administrar usuarios.'});return null;}return {...a,managed};}
-  const manages=(a,companyId)=>a.user.is_owner||a.managed.includes(companyId);
+  function manager(req,res){
+    const a=auth(req,res);if(!a?.session)return null;
+    if(a.user.password_change_required){res.status(403).json({error:'Cambia primero tu contraseña temporal.'});return null;}
+    const managed=adminCompanies(a.user),delegated=delegatedCashiers(a.user);
+    if(managed&&!managed.length&&!delegated.length){res.status(403).json({error:'No tienes permisos para administrar usuarios.'});return null;}
+    return {...a,managed,delegated};
+  }
+  const manages=(a,companyId)=>a.user.is_owner||a.managed?.includes(companyId);
+  const managesCashier=(a,companyId)=>manages(a,companyId)||a.delegated?.includes(companyId);
+  const subordinate=(a,u)=>!u.is_owner&&userCompanies(u.id).length>0&&userCompanies(u.id).every(c=>c.role==='cashier'&&managesCashier(a,c.company_id));
+  const manageableTarget=(a,u)=>!u.is_owner&&userCompanies(u.id).length>0&&userCompanies(u.id).every(c=>manages(a,c.company_id)&& (a.user.is_owner||c.role!=='company_admin'));
   app.get('/api/auth/users',(req,res)=>{
     const a=manager(req,res);if(!a)return;
-    const users=db.prepare('SELECT id,username,display_name,is_owner,is_active,password_change_required FROM access_users ORDER BY is_owner DESC,id ASC').all();
-    res.json(users.filter(u=>a.user.is_owner||(!u.is_owner&&userCompanies(u.id).some(c=>a.managed.includes(c.company_id))))
-      .map(u=>({...u,companies:u.is_owner?[]:userCompanies(u.id).filter(c=>a.user.is_owner||a.managed.includes(c.company_id))})));
+    const users=db.prepare('SELECT id,username,display_name,is_owner,is_active,password_change_required,is_deleted FROM access_users WHERE is_deleted=0 ORDER BY is_owner DESC,id ASC').all();
+    res.json(users.filter(u=>a.user.is_owner||(!u.is_owner&&userCompanies(u.id).some(c=>manages(a,c.company_id)||c.role==='cashier'&&a.delegated.includes(c.company_id))))
+      .map(u=>({...u,companies:u.is_owner?[]:userCompanies(u.id).filter(c=>a.user.is_owner||manages(a,c.company_id)||c.role==='cashier'&&a.delegated.includes(c.company_id)).map(c=>({...c,cashierDelegation:c.role==='supervisor'&&!!db.prepare("SELECT allowed FROM access_permission_overrides WHERE user_id=? AND company_id=? AND permission='users.manage_cashiers'").get(u.id,c.company_id)?.allowed}))})));
   });
   app.post('/api/auth/users',localOriginOnly,(req,res)=>{
     const a=manager(req,res);if(!a)return;
@@ -255,7 +268,7 @@ export function registerAuth(app,getDb,options={}){
       const companyId=Number(req.body?.companyId),role=String(req.body?.role||'');
       if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username)||displayName.length<2||displayName.length>160)throw Error('Usuario o nombre inválido.');
       if(!['company_admin','supervisor','cashier'].includes(role)||!Number.isSafeInteger(companyId)||companyId<=0||!db.prepare('SELECT id FROM companies WHERE id=?').get(companyId))throw Error('Selecciona empresa y rol válidos.');
-      if(!manages(a,companyId)||!a.user.is_owner&&role==='company_admin')return res.status(403).json({error:'No puedes asignar este rol o empresa.'});
+      if(!managesCashier(a,companyId)||!manages(a,companyId)&&role!=='cashier'||!a.user.is_owner&&role==='company_admin')return res.status(403).json({error:'No puedes asignar este rol o empresa.'});
       const hash=passwordHash(req.body?.password);
       const id=db.transaction(()=>{
         const id=Number(db.prepare("INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required) VALUES (?,?,?,'scrypt',0,1,1)").run(username,displayName,hash).lastInsertRowid);
@@ -276,8 +289,8 @@ export function registerAuth(app,getDb,options={}){
     const targetId=Number(req.params.userId);
     if(!Number.isSafeInteger(targetId)||targetId<=0||targetId===a.user.id)
       return res.status(400).json({error:'Selecciona una cuenta de personal válida.'});
-    const target=db.prepare('SELECT id,is_owner,is_active FROM access_users WHERE id=?').get(targetId);
-    if(!target||target.is_owner||!target.is_active)
+    const target=db.prepare('SELECT id,is_owner,is_active,is_deleted FROM access_users WHERE id=?').get(targetId);
+    if(!target||target.is_owner||!target.is_active||target.is_deleted)
       return res.status(404).json({error:'La cuenta no existe o está suspendida.'});
     const previous=ownerResetAttempts.get(a.user.id),now=Date.now();
     if(previous&&previous.until>now&&previous.count>=5)
@@ -305,14 +318,16 @@ export function registerAuth(app,getDb,options={}){
   });
   app.put('/api/auth/users/:userId',localOriginOnly,(req,res)=>{
     const a=manager(req,res);if(!a)return;
-    const id=Number(req.params.userId),target=db.prepare('SELECT id,is_owner FROM access_users WHERE id=?').get(id);
-    if(!target||target.is_owner)return res.status(400).json({error:'No se puede modificar esta cuenta.'});
+    const id=Number(req.params.userId),target=db.prepare('SELECT id,is_owner,is_deleted FROM access_users WHERE id=?').get(id);
+    if(!target||target.is_owner||target.is_deleted)return res.status(400).json({error:'No se puede modificar esta cuenta.'});
     // Ni propietario ni administrador pueden saltarse la confirmación de contraseña
     // del procedimiento de recuperación utilizando el endpoint de edición normal.
     if(req.body?.password!==undefined)return res.status(403).json({error:'Para restablecer contraseñas utiliza la recuperación exclusiva del propietario.'});
     const assignments=userCompanies(id);
-    if(!a.user.is_owner&&(!assignments.length||assignments.some(c=>!a.managed.includes(c.company_id)||c.role==='company_admin')))
-      return res.status(403).json({error:'Solo el propietario puede modificar esta cuenta.'});
+    if(!a.user.is_owner&&!manageableTarget(a,target)){
+      if(!subordinate(a,target)||req.body?.companyId!==undefined||Object.keys(req.body||{}).some(k=>k!=='isActive'))
+        return res.status(403).json({error:'Solo puedes suspender o reactivar cajeros autorizados.'});
+    }
     try{
       if(req.body?.companyId!==undefined){
         const companyId=Number(req.body.companyId),role=String(req.body.role||'');
@@ -348,6 +363,64 @@ export function registerAuth(app,getDb,options={}){
     audit(a.user.id,'users.company_access_revoked','user',userId,companyId);
     res.json({ok:true});
   });
+  // Permiso granular: solo el propietario lo activa por supervisor y empresa.
+  app.put('/api/auth/users/:userId/delegation',localOriginOnly,(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner||a.user.password_change_required)return res.status(403).json({error:'Solo el propietario puede delegar la creación de cajeros.'});
+    const id=Number(req.params.userId),companyId=Number(req.body?.companyId),allowed=req.body?.allowed;
+    if(!Number.isSafeInteger(id)||!Number.isSafeInteger(companyId)||typeof allowed!=='boolean'||
+       !db.prepare("SELECT 1 FROM access_company_roles r JOIN access_users u ON u.id=r.user_id WHERE r.user_id=? AND r.company_id=? AND r.role='supervisor' AND u.is_active=1 AND u.is_deleted=0").get(id,companyId))
+      return res.status(400).json({error:'Selecciona un supervisor activo y su empresa.'});
+    db.transaction(()=>{
+      db.prepare("INSERT INTO access_permission_overrides(user_id,company_id,permission,allowed,changed_by) VALUES (?,?, 'users.manage_cashiers', ?,?) ON CONFLICT(user_id,company_id,permission) DO UPDATE SET allowed=excluded.allowed,changed_by=excluded.changed_by,changed_at=CURRENT_TIMESTAMP").run(id,companyId,allowed?1:0,a.user.id);
+      audit(a.user.id,'users.cashier_delegation','user',id,companyId);
+    })();
+    revokeUserSessions(id);
+    res.json({ok:true,allowed});
+  });
+  // Eliminar perfil = baja lógica; nunca elimina historial fiscal, ventas o auditoría.
+  app.delete('/api/auth/users/:userId',localOriginOnly,(req,res)=>{
+    const a=manager(req,res);if(!a)return;
+    const id=Number(req.params.userId),target=db.prepare('SELECT id,username,is_owner,is_deleted FROM access_users WHERE id=?').get(id);
+    if(!target||target.is_owner||target.is_deleted||id===a.user.id)return res.status(400).json({error:'No se puede eliminar esta cuenta.'});
+    if(!manageableTarget(a,target))return res.status(403).json({error:'No tienes permiso para eliminar ese perfil.'});
+    if(req.body?.confirmation!==target.username)return res.status(400).json({error:'Confirma exactamente el nombre de usuario.'});
+    const ownerRow=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
+    if(!verifyPassword(req.body?.currentPassword,ownerRow?.password_hash))return res.status(403).json({error:'Contraseña actual incorrecta.'});
+    db.transaction(()=>{
+      db.prepare('UPDATE access_users SET is_active=0,is_deleted=1,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(id);
+      db.prepare('DELETE FROM access_email_tokens WHERE user_id=?').run(id);
+      db.prepare('DELETE FROM access_user_emails WHERE user_id=?').run(id);
+      audit(a.user.id,'users.deleted','user',id);
+    })();
+    revokeUserSessions(id);
+    res.json({ok:true,message:'Perfil eliminado de la lista activa. Historial comercial conservado.'});
+  });
+  // Bitácora exclusiva del propietario; paginación y filtrado se aplican en SQL.
+  app.get('/api/auth/audit',(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner||a.user.password_change_required)return res.status(403).json({error:'Solo el propietario puede consultar la auditoría completa.'});
+    const page=Number(req.query?.page||1),userId=Number(req.query?.userId||0),companyId=Number(req.query?.companyId||0),category=String(req.query?.category||'').trim(),dateFrom=String(req.query?.from||''),dateTo=String(req.query?.to||'');
+    const validDay=v=>{if(!v)return true;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const t=Date.parse(v+'T00:00:00Z');return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===v};
+    if(!Number.isSafeInteger(page)||page<1||page>100000||!Number.isSafeInteger(userId)||userId<0||!Number.isSafeInteger(companyId)||companyId<0||category.length>45||![dateFrom,dateTo].every(validDay)||dateFrom&&dateTo&&dateFrom>dateTo)
+      return res.status(400).json({error:'Filtros de auditoría inválidos.'});
+    const parts=[],params=[];
+    if(userId){parts.push('l.user_id=?');params.push(userId)}
+    if(companyId){parts.push('l.company_id=?');params.push(companyId)}
+    if(category){parts.push('l.event_type LIKE ?');params.push(category.replace(/[%_]/g,'')+'%')}
+    if(dateFrom){parts.push('l.occurred_at>=?');params.push(dateFrom+' 06:00:00')}
+    if(dateTo){parts.push('l.occurred_at<?');params.push(new Date(Date.parse(dateTo+'T06:00:00Z')+86400000).toISOString().slice(0,19).replace('T',' '))}
+    const where=parts.length?' WHERE '+parts.join(' AND '):'';
+    const total=db.prepare('SELECT COUNT(*) n FROM access_audit_log l'+where).get(...params).n;
+    const rows=db.prepare(`SELECT l.id,l.occurred_at,l.event_type,l.object_type,l.object_id,l.details_json,l.user_id,l.company_id,u.username,u.display_name,c.trade_name,c.legal_name,t.username AS target_username,t.display_name AS target_name FROM access_audit_log l LEFT JOIN access_users u ON u.id=l.user_id LEFT JOIN companies c ON c.id=l.company_id LEFT JOIN access_users t ON l.object_type='user' AND t.id=CAST(l.object_id AS INTEGER) ${where} ORDER BY l.id DESC LIMIT 50 OFFSET ?`).all(...params,(page-1)*50).map(r=>{let details={};try{details=JSON.parse(r.details_json||'{}')}catch{}return {...r,details,details_json:undefined}});
+    res.setHeader('Cache-Control','no-store');res.json({rows,total,page,pageSize:50});
+  });
+  app.get('/api/auth/audit/actors',(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario puede consultar actores históricos.'});
+    res.setHeader('Cache-Control','no-store');
+    res.json(db.prepare('SELECT id,username,display_name,is_deleted FROM access_users ORDER BY display_name,id').all());
+  });
   app.post('/api/auth/password-change',localOriginOnly,(req,res)=>{
     const a=auth(req,res);if(!a)return;
     const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
@@ -374,15 +447,46 @@ export function registerAuth(app,getDb,options={}){
     const a=credentials(req);
     if(!a)return res.status(401).json({error:'Tu sesión está bloqueada o ha expirado.',code:'AUTH_REQUIRED'});
     if(a.user.password_change_required)return res.status(403).json({error:'Debes cambiar tu contraseña temporal antes de continuar.',code:'PASSWORD_CHANGE_REQUIRED'});
+    const path=req.path,method=req.method||'GET';
     if(!a.user.is_owner){
-      const path=req.path,method=req.method||'GET';
-      const permission=permissionFor(method,path);
+      const permission=permissionFor(method,path,req.body);
       if(!permission)return res.status(403).json({error:'Operación reservada al propietario.'});
-      if(permission==='companies.list'){req.authUser=a.user;return next();}
-      const match=path.match(/^\/companies\/(\d+)(?:\/|$)/);
-      if(!match||!can(a.user,Number(match[1]),permission))return res.status(403).json({error:'No tienes autorización en esta empresa.'});
+      if(permission!=='companies.list'){
+        const match=path.match(/^\/companies\/(\d+)(?:\/|$)/);
+        if(!match||!(can(a.user,Number(match[1]),permission)||['inventory.receive','inventory.count'].includes(permission)&&can(a.user,Number(match[1]),'inventory.adjust')))return res.status(403).json({error:'No tienes autorización en esta empresa.'});
+      }
     }
     req.authUser=a.user;
+    const operations=[
+      [/^\/companies\/\d+\/sales$/, 'sales.create'],
+      [/^\/companies\/\d+\/sales\/\d+\/annul$/, 'sales.void'],
+      [/^\/companies\/\d+\/sales\/\d+\/payments$/, 'sales.payment'],
+      [/^\/companies\/\d+\/inventory\/movements$/, 'inventory.movement'],
+      [/^\/companies\/\d+\/cash\/(open|close)$/, 'cash.operation'],
+      [/^\/companies\/\d+\/cash\/expenses$/, 'cash.expense'],
+      [/^\/companies\/\d+\/products(?:\/\d+)?$/, 'inventory.product_changed'],
+      [/^\/companies\/\d+\/clients(?:\/\d+)?$/, 'clients.changed'],
+      [/^\/companies\/\d+\/quotations(?:\/\d+)?$/, 'quotations.changed'],
+    ];
+    const operation=method!=='GET'&&method!=='HEAD'&&!/\/sales\/draft(?:\/beacon)?$/.test(path)?(operations.find(([rx])=>rx.test(path))||[null,'system.operation']):null;
+    if(operation&&typeof res.once==='function'){
+      const originalJson=typeof res.json==='function'?res.json.bind(res):null;
+      if(originalJson)res.json=function(payload){if(payload&&Number.isSafeInteger(Number(payload.id))&&Number(payload.id)>0)res.auditResultId=Number(payload.id);return originalJson(payload)};
+      res.once('finish',()=>{
+      if(res.statusCode<200||res.statusCode>=300)return;
+      try{
+        const rawId=Number(path.split('/')[2]),companyId=Number.isSafeInteger(rawId)&&rawId>0?rawId:null;
+        const safe={method};
+        if(operation[1]==='inventory.movement')Object.assign(safe,{
+          productId:Number(req.body?.product_id)||null,type:String(req.body?.movement_type||'').slice(0,12),quantity:Number(req.body?.quantity)||0,
+          reason:String(req.body?.reason||'').slice(0,120)
+        });
+        if(operation[1]==='sales.create')safe.saleType=String(req.body?.sale_type||'').slice(0,15);
+        db.prepare('INSERT INTO access_audit_log(user_id,company_id,event_type,object_type,object_id,details_json) VALUES(?,?,?,?,?,?)')
+          .run(a.user.id,companyId,operation[1],path.includes('inventory')?'inventory':path.includes('sales')?'sale':'operation',String(res.auditResultId||path).slice(0,150),JSON.stringify(safe));
+      }catch(e){console.error('Error de auditoría:',e.message)}
+      });
+    }
     next();
   });
   return {invalidateSessions:()=>sessions.clear()};

@@ -1,6 +1,6 @@
-# FacturaCR v0.6.62 — Correo emisor configurable y recuperación verificada
+# FacturaCR v0.6.63 — Perfiles, permisos delegados y auditoría
 
-**Versión vigente: 0.6.62 (10 de noviembre de 2026).** Continuamos desde v0.6.61. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
+**Versión vigente: 0.6.63 (10 de noviembre de 2026).** Continuamos desde v0.6.62. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
 
 ## Actualización correctiva de v0.6.62 — Gmail 534, desplegables y recuperación de otras cuentas
 
@@ -756,3 +756,15 @@ Desde el historial puedes seleccionar una proforma y usar **Eliminar proforma**.
 ### Ajustes de v0.6.56
 
 Los CSV de caja exportan cifras sin el símbolo ₡, con columnas identificadas en CRC. Los PDF conservan el formato monetario. Los campos monetarios de cobro en Ventas ocultan las flechas de incremento, pero aceptan valores escritos por teclado.
+
+
+## v0.6.63 — Delegación, perfiles, inventario de caja y auditoría
+
+- **Perfiles:** propietario y administradores de empresa pueden dar de baja cuentas subordinadas. La eliminación es lógica (conserva identificadores, ventas y auditoría), exige nombre de usuario y contraseña actual; nunca permite eliminar al propietario. El nombre de acceso permanece reservado para preservar trazabilidad.
+- **Supervisores:** solo si el propietario activa «Permitir administrar cajeros» para una empresa, pueden crear, suspender y reactivar cajeros de esa empresa. El permiso se revoca sin cambiar otros roles, y se invalidan sesiones del supervisor tras modificar la delegación.
+- **Inventario del cajero:** nueva sección «Ingresos / Tomas físicas», basada en las operaciones del Kardex. Solo se permiten entradas y ajustes a saldo físico; no salidas manuales, costos o cambio de precios. El servidor valida empresa, tipo, existencias y registra los movimientos.
+- **Auditoría del propietario:** consulta paginada con filtros por usuario, empresa, categoría y fecha, más exportación CSV de la página visible. Registra login, logout, cambios de usuarios y operaciones comerciales exitosas. No incluye contraseñas ni tokens. Historial anterior a esta versión solo contiene los eventos que ya se registraban; no se reconstruyen actividades inexistentes.
+- **Interfaz:** barra de sesión anclada arriba y navegación lateral independiente en escritorio, sin desplazamiento al abrir Seguridad o mostrar errores del correo.
+- **Correo futuro:** evaluar un proveedor transaccional HTTPS con dominio verificado (p. ej., Resend) frente a OAuth 2.0 Gmail para reemplazar el uso de contraseñas de aplicación, manteniendo secretos cifrados y envío local. No está integrado en esta versión.
+
+Las pruebas locales y workflows se ejecutan como antes: `npm test`, `npm run qa:real-server`, `npm run dist:win`. Hacer respaldo antes de actualizar. La migración agrega `access_users.is_deleted` y un índice de auditoría sin borrar registros.

@@ -6,9 +6,9 @@ export const ACCESS_ROLES = Object.freeze(['owner', 'company_admin', 'supervisor
 export const ACCESS_PERMISSIONS = Object.freeze([
   'sales.create','sales.read_all','sales.void','sales.payments.create',
   'clients.manage','clients.delete','quotations.manage','quotations.delete',
-  'inventory.read','inventory.manage','inventory.delete','inventory.adjust','inventory.costs.read','inventory.kardex.read',
+  'inventory.read','inventory.manage','inventory.delete','inventory.adjust','inventory.receive','inventory.count','inventory.costs.read','inventory.kardex.read',
   'cash.open','cash.close_own','cash.expenses.create','cash.read_all','cash.reopen',
-  'reports.operational','reports.financial','users.manage_company',
+  'reports.operational','reports.financial','users.manage_company','users.manage_cashiers',
   'companies.manage_all','users.manage_all','permissions.manage_all',
   'backups.manage','backups.restore','audit.read','tax.configure'
 ]);
@@ -27,7 +27,7 @@ export const DEFAULT_ROLE_PERMISSIONS = Object.freeze({
   ],
   cashier: [
     'sales.create','sales.payments.create','clients.manage','quotations.manage',
-    'inventory.read','cash.open','cash.close_own'
+    'inventory.read','inventory.receive','inventory.count','cash.open','cash.close_own'
   ]
 });
 export function defaultPermissionsFor(role){
@@ -125,4 +125,8 @@ export function ensureAccessSchema(db){
     PRIMARY KEY(user_id,company_id)
   );
   INSERT OR IGNORE INTO access_security_settings(id,idle_lock_minutes,preserve_draft_on_lock) VALUES(1,15,1);`);
+  // Baja lógica: conserva movimientos y actores históricos; la cuenta no puede volver a entrar.
+  if(!db.prepare('PRAGMA table_info(access_users)').all().some(c=>c.name==='is_deleted'))
+    db.exec('ALTER TABLE access_users ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0 CHECK(is_deleted IN (0,1))');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_access_audit_recent ON access_audit_log(id DESC)');
 }

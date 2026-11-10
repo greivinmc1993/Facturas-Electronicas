@@ -1,3 +1,11 @@
+## 0.6.63 — Usuarios delegados, baja lógica, inventario de caja y auditoría del propietario
+- Delegación individual para supervisores; creación/administración limitada de cajeros.
+- Eliminación lógica de perfiles para propietario y administradores autorizados, con confirmación fuerte y preservación histórica.
+- Captura de entradas y tomas físicas por cajero en inventario/Kardex, sin costos ni salidas manuales.
+- Registro de autenticación, cambios de usuarios, ventas, caja e inventario; panel de auditoría exclusivo del propietario.
+- Barra de sesión fija y menú lateral anclado independientemente del panel de seguridad.
+- Alternativas futuras al SMTP de Gmail investigadas, sin nueva integración en esta versión.
+
 ## Corrección adicional v0.6.62 — SMTP Gmail 534, selectores y recuperación exclusiva del propietario
 
 - Diagnóstico legible del rechazo SMTP 534/535 de Gmail con indicaciones de contraseña de aplicación y enlace oficial; nunca se exponen credenciales cifradas ni se desactiva TLS.
