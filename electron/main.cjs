@@ -62,26 +62,45 @@ async function runPackagedSmoke(){
      cache:'no-store'});
    return {status:r.status,body:await r.json()};
  })()`,true);
- const initial=await waitFor(d=>d.authHeading==='Configurar propietario'&&d.authFormVisible,
-   'No apareció el formulario seguro de configuración inicial');
- if(initial.navButtons!==0)throw Error('El menú comercial no debe verse antes del acceso.');
- if(!initial.preloadPrinter||!initial.preloadReports||!initial.preloadBackups)
-   throw Error('El preload de Electron no está disponible en el inicio protegido: '+JSON.stringify(initial));
+ // En la primera instalación no hay propietario; tras reinstalarlo debe persistir.
+ // La sesión HTTP es en memoria y por tanto se inicia de nuevo de forma normal.
  const firstStatus=await request('GET','/api/auth/status');
- if(firstStatus.status!==200||firstStatus.body.setupRequired!==true||firstStatus.body.authenticated!==false)
+ if(firstStatus.status!==200||firstStatus.body.authenticated!==false||
+    typeof firstStatus.body.setupRequired!=='boolean')
    throw Error('Estado inicial de seguridad incorrecto: '+JSON.stringify(firstStatus));
- const beforeSetup=await request('GET','/api/companies');
- if(beforeSetup.status!==428||beforeSetup.body.code!=='OWNER_SETUP_REQUIRED')
-   throw Error('La API debe bloquear operaciones hasta crear propietario: '+JSON.stringify(beforeSetup));
- // Cuenta temporal ALEATORIA, creada solo en --qa-data-dir y eliminada al terminar.
- const owner={username:'qa_propietario',displayName:'Propietario temporal de QA',
-   password:'QaSeguro1234'+randomBytes(20).toString('hex')};
- const setup=await request('POST','/api/auth/setup',owner);
- if(setup.status!==201||setup.body.ok!==true)
-   throw Error('Configuración inicial del propietario falló: '+JSON.stringify(setup));
+ const needsSetup=firstStatus.body.setupRequired;
+ const expectedHeading=needsSetup?'Configurar propietario':'Iniciar sesión';
+ const initial=await waitFor(d=>d.authHeading===expectedHeading&&d.authFormVisible,
+   'No apareció el formulario seguro esperado ('+expectedHeading+')');
+ if(initial.navButtons!==0||initial.hasCompanyNavigation)
+   throw Error('El menú comercial no debe verse antes de iniciar sesión.');
+ if(!initial.preloadPrinter||!initial.preloadReports||!initial.preloadBackups)
+   throw Error('El preload de Electron no está disponible en el acceso protegido: '+JSON.stringify(initial));
  const beforeLogin=await request('GET','/api/companies');
- if(beforeLogin.status!==401||beforeLogin.body.code!=='AUTH_REQUIRED')
-   throw Error('La API debe seguir protegida sin iniciar sesión: '+JSON.stringify(beforeLogin));
+ if(needsSetup){
+   if(beforeLogin.status!==428||beforeLogin.body.code!=='OWNER_SETUP_REQUIRED')
+     throw Error('La API debe exigir configurar propietario: '+JSON.stringify(beforeLogin));
+ }else if(beforeLogin.status!==401||beforeLogin.body.code!=='AUTH_REQUIRED'){
+   throw Error('La API debe exigir autenticación al reinstalar: '+JSON.stringify(beforeLogin));
+ }
+ // La contraseña compartida entre los dos arranques de QA se pasa exclusivamente
+ // por una variable de entorno del proceso hijo, nunca por argumentos, SQLite ni evidencias.
+ // En el ensayo de arranque individual se genera una contraseña nueva al vuelo.
+ const qaPassword=process.env.FACTURACR_QA_OWNER_PASSWORD;
+ const owner={username:'qa_propietario',displayName:'Propietario temporal de QA',
+   password:qaPassword||(needsSetup?'QaSeguro1234'+randomBytes(20).toString('hex'):null)};
+ if(!owner.password)throw Error('Falta la contraseña efímera del propietario QA para verificar la reinstalación.');
+ if(needsSetup){
+   const setup=await request('POST','/api/auth/setup',owner);
+   if(setup.status!==201||setup.body.ok!==true)
+     throw Error('Configuración inicial del propietario falló: '+JSON.stringify(setup));
+   const afterSetup=await request('GET','/api/auth/status');
+   if(afterSetup.status!==200||afterSetup.body.setupRequired!==false||afterSetup.body.authenticated!==false)
+     throw Error('Estado posterior a configuración incorrecto: '+JSON.stringify(afterSetup));
+   const beforeLoginAfterSetup=await request('GET','/api/companies');
+   if(beforeLoginAfterSetup.status!==401||beforeLoginAfterSetup.body.code!=='AUTH_REQUIRED')
+     throw Error('La API debe seguir protegida sin login: '+JSON.stringify(beforeLoginAfterSetup));
+ }
  const login=await request('POST','/api/auth/login',{username:owner.username,password:owner.password});
  if(login.status!==200||login.body.user?.isOwner!==true)
    throw Error('No se pudo autenticar al propietario de QA: '+JSON.stringify(login));
@@ -106,7 +125,8 @@ async function runPackagedSmoke(){
    await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
  }
  return {success:true,dom,health:health.body,
-   security:{initialOwnerSetup:true,blockedBeforeSetup:true,blockedBeforeLogin:true,
+   security:{initialOwnerSetup:needsSetup,existingOwnerLogin:!needsSetup,
+     blockedBeforeSetup:needsSetup,blockedBeforeLogin:true,
      authenticatedOwner:true,commercialScreenAfterLogin:true},screenshot:shot||null};
 }
 

@@ -34,7 +34,7 @@ async function main(){
   assert.ok(report.dom.visibleCharacters>100);
   assert.ok(report.dom.navButtons>=4);
   assert.ok(report.dom.preloadReports && report.dom.preloadPrinter && report.dom.preloadBackups);
-  assert.deepEqual(report.security,{initialOwnerSetup:true,blockedBeforeSetup:true,blockedBeforeLogin:true,authenticatedOwner:true,commercialScreenAfterLogin:true});
+  assert.deepEqual(report.security,{initialOwnerSetup:true,existingOwnerLogin:false,blockedBeforeSetup:true,blockedBeforeLogin:true,authenticatedOwner:true,commercialScreenAfterLogin:true});
   fs.mkdirSync(evidence,{recursive:true});
   fs.copyFileSync(result,path.join(evidence,'smoke-result.json'));
   if(fs.existsSync(screenshot))fs.copyFileSync(screenshot,path.join(evidence,'smoke-pantalla.png'));

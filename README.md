@@ -2,6 +2,13 @@
 
 **Versión vigente: 0.6.59 (9 de noviembre de 2026).** Esta actualización parte de v0.6.58 y conserva módulos comerciales, base SQLite e instalador NSIS.
 
+## Corrección adicional de v0.6.59: prueba de reinstalación NSIS (9 de noviembre de 2026)
+
+- **Fallo corregido en `qa:install-upgrade`:** al reinstalar, el propietario creado durante el primer arranque **permanece en SQLite**. El QA del ejecutable ahora reconoce ambos estados seguros: `Configurar propietario` cuando no existe cuenta propietaria, e `Iniciar sesión` cuando ya existe.
+- El ensayo de instalación/reinstalación comparte una contraseña de prueba aleatoria **solo entre procesos del runner temporal, mediante una variable de entorno**, sin escribir contraseñas en SQLite como texto plano, en la línea de comandos, en logs ni en evidencias.
+- Se confirma que la segunda ejecución **no crea otro propietario**, que la API sigue exigiendo autenticación y que los registros de la empresa siguen presentes e íntegros tras reinstalar y desinstalar.
+- Las pruebas reales del instalador **deben volver a ejecutarse en GitHub Actions Windows**. Las pruebas estáticas pueden pasar en otros sistemas, pero no sustituyen la ejecución del instalador NSIS real.
+
 ## Qué cambia en v0.6.59
 
 - **Corrección del fallo `qa:packaged` en GitHub Actions:** el ejecutable arranca con una base de prueba aislada, por lo que es normal que aparezca primero **Configurar propietario**, sin barra lateral. El QA ahora verifica esa pantalla protegida y los rechazos HTTP **428** antes de la configuración y **401** antes del inicio de sesión. Después crea un propietario aleatorio exclusivamente en esa base temporal, inicia sesión usando las rutas reales y comprueba que aparezca el menú comercial, que el preload de Electron funcione y que responda `/api/health`.

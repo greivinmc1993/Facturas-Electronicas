@@ -1,3 +1,12 @@
+## Corrección adicional v0.6.59 — QA de reinstalación NSIS
+
+- `qa:install-upgrade` ya no exige erróneamente el formulario **Configurar propietario** en la segunda ejecución. Comprueba el inicio de sesión cuando la cuenta propietaria persiste en SQLite.
+- Reutiliza una contraseña QA generada al inicio de la prueba mediante variable de entorno del proceso temporal; no se persiste en archivos ni se expone en reportes.
+- Verifica la existencia de un único propietario después de reinstalar y mantiene los controles de HTTP 428/401, acceso con cookie auténtica y conservación de datos.
+- Añadida regresión estática para ambos caminos de autenticación. La ejecución real de NSIS en Windows Actions sigue pendiente de validación.
+
+---
+
 ## 0.6.59 — Arranque empaquetado autenticado y seguridad de sesiones (2026-11-09)
 
 - Corrección del `qa:packaged` que exigía menú de empresas en una instalación nueva sin propietario: ahora valida pantalla de configuración protegida, rechazos 428/401, creación de cuenta temporal por API normal, inicio de sesión, menú comercial, preload y salud del servidor.

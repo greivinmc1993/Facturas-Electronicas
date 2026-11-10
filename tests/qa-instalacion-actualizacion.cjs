@@ -6,6 +6,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {spawn}=require('node:child_process');
+const {randomBytes}=require('node:crypto');
 const root=path.resolve(__dirname,'..');
 const release=path.join(root,'release');
 const evidence=path.join(release,'qa-evidence');
@@ -20,6 +21,8 @@ const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'facturacr-qa-upgrade-'));
 const installDir=path.join(tempRoot,'aplicacion');
 const userData=path.join(tempRoot,'datos-sqlite');
 const marker='QA_INSTALL_UPGRADE_'+process.pid+'_'+Date.now();
+// Se mantiene solo en memoria del runner temporal para autenticar ambas aperturas.
+const qaOwnerPassword='QaSeguro1234'+randomBytes(20).toString('hex');
 const dbFile=path.join(userData,'facturacr.sqlite');
 const report={version:require('../package.json').version,installer:installers[0],checks:[],passed:false};
 fs.mkdirSync(userData,{recursive:true});
@@ -39,7 +42,9 @@ function run(executable,args,timeoutMs=180000){
 async function smoke(stage){
  const json=path.join(tempRoot,stage+'.json');
  const png=path.join(tempRoot,stage+'.png');
- const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${userData}`,`--qa-result=${json}`,`--qa-screenshot=${png}`],{windowsHide:false,cwd:root,stdio:'ignore'});
+ const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${userData}`,`--qa-result=${json}`,`--qa-screenshot=${png}`],{
+   windowsHide:false,cwd:root,stdio:'ignore',env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:qaOwnerPassword}
+ });
  let exited=false;
  child.once('exit',()=>{exited=true});
  const deadline=Date.now()+90000;
@@ -51,10 +56,19 @@ async function smoke(stage){
   assert.equal(data.health?.ok,true);
   assert.equal(data.health?.version,report.version);
   assert.ok(data.dom?.navButtons>=4,'No se encontró menú React');
+  assert.equal(data.security?.initialOwnerSetup,stage==='primera-instalacion',
+    'Solo la primera instalación debe configurar propietario');
+  assert.equal(data.security?.existingOwnerLogin,stage==='reinstalacion',
+    'La reinstalación debe entrar por el login sin recrear al propietario');
+  assert.equal(data.security?.authenticatedOwner,true);
+  assert.equal(data.security?.commercialScreenAfterLogin,true);
   report.checks.push({step:'arranque-'+stage,ok:true});
-  fs.copyFileSync(json,path.join(evidence,'upgrade-'+stage+'.json'));
-  if(fs.existsSync(png))fs.copyFileSync(png,path.join(evidence,'upgrade-'+stage+'.png'));
  }finally{
+  // Conservar evidencia incluso cuando falla una aserción de la interfaz.
+  try{
+   if(fs.existsSync(json))fs.copyFileSync(json,path.join(evidence,'upgrade-'+stage+'.json'));
+   if(fs.existsSync(png))fs.copyFileSync(png,path.join(evidence,'upgrade-'+stage+'.png'));
+  }catch(e){console.error('No se pudo guardar la evidencia del arranque:',e.message)}
   // Electron escribe su resultado antes de salir; darle tiempo para cerrar SQLite.
   const closeDeadline=Date.now()+10000;
   while(!exited&&Date.now()<closeDeadline)await pause(200);
@@ -84,6 +98,8 @@ async function main(){
  db=new Database(dbFile,{readonly:true,fileMustExist:true});
  try{
   assert.equal(db.prepare('SELECT COUNT(*) n FROM companies WHERE identification=?').get(marker).n,1,'La reinstalación eliminó el registro');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM access_users WHERE is_owner=1').get().n,1,
+    'La reinstalación duplicó o eliminó al propietario');
   assert.equal(db.pragma('integrity_check',{simple:true}),'ok','La base SQLite quedó dañada');
  }finally{db.close()}
  report.checks.push({step:'reinstalacion-conserva-empresa-y-db-integra',ok:true});
