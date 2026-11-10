@@ -1,3 +1,13 @@
+# FacturaCR v0.6.62 — SMTP configurable desde la aplicación (2026-11-10)
+
+- Panel de configuración del correo emisor exclusivo del propietario en Mi sesión → Seguridad y bloqueo; guarda, elimina y permite probar el envío SMTP. Contraseña del propietario obligatoria, permisos verificados en servidor y registro de auditoría.
+- Configuración cifrada con `safeStorage` de Electron y cifrado del sistema operativo (DPAPI en Windows) en `smtp-settings.secure` fuera de SQLite; sin claves en respuestas HTTP, ZIP, instalador, README ni artefactos de pruebas. Ante ausencia de cifrado seguro, no guarda credenciales.
+- Envío de prueba y recuperación real utilizan la misma configuración SMTP guardada, TLS implícito puerto 465 y verificación de certificado. Se conservan todos los roles y su recuperación individual por correo verificado, el código de emergencia del propietario y la seguridad de permisos.
+- QA de configuración SMTP, controles de acceso por rol, orígenes, clave, persistencia cifrada simulada y envío simulado; integración con `npm test`. Pendiente validar DPAPI, envío y NSIS reales en Windows y Actions.
+- Instalador y workflow actualizados para migración v0.6.34 → v0.6.62. No se cambió el esquema de SQLite ni se añadieron archivos de notas de versión.
+
+---
+
 # FacturaCR v0.6.61 — Recuperación por correo verificado
 
 - **Recuperación por correo para los cuatro roles:** propietario, administrador, supervisor y cajero pueden verificar individualmente su correo y restablecer únicamente su propia contraseña. El token se vincula a `user_id`; recuperar nunca cambia rol, empresa ni permisos. Continúa el restablecimiento administrado del personal y el código de emergencia del propietario.

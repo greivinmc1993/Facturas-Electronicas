@@ -3,19 +3,26 @@
 import tls from 'node:tls';
 
 const safeAddress=value=>typeof value==='string'&&value.length<=254&&/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/.test(value);
+export function validateSmtpSettings(raw){
+ const host=String(raw?.host||'').trim().toLowerCase();
+ const user=String(raw?.user||'').trim();
+ const password=String(raw?.password||'');
+ const from=String(raw?.from||user).trim();
+ const port=Number(raw?.port??465);
+ if(host.length>253||!/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host)||!host.includes('.')||host.includes('..')||/^[0-9.]+$/.test(host))throw Error('Servidor SMTP inválido. Usa el dominio de tu proveedor.');
+ if(!safeAddress(user)||!safeAddress(from))throw Error('El usuario y el remitente deben ser correos válidos.');
+ if(!password||password.length>1024||/[\r\n\x00]/.test(password))throw Error('Clave SMTP inválida.');
+ if(port!==465||!Number.isInteger(port))throw Error('Solo se admite SMTP con TLS implícito en el puerto 465.');
+ return {host,port,user,password,from};
+}
 export function smtpConfiguration(){
- const host=String(process.env.FACTURACR_SMTP_HOST||'').trim();
- const user=String(process.env.FACTURACR_SMTP_USER||'').trim();
- const password=String(process.env.FACTURACR_SMTP_PASSWORD||'');
- const from=String(process.env.FACTURACR_SMTP_FROM||user).trim();
- const port=Number(process.env.FACTURACR_SMTP_PORT||465);
- return host&&!/[\s\r\n\/]/.test(host)&&safeAddress(user)&&safeAddress(from)&&password&&Number.isInteger(port)&&port===465?
-   {host,port,user,password,from}:null;
+ try{return validateSmtpSettings({host:process.env.FACTURACR_SMTP_HOST,port:process.env.FACTURACR_SMTP_PORT||465,user:process.env.FACTURACR_SMTP_USER,password:process.env.FACTURACR_SMTP_PASSWORD,from:process.env.FACTURACR_SMTP_FROM||process.env.FACTURACR_SMTP_USER});}
+ catch{return null;}
 }
 export const isMailConfigured=()=>!!smtpConfiguration();
 
-export async function sendSecurityMail({to,subject,body}){
- const cfg=smtpConfiguration();
+export async function sendSecurityMail({to,subject,body},configuration=null){
+ const cfg=configuration?validateSmtpSettings(configuration):smtpConfiguration();
  if(!cfg)throw Error('SMTP seguro no configurado.');
  if(!safeAddress(to)||typeof subject!=='string'||/[\r\n]/.test(subject)||typeof body!=='string')throw Error('Mensaje inválido.');
  const socket=tls.connect({host:cfg.host,port:cfg.port,servername:cfg.host,minVersion:'TLSv1.2',rejectUnauthorized:true});

@@ -3,6 +3,7 @@ import {randomBytes, scryptSync, timingSafeEqual, createHash} from 'node:crypto'
 import {isValidIdleLockMinutes,ACCESS_ROLES,defaultPermissionsFor} from './access-schema.js';
 import {registerEmailRecovery} from './email-recovery.js';
 import {isMailConfigured,sendSecurityMail} from './email-smtp.js';
+import {registerMailAdmin} from './mail-admin.js';
 
 const COOKIE='facturacr_session';
 const TOKEN_TTL=12*60*60*1000;
@@ -77,7 +78,9 @@ export function registerAuth(app,getDb,options={}){
     if(!user?.is_active){sessions.delete(key);return null;}
     return {key,session:s,user};
   };
-  const publicState=()=>({setupRequired:ownerCount()===0,emailRecoveryAvailable:isMailConfigured(),...settings()});
+  const smtpConfigured=options.mailConfigured||(()=>{try{return options.mailStore?!!options.mailStore.read():isMailConfigured()}catch{return false}});
+  const smtpMailer=options.sendMail||((mail,cfg)=>sendSecurityMail(mail,cfg||options.mailStore?.read()));
+  const publicState=()=>({setupRequired:ownerCount()===0,emailRecoveryAvailable:smtpConfigured(),...settings()});
   const userCompanies=userId=>db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(userId);
   const displayUser=user=>({id:user.id,username:user.username,displayName:user.display_name,isOwner:!!user.is_owner,passwordChangeRequired:!!user.password_change_required,companies:user.is_owner?[]:userCompanies(user.id)});
   const audit=(userId,type,objectType='',objectId='',companyId=null)=>db.prepare('INSERT INTO access_audit_log(user_id,company_id,event_type,object_type,object_id) VALUES (?,?,?,?,?)').run(userId,companyId,type,objectType,String(objectId));
@@ -321,7 +324,8 @@ export function registerAuth(app,getDb,options={}){
       res.json({ok:true});
     }catch(e){res.status(400).json({error:e.message});}
   });
-  registerEmailRecovery(app,{db,auth,localOriginOnly,audit,verifyPassword,passwordHash,revokeUserSessions,mailer:options.sendMail||sendSecurityMail,mailConfigured:options.mailConfigured||isMailConfigured});
+  registerEmailRecovery(app,{db,auth,localOriginOnly,audit,verifyPassword,passwordHash,revokeUserSessions,mailer:smtpMailer,mailConfigured:smtpConfigured});
+  registerMailAdmin(app,{db,auth,localOriginOnly,audit,verifyPassword,mailStore:options.mailStore,sendMail:smtpMailer});
   // Es obligatorio validar todas las rutas /api restantes en el SERVIDOR.
   // La política por roles y empresas se activará después, ANTES de crear usuarios subordinados.
   app.use('/api',(req,res,next)=>{

@@ -999,11 +999,14 @@ function SecureApp(){
  const [emailVerifyCode,setEmailVerifyCode]=useState(''),[emailVerifyPending,setEmailVerifyPending]=useState(false),[emailFeedback,setEmailFeedback]=useState(null);
  const [emailRecoveryMode,setEmailRecoveryMode]=useState(false),[emailResetRequested,setEmailResetRequested]=useState(false);
  const [emailResetCode,setEmailResetCode]=useState(''),[emailResetPassword,setEmailResetPassword]=useState(''),[emailResetConfirm,setEmailResetConfirm]=useState('');
+ // Solo el propietario administra SMTP; nunca se devuelve la clave guardada al navegador.
+ const [smtpStatus,setSmtpStatus]=useState(null),[smtpBusy,setSmtpBusy]=useState(false),[smtpFeedback,setSmtpFeedback]=useState(null);
+ const [smtpForm,setSmtpForm]=useState({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});
  const sessionUser=state?.authenticated && state?.user ? state.user : null;
  const hasSession=!!sessionUser;
  useEffect(()=>{if(!settingsFeedback)return;const timer=setTimeout(()=>setSettingsFeedback(null),6000);return()=>clearTimeout(timer)},[settingsFeedback]);
  const activity=useRef(Date.now()),lastTouch=useRef(0);
- const lockNow=()=>{setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
+ const lockNow=()=>{setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
  const reload=async()=>{
   try{
    const r=await fetch('/api/auth/status',{cache:'no-store'});
@@ -1066,17 +1069,20 @@ function SecureApp(){
     await reload();
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoveryCode('');setRecoveryMode(false);setOwnerRecoveryPassword('');setEmailStatus(null);setEmailValue('');setEmailPassword('');setEmailVerifyCode('');setEmailVerifyPending(false);setEmailFeedback(null);setEmailRecoveryMode(false);setEmailResetRequested(false);setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setState(null);await reload();}};
+ const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoveryCode('');setRecoveryMode(false);setOwnerRecoveryPassword('');setEmailStatus(null);setEmailValue('');setEmailPassword('');setEmailVerifyCode('');setEmailVerifyPending(false);setEmailFeedback(null);setEmailRecoveryMode(false);setEmailResetRequested(false);setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setSmtpStatus(null);setSmtpFeedback(null);setSmtpForm({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});setState(null);await reload();}};
  const openSecurity=async()=>{
    setMinutes(savedMinutes);setSettingsFeedback(null);setAccountMenuOpen(false);
    const opening=!securitySettingsOpen;
    setSecuritySettingsOpen(opening);
+   if(!opening){setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null)}
    setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setEmailVerifyPending(false);
    if(opening){
      try{const email=await api('/api/auth/email/status');setEmailStatus(email);setEmailValue(email.email||'');setEmailVerifyPending(false);setEmailFeedback(null)}
      catch{setEmailStatus(null);setEmailValue('')}
    }
    if(opening&&sessionUser?.isOwner){
+     try{const m=await api('/api/auth/mail/settings');setSmtpStatus(m);setSmtpFeedback(null);setSmtpForm(f=>({...f,host:m.host||'smtp.gmail.com',user:m.user||'',from:m.from||'',smtpPassword:'',ownerPassword:'',testTo:m.from||m.user||''}));}
+     catch(e){setSmtpStatus(null);setSmtpFeedback({type:'error',message:e.message})}
      try{const v=await api('/api/auth/recovery/status');setOwnerRecoveryConfigured(!!v.configured)}
      catch{setOwnerRecoveryConfigured(null)}
    }
@@ -1100,6 +1106,33 @@ function SecureApp(){
      setRecoveryMessage('Contraseña restaurada. Guarda el nuevo código de recuperación e inicia sesión.');
      await reload();
    }catch(err){setError(err.message)}finally{setBusy(false)}
+ };
+ const editSmtp=(key,value)=>{setSmtpForm(f=>({...f,[key]:value}));setSmtpFeedback(null)};
+ const saveSmtp=async e=>{
+   e.preventDefault();setSmtpBusy(true);setSmtpFeedback(null);
+   try{
+     const result=await api('/api/auth/mail/settings',{method:'PUT',body:JSON.stringify({host:smtpForm.host,port:465,user:smtpForm.user,from:smtpForm.from,smtpPassword:smtpForm.smtpPassword,currentPassword:smtpForm.ownerPassword})});
+     setSmtpStatus(result);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));
+     setSmtpFeedback({type:'success',message:'Configuración SMTP cifrada y guardada. Envía ahora un correo de prueba.'});
+     try{const email=await api('/api/auth/email/status');setEmailStatus(email)}catch{/* La configuración ya se guardó; no mostrar un fallo engañoso. */}
+   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
+ };
+ const testSmtp=async e=>{
+   e.preventDefault();setSmtpBusy(true);setSmtpFeedback(null);
+   try{
+     const result=await api('/api/auth/mail/test',{method:'POST',body:JSON.stringify({currentPassword:smtpForm.ownerPassword,to:smtpForm.testTo})});
+     setSmtpForm(f=>({...f,ownerPassword:''}));setSmtpFeedback({type:'success',message:result.message});
+   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
+ };
+ const removeSmtp=async()=>{
+   if(!window.confirm('¿Eliminar la configuración de correo emisor? Se desactivará la recuperación por correo hasta configurar otro servidor.'))return;
+   setSmtpBusy(true);setSmtpFeedback(null);
+   try{
+     const result=await api('/api/auth/mail/settings',{method:'DELETE',body:JSON.stringify({currentPassword:smtpForm.ownerPassword})});
+     setSmtpStatus(result);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));
+     setSmtpFeedback({type:'success',message:'Configuración SMTP eliminada. Los correos verificados se conservaron.'});
+     try{const email=await api('/api/auth/email/status');setEmailStatus(email)}catch{/* La configuración ya se guardó; no mostrar un fallo engañoso. */}
+   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
  };
  const requestEmailVerification=async e=>{
    e.preventDefault();setBusy(true);setEmailFeedback(null);
@@ -1177,7 +1210,7 @@ function SecureApp(){
       </label>
       <div className="securitySettingsActions">
        <button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button>
-       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false)}} disabled={settingsBusy}>Cerrar</button>
+       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null)}} disabled={settingsBusy}>Cerrar</button>
       </div>
      </div>
     </div>
@@ -1186,6 +1219,30 @@ function SecureApp(){
       <form onSubmit={rotateRecovery}><label htmlFor="owner-recovery-password">Contraseña actual
         <input id="owner-recovery-password" type="password" autoComplete="current-password" required value={ownerRecoveryPassword} onChange={e=>setOwnerRecoveryPassword(e.target.value)}/>
       </label><button disabled={busy} type="submit">{ownerRecoveryConfigured===false?'Crear código de recuperación':'Reemplazar código'}</button></form>
+    </div>}
+    {sessionUser?.isOwner&&<div className="smtpAdminTools" aria-label="Correo emisor SMTP">
+     <div className="smtpAdminHeading">
+      <strong><UiIcon name="settings" size={17}/> Correo emisor de FacturaCR</strong>
+      <p>Solo el propietario configura la cuenta que enviará códigos a todos los usuarios. La clave queda cifrada por el sistema operativo, fuera de SQLite y de GitHub.</p>
+      <small className={smtpStatus?.configured?'smtpConfigured':'smtpNotConfigured'}>{smtpStatus?.configured?'Servidor guardado. Puedes enviar un correo de prueba.':smtpStatus?.available===false?'Almacenamiento seguro no disponible aquí. Configura el correo desde la aplicación Windows instalada.':'Servidor SMTP pendiente de configurar.'}</small>
+     </div>
+     {smtpStatus?.available&&<div className="smtpAdminContent">
+      <form className="smtpAdminForm" onSubmit={saveSmtp}>
+       <label>Servidor SMTP<input required maxLength={253} value={smtpForm.host} onChange={e=>editSmtp('host',e.target.value)} placeholder="smtp.gmail.com"/></label>
+       <label>Puerto TLS<input readOnly value="465" aria-label="Puerto TLS fijo 465"/></label>
+       <label>Usuario SMTP<input required type="email" autoComplete="off" value={smtpForm.user} onChange={e=>editSmtp('user',e.target.value)} placeholder="correo@empresa.com"/></label>
+       <label>Correo remitente<input required type="email" autoComplete="off" value={smtpForm.from} onChange={e=>editSmtp('from',e.target.value)} placeholder="correo@empresa.com"/></label>
+       <label>Clave SMTP<input type="password" autoComplete="new-password" value={smtpForm.smtpPassword} onChange={e=>editSmtp('smtpPassword',e.target.value)} required={!smtpStatus?.passwordSaved} placeholder={smtpStatus?.passwordSaved?'Dejar vacío para conservar clave':'Clave o contraseña de aplicación'}/></label>
+       <label>Contraseña del propietario<input type="password" autoComplete="current-password" required value={smtpForm.ownerPassword} onChange={e=>editSmtp('ownerPassword',e.target.value)} placeholder="Confirma para guardar o probar"/></label>
+       <div className="smtpAdminActions"><button type="submit" disabled={smtpBusy}>{smtpBusy?'Procesando…':'Guardar SMTP cifrado'}</button><button type="button" disabled={smtpBusy||!smtpStatus?.configured} className="secondary" onClick={removeSmtp}>Eliminar configuración</button></div>
+      </form>
+      {smtpStatus?.configured&&<form className="smtpTestForm" onSubmit={testSmtp}>
+       <label>Enviar correo de prueba a<input type="email" required maxLength={254} value={smtpForm.testTo} onChange={e=>editSmtp('testTo',e.target.value)} placeholder="tu-correo@ejemplo.com"/></label>
+       <button type="submit" disabled={smtpBusy||!smtpForm.ownerPassword}>{smtpBusy?'Enviando…':'Enviar correo de prueba'}</button>
+       <small>Vuelve a escribir arriba tu contraseña de propietario para cada prueba. La aceptación SMTP no garantiza que el mensaje llegue a la bandeja de entrada.</small>
+      </form>}
+     </div>}
+     {smtpFeedback&&<p className={smtpFeedback.type==='error'?'authError':'emailSuccess'} role="status">{smtpFeedback.message}</p>}
     </div>}
     {emailStatus?.eligible&&<div className="emailRecoveryTools" aria-label="Correo para recuperación">
       <div className="emailRecoveryHeading">

@@ -1,6 +1,27 @@
-# FacturaCR v0.6.61 — Correos verificados y recuperación de acceso
+# FacturaCR v0.6.62 — Correo emisor configurable y recuperación verificada
 
-**Versión vigente: 0.6.61 (9 de noviembre de 2026).** Continuamos desde v0.6.60. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
+**Versión vigente: 0.6.62 (10 de noviembre de 2026).** Continuamos desde v0.6.61. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
+
+## Nuevo en v0.6.62 — Configuración de SMTP desde FacturaCR instalado
+
+- **Panel exclusivo del propietario:** abre **Mi sesión → Seguridad y bloqueo → Correo emisor de FacturaCR**. Permite configurar servidor SMTP, usuario, remitente, contraseña de aplicación y envío a un correo de prueba. Confirmación de la contraseña actual de propietario obligatoria para guardar, probar y eliminar. Ningún cajero, supervisor ni administrador de empresa puede administrar SMTP.
+- **Cifrado local real:** el ejecutable de Electron utiliza `safeStorage` (DPAPI en Windows) para guardar la configuración en un archivo protegido `smtp-settings.secure` dentro del directorio `userData`. La contraseña no se almacena en SQLite, no se incorpora en los respaldos comerciales, no aparece en la API ni se incluye en el instalador. Si el cifrado del sistema operativo no está disponible, se rechaza el guardado para evitar almacenamiento en texto plano.
+- **SMTP seguro:** solo puerto 465 con TLS implícito, validación de certificado y autenticación SMTP. En la pantalla de prueba, **«Aceptado por el servidor SMTP» no significa necesariamente «Entregado a la bandeja de entrada»**. Verifica Spam y mensajes rechazados por el proveedor.
+- **Todos los roles siguen recuperando solo su cuenta:** el propietario configura el servidor emisor una única vez; cada propietario, administrador, supervisor y cajero verifica su propio correo y recibe únicamente los códigos asociados a su identificador de usuario. No se elevan privilegios ni se reasignan empresas.
+- **Seguridad del panel:** requiere sesión propietaria, contraseña vigente, origen local idéntico, límites de pruebas y auditoría; en las respuestas se ocultan credenciales. La configuración no se transmite al navegador al leerla.
+- **Desarrollo:** la API web arrancada por `npm run desktop:dev` no dispone del almacén de contraseñas de Electron; para probar el panel con almacenamiento cifrado y el envío SMTP real, **utiliza el instalador Windows de `npm run dist:win`**. En desarrollo se conservan las variables de entorno anteriores como opción de pruebas.
+- **QA:** incluye pruebas automatizadas sin Internet de la configuración, permisos, cifrado simulado y envío simulado. El guardado real con Windows DPAPI y la entrega SMTP real requieren ejecución en Windows con un proveedor configurado. No guardar claves en GitHub Actions.
+
+### Cómo probar el correo en la aplicación instalada
+
+1. Haz un respaldo de SQLite; instala la versión y accede como propietario.
+2. Ve a **Mi sesión → Seguridad y bloqueo**. En «Correo emisor de FacturaCR» introduce el host SMTP del proveedor (para Gmail, `smtp.gmail.com`), usuario, remitente y **clave de aplicación** o credencial SMTP autorizada; el puerto 465 es fijo. Confirma tu contraseña del propietario y elige **Guardar SMTP cifrado**.
+3. Escribe una dirección tuya en **Enviar correo de prueba a**, vuelve a introducir la contraseña de propietario y pulsa **Enviar correo de prueba**. Comprueba que el mensaje aparezca en la bandeja de entrada o en spam.
+4. Sin salir de **Seguridad y bloqueo**, cada usuario puede registrar y verificar su **propio correo**. Enviará un código `FCR-MAIL-...` válido 15 minutos.
+5. Para probar la recuperación sin afectar datos de un negocio, crea un **usuario de prueba** de cajero en una empresa de prueba, verifica su correo, cierra sesión, solicita recuperación y establece una contraseña nueva con el código de 10 minutos. Confirma que siga siendo cajero, sin permisos nuevos.
+6. Conserva el código de emergencia del propietario como método alternativo cuando no haya correo o Internet.
+
+**Notas de seguridad:** el servicio SMTP pertenece a la instalación y al perfil de Windows, no a cada empresa. No compartas claves de aplicación ni códigos de recuperación. Al reinstalar bajo otro usuario de Windows, tendrás que configurar SMTP nuevamente. El archivo cifrado no está incluido en el respaldo SQLite.
 
 ## Nuevo en v0.6.61 — Recuperación por correo individual para todos los roles
 

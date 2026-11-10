@@ -1,4 +1,5 @@
-const {app, BrowserWindow, Menu, ipcMain, dialog, shell} = require('electron');
+const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require('electron');
+const {createMailSettingsStore}=require('./mail-settings.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -179,7 +180,8 @@ app.whenReady().then(async () => {
   try {
     if (!dev) {
       const {startServer} = await import('../server/index.js');
-      server = await startServer({dataDir:app.getPath('userData'),port:0,staticDir:path.join(__dirname,'../dist')});
+      server = await startServer({dataDir:app.getPath('userData'),port:0,staticDir:path.join(__dirname,'../dist'),
+        mailSettingsStore:createMailSettingsStore({dataDir:app.getPath('userData'),safeStorage})});
     }
     mainWindow = new BrowserWindow({width:1180,height:760,minWidth:850,minHeight:580,
       title:'FacturaCR', icon:path.join(__dirname,'../build/icon.png'),
