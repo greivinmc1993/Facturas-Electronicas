@@ -56,6 +56,30 @@ export function ensureAccessSchema(db){
     CHECK(length(password_hash) >= 20)
   );
   CREATE UNIQUE INDEX IF NOT EXISTS ux_access_one_owner ON access_users(is_owner) WHERE is_owner=1;
+  -- v0.6.60: código local de recuperación del propietario; solo se guarda su SHA-256.
+  -- No se generan claves maestras ni se tocan credenciales de instalaciones anteriores.
+  CREATE TABLE IF NOT EXISTS access_owner_recovery (
+    user_id INTEGER PRIMARY KEY REFERENCES access_users(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL CHECK(length(code_hash)=64),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  -- v0.6.61: el email solo funciona para recuperación después de verificarlo.
+  CREATE TABLE IF NOT EXISTS access_user_emails (
+    user_id INTEGER PRIMARY KEY REFERENCES access_users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN (0,1)),
+    verified_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS access_email_tokens (
+    user_id INTEGER NOT NULL REFERENCES access_users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL CHECK(purpose IN ('verify','reset')),
+    code_hash TEXT NOT NULL CHECK(length(code_hash)=64),
+    pending_email TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id,purpose)
+  );
   CREATE TABLE IF NOT EXISTS access_company_roles (
     user_id INTEGER NOT NULL REFERENCES access_users(id) ON DELETE CASCADE,
     company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,

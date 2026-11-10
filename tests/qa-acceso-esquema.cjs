@@ -26,6 +26,12 @@ const {pathToFileURL}=require('node:url');
    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM access_users').get().n,0);
    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM access_company_roles').get().n,0);
   });
+  check('Nueva tabla de recuperación preserva cuentas y permite migración repetible',()=>{
+   const schema=db.prepare("SELECT sql FROM sqlite_master WHERE name='access_owner_recovery'").get();
+   assert.ok(schema&&schema.sql.includes('code_hash'));
+   assert.equal(db.prepare('SELECT COUNT(*) n FROM access_owner_recovery').get().n,0);
+   assert.equal(db.prepare('SELECT COUNT(*) n FROM companies').get().n,2);
+  });
   check('Predeterminado 15 minutos y borrador conservado',()=>{
    const x=db.prepare('SELECT idle_lock_minutes,preserve_draft_on_lock FROM access_security_settings WHERE id=1').get();
    assert.equal(x.idle_lock_minutes,DEFAULT_IDLE_LOCK_MINUTES);assert.equal(x.preserve_draft_on_lock,1);

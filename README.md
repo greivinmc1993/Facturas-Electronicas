@@ -1,6 +1,82 @@
-# FacturaCR v0.6.59 — Seguridad de sesiones y QA del ejecutable empaquetado
+# FacturaCR v0.6.61 — Correos verificados y recuperación de acceso
 
-**Versión vigente: 0.6.59 (9 de noviembre de 2026).** Esta actualización parte de v0.6.58 y conserva módulos comerciales, base SQLite e instalador NSIS.
+**Versión vigente: 0.6.61 (9 de noviembre de 2026).** Continuamos desde v0.6.60. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
+
+## Nuevo en v0.6.61 — Recuperación por correo individual para todos los roles
+
+- **Registro individual:** propietario, administradores, supervisores y cajeros pueden registrar únicamente su propio correo en **Mi sesión → Seguridad y bloqueo**. Requiere confirmar la contraseña actual y verificar un código recibido por correo. No existe registro público ni se pueden asignar roles por correo.
+- **Verificación previa:** la dirección existente continúa activa hasta que se verifique la nueva. Los códigos de verificación vencen a los **15 minutos**, tienen límite de intentos y solo se guarda un hash SHA-256 en SQLite.
+- **Recuperación individual:** en la pantalla de inicio, **Recuperar mi cuenta por correo** permite solicitar un código para cualquier cuenta activa que tenga un correo previamente verificado. Los códigos duran **10 minutos**, se usan una sola vez y la nueva contraseña debe cumplir las reglas existentes. Se invalidan las sesiones anteriores.
+- **Política de privilegios:** cada código está vinculado al identificador exclusivo de la cuenta que lo solicitó. Un cajero solamente recupera su propia cuenta de cajero; jamás la del propietario, administrador, supervisor u otro cajero. Recuperar la contraseña NO cambia roles, empresas ni permisos. El restablecimiento administrado y el código de emergencia del propietario se conservan como alternativas.
+- **No enumeración de usuarios:** la solicitud pública no confirma si una cuenta existe, tiene correo o posee permisos. Se aplican límites de envío y de intentos de verificación.
+- **Migración SQLite aditiva:** se crean `access_user_emails` y `access_email_tokens`; no se alteran usuarios existentes, ventas, inventarios, carritos ni configuraciones de caja. Los correos anteriores no se asumen verificados.
+- **QA:** pruebas con SQLite temporal y un correo simulado, junto con la suite de regresión, para validar permisos, caducidad, token consumido, contraseña y sesiones. **El envío SMTP real debe comprobarse con un proveedor configurado:** las pruebas automatizadas no envían correos reales.
+
+## Configurar el correo saliente (SMTP cifrado)
+
+El envío **no queda activado por defecto**: debe proporcionarse un correo emisor y credenciales SMTP válidas en la computadora donde se ejecuta FacturaCR. Por seguridad, el transporte usa **TLS implícito en puerto 465**, comprueba el certificado del servidor y rechaza SMTP sin cifrado. No necesita una dependencia de npm adicional.
+
+Variables del proceso: `FACTURACR_SMTP_HOST`, `FACTURACR_SMTP_PORT` (465), `FACTURACR_SMTP_USER`, `FACTURACR_SMTP_PASSWORD` y, opcionalmente, `FACTURACR_SMTP_FROM` (si falta, usa el usuario SMTP). El proveedor debe admitir autenticación SMTP. Para proveedores que requieren clave de aplicación, utiliza una credencial específica del servicio y no la contraseña normal de tu cuenta.
+
+Ejemplo para una sesión de **PowerShell** (desarrollo o prueba, sin guardar la contraseña en el repositorio ni en un archivo):
+
+```powershell
+$env:FACTURACR_SMTP_HOST = 'smtp.tu-proveedor.com'
+$env:FACTURACR_SMTP_PORT = '465'
+$env:FACTURACR_SMTP_USER = 'avisos@tu-negocio.com'
+$env:FACTURACR_SMTP_FROM = 'avisos@tu-negocio.com'
+$secret = Read-Host 'Contraseña o clave de aplicación SMTP' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+try { $env:FACTURACR_SMTP_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+npm run desktop:dev
+```
+
+Para la versión instalada, hay que iniciar el ejecutable desde el mismo entorno configurado o administrar las variables de forma protegida desde Windows antes de abrirlo. Al reiniciar sin ellas, **el correo deja de estar disponible, pero el inicio de sesión y la recuperación de emergencia del propietario siguen funcionando**. Evita guardar la contraseña SMTP en archivos `.env` que puedan subirse a GitHub, en un instalador compartido o en capturas y registros de QA.
+
+Las cuatro clases de cuenta con correos verificados pueden recuperar **solo su propia contraseña**. Un cajero seguirá siendo cajero, sin acceso adicional a empresas, costos ni funciones administrativas. El código está asociado al usuario, no al rol, y no permite iniciar sesión sin una nueva contraseña ni elevar privilegios. Los envíos reales requieren Internet y un proveedor SMTP disponible; todos los datos comerciales permanecen en SQLite local.
+
+## Comprobaciones de la versión
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+GitHub Actions ejecuta las pruebas automáticas y la migración histórica **v0.6.34 → v0.6.61**. El SMTP remoto y el instalador real de esta versión quedan sujetos a validación posterior: no se consideran aprobados hasta ejecutarlos con un correo emisor y un runner Windows, respectivamente.
+
+---
+
+## Historial consolidado
+
+# FacturaCR v0.6.60 — Recuperación segura del propietario y consolidación de permisos
+
+**Versión vigente: 0.6.60 (9 de noviembre de 2026).** Esta actualización parte de la v0.6.59 con QA Windows aprobado según el resultado reportado y conserva módulos comerciales, SQLite e instalador NSIS.
+
+## Nuevo en v0.6.60 — Código de recuperación del propietario
+
+- **Instalación nueva:** al configurar la cuenta propietaria se entrega un código aleatorio de recuperación `FCR1-...` de **192 bits**. La interfaz muestra el código una sola vez; cópialo o transcríbelo en un lugar privado **fuera del equipo**. La aplicación solo guarda su **hash SHA-256**, nunca el código visible.
+- **Instalación que se actualiza desde v0.6.59:** no se genera silenciosamente un código. El propietario debe iniciar sesión y entrar en **Mi sesión → Seguridad y bloqueo → Recuperación del propietario**, introducir su contraseña vigente y pulsar **Crear código de recuperación**. También puede reemplazar un código anterior; el anterior deja de servir de inmediato.
+- **Si olvida la contraseña:** desde la pantalla de acceso puede abrir **¿Olvidaste la contraseña del propietario?**, introducir el usuario propietario, el código privado y una contraseña nueva de al menos 12 caracteres con letras y números. El servidor verifica el hash, cambia la contraseña en transacción SQLite, invalida todas las sesiones antiguas, consume el código y entrega **uno nuevo que debe guardarse**. El proceso queda en la auditoría sin registrar el código.
+- **Seguridad:** recuperación restringida a la cuenta propietaria, intentos fallidos limitados, respuestas genéricas para códigos/usuarios incorrectos, rutas protegidas por validación de origen local y sin cuentas universales ni contraseñas maestras. Los cajeros y administradores de empresa **no pueden recuperar la cuenta propietaria**; sus contraseñas temporales siguen gestionándose mediante usuarios autorizados.
+- **Límite importante:** si el propietario pierde **la contraseña y el código**, no existe recuperación automática o clave secreta de soporte. Los respaldos de SQLite tampoco revelan el código. Guarda el código en un lugar seguro y restringe su acceso.
+- **Migración de SQLite:** se incorpora exclusivamente la tabla `access_owner_recovery`; es una migración aditiva y repetible. No se cambian ni eliminan registros de empresas, ventas, carritos, caja o usuarios anteriores. Respaldar SQLite antes de actualizar.
+- **QA:** 16 casos nuevos de recuperación en `tests/qa-recuperacion-propietario.cjs` incorporados a `npm test`, prueba de migración del esquema y casos adicionales para HTTP real cuando se instalan Express y `better-sqlite3`. Las 45 pruebas de integración local se conservan.
+- **Validación:** `npm test` y comprobación sintáctica de los siete componentes JSX pasaron en este entorno. La compilación Vite y la ejecución nativa Windows deben verificarse de nuevo en GitHub Actions para **v0.6.60**.
+
+### Flujo recomendado en un negocio ya instalado
+
+1. Crear y verificar un respaldo de la base de datos SQLite de FacturaCR v0.6.59.
+2. Actualizar a v0.6.60 e iniciar sesión como propietario.
+3. Ir a **Mi sesión → Seguridad y bloqueo**, generar el código confirmando la contraseña vigente.
+4. Guardar el código de recuperación en un lugar privado distinto del equipo donde funciona FacturaCR.
+5. Continuar las operaciones normalmente. No es necesario modificar las cuentas del personal ni reconfigurar el bloqueo global de 15 minutos (o el valor ya guardado).
+
+---
+
+## Archivo histórico: v0.6.59
 
 ## Corrección adicional de v0.6.59: migración real 0.6.34 → 0.6.59 (HTTP 401)
 

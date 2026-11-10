@@ -761,3 +761,35 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .securitySaveToast>span{flex:1}.securitySaveToast button{padding:4px;border:0;background:transparent;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px}
 .securitySaveToast button:hover,.securitySaveToast button:focus-visible{background:#00000012}
 @media(max-width:650px){.securitySaveToast{top:12px}}
+
+
+/* v0.6.60 · Recuperación local del propietario sin cuentas maestras. */
+.recoveryCodeNotice{position:relative;z-index:100;background:#edf9f5;border:1px solid #8ec8b3;border-radius:12px;max-width:960px;margin:14px auto;padding:17px 19px;display:grid;gap:12px;color:#164b41;box-shadow:0 5px 20px #0b454319}
+.recoveryCodeNotice strong{font-size:15px}.recoveryCodeNotice p{margin:5px 0;font-size:12px;line-height:1.55}
+.recoveryCodeNotice input{width:100%;min-height:43px;border:1px solid #84aca6;border-radius:9px;padding:10px 13px;font:700 13px ui-monospace,Consolas,monospace;letter-spacing:.03em;color:#123e40;background:#fff;box-sizing:border-box}
+.recoveryCodeNotice .actions{display:flex;gap:10px;flex-wrap:wrap;margin:0}.recoveryCodeNotice button{min-height:40px}
+.authPanel .recoveryCodeNotice{margin:12px 0;max-width:100%;padding:12px}.authPanel .recoveryCodeNotice input{font-size:11px;letter-spacing:0}
+.authRecoveryLink{margin-top:10px;background:transparent!important;color:#0a776c!important;box-shadow:none!important;text-decoration:underline;border:0!important;font-weight:650;min-height:34px}
+.authRecoveryLink:hover{color:#09544c!important}
+.recoveryInlineMessage{max-width:960px;margin:10px auto;padding:11px 15px;background:#e6f7f1;border-radius:9px;color:#145d4b;font-size:13px}
+.ownerRecoveryTools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(310px,450px);gap:20px;align-items:end;max-width:1540px;margin:18px auto 0;border-top:1px solid #d0e3e4;padding-top:16px}
+.ownerRecoveryTools strong{font-size:13px;color:#173f4a}.ownerRecoveryTools p{margin:5px 0;font-size:12px;line-height:1.5;color:#607781}.ownerRecoveryTools small{font-size:11px;color:#547367}
+.ownerRecoveryTools form{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:12px;align-items:end;margin:0}.ownerRecoveryTools form label{display:grid;gap:6px;margin:0;font-size:11px;font-weight:700;color:#395868}.ownerRecoveryTools form input{box-sizing:border-box;min-width:0;width:100%;height:42px;border-radius:9px;padding:0 10px;border:1px solid #b4cfd2;background:white}.ownerRecoveryTools form button{height:42px;border-radius:9px;margin:0;white-space:nowrap}
+@media(max-width:850px){.ownerRecoveryTools{grid-template-columns:1fr}.ownerRecoveryTools form{max-width:580px}}
+@media(max-width:520px){.ownerRecoveryTools form{grid-template-columns:1fr}.recoveryCodeNotice{margin:10px;padding:13px}.recoveryCodeNotice input{font-size:11px}}
+
+/* v0.6.61: sección de correo con alineación independiente del resto del panel. */
+.emailRecoveryTools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(290px,1.3fr);gap:16px 24px;max-width:1540px;margin:16px auto 0;padding-top:18px;border-top:1px solid #d0e3e4;align-items:start}
+.emailRecoveryHeading strong{color:#174956;font-size:13px}
+.emailRecoveryHeading p{margin:5px 0;font-size:12px;line-height:1.5;color:#607781}
+.emailRecoveryHeading small{display:block;color:#357d6f;font-size:12px;overflow-wrap:anywhere}
+.emailRecoveryForm{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,1fr);gap:12px;align-items:end;margin:0}
+.emailRecoveryForm label{display:grid;gap:6px;font-size:11px;font-weight:700;color:#395868;margin:0;min-width:0}
+.emailRecoveryForm input{box-sizing:border-box;width:100%;height:42px;min-width:0;border-radius:9px;padding:0 10px;border:1px solid #b4cfd2;background:#fff}
+.emailRecoveryForm button{height:42px;margin:0;grid-column:1/-1;justify-self:end}
+.emailVerifyForm{grid-column:2}
+.emailSuccess{grid-column:1/-1;color:#207d61;font-size:12px;margin:0}
+.emailRecoveryTools>.authError{grid-column:1/-1;margin:0}
+.authRecoveryChoices{display:grid;gap:4px}
+@media(max-width:940px){.emailRecoveryTools{grid-template-columns:1fr}.emailVerifyForm{grid-column:1}}
+@media(max-width:560px){.emailRecoveryForm{grid-template-columns:1fr}.emailRecoveryForm button{width:100%}}

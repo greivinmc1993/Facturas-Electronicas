@@ -79,6 +79,34 @@ async function main(){
     body:JSON.stringify({username:'qa_propietario',password:'ClavePropietarioQA67890'})});
   assert.equal(valid.status,200);
  });
+ await test('HTTP real permite rotar código de recuperación solo con la contraseña del propietario',async()=>{
+  const status=await request('GET','/api/auth/recovery/status');
+  assert.equal(status.status,200);assert.equal(status.body.configured,true);
+  const unauthorized=await fetch(base+'/api/auth/recovery/rotate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'ClavePropietarioQA67890'})});
+  assert.equal(unauthorized.status,401);
+  const wrong=await request('POST','/api/auth/recovery/rotate',{password:'IncorrectaSegura12345'});
+  assert.equal(wrong.status,403);
+  const r=await request('POST','/api/auth/recovery/rotate',{password:'ClavePropietarioQA67890'});
+  assert.equal(r.status,200,JSON.stringify(r.body));
+  assert.match(r.body.recoveryCode,/^FCR1-(?:[A-F0-9]{8}-){5}[A-F0-9]{8}$/);
+  server.qaRecoveryCode=r.body.recoveryCode;
+ });
+ await test('HTTP real recupera propietario, consume código y revoca sesiones previas',async()=>{
+  const old=sessionCookie;
+  const reset=await fetch(base+'/api/auth/recovery/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'qa_propietario',recoveryCode:server.qaRecoveryCode,newPassword:'ClaveRecuperadaQA12345'})});
+  assert.equal(reset.status,200);
+  const result=await reset.json();assert.notEqual(result.recoveryCode,server.qaRecoveryCode);
+  assert.equal((await request('GET','/api/auth/status')).body.authenticated,false);
+  const used=await request('POST','/api/auth/recovery/reset',{username:'qa_propietario',recoveryCode:server.qaRecoveryCode,newPassword:'OtraClaveQA12345'});
+  assert.equal(used.status,403);
+  const oldSession=await fetch(base+'/api/auth/status',{headers:{cookie:old}}).then(r=>r.json());
+  assert.equal(oldSession.authenticated,false);
+  const r=await request('POST','/api/auth/login',{username:'qa_propietario',password:'ClaveRecuperadaQA12345'});
+  assert.equal(r.status,200);sessionCookie=(r.headers.get('set-cookie')||'').split(';',1)[0];
+  assert.match(sessionCookie,/^facturacr_session=/);
+  assert.equal((await request('GET','/api/auth/recovery/status')).body.configured,true);
+  delete server.qaRecoveryCode;
+ });
  await test('SQLite nativo crea empresa y la recupera por HTTP',async()=>{
   const r=await request('POST','/api/companies',{legal_name:'Comercio temporal QA',identification:'123456789'});
   assert.equal(r.status,201,JSON.stringify(r.body));

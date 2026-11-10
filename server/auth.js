@@ -1,6 +1,8 @@
 // Autenticación local v0.6.56: sin cuentas universales ni usuarios ocultos.
 import {randomBytes, scryptSync, timingSafeEqual, createHash} from 'node:crypto';
 import {isValidIdleLockMinutes,ACCESS_ROLES,defaultPermissionsFor} from './access-schema.js';
+import {registerEmailRecovery} from './email-recovery.js';
+import {isMailConfigured,sendSecurityMail} from './email-smtp.js';
 
 const COOKIE='facturacr_session';
 const TOKEN_TTL=12*60*60*1000;
@@ -8,6 +10,25 @@ const PASSWORD_MIN=12;
 const LOGIN_DELAY_MAX=30*60*1000;
 const sessions=new Map();
 const failures=new Map();
+const recoveryFailures=new Map();
+const RECOVERY_CODE_BYTES=24; // 192 bits aleatorios; imposible inferirlo de los datos SQLite.
+const RECOVERY_LIMIT=6;
+const RECOVERY_WINDOW=15*60*1000;
+const recoveryFormat=raw=>'FCR1-'+raw.match(/.{1,8}/g).join('-');
+function newRecoveryCode(){return recoveryFormat(randomBytes(RECOVERY_CODE_BYTES).toString('hex').toUpperCase());}
+function normalizedRecoveryCode(value){
+ if(typeof value!=='string'||value.length>90)return null;
+ const normalized=value.trim().toUpperCase().replace(/[-\s]/g,'');
+ return /^FCR1[0-9A-F]{48}$/.test(normalized)?normalized:null;
+}
+function recoveryHash(value){return tokenHash(value);}
+function recoveryMatches(value,expected){
+ const normalized=normalizedRecoveryCode(value);
+ const supplied=Buffer.from(recoveryHash(normalized||''),'hex');
+ const stored=Buffer.from(/^[0-9a-f]{64}$/.test(String(expected))?expected:'0'.repeat(64),'hex');
+ return !!normalized&&timingSafeEqual(supplied,stored);
+}
+
 const cookie=(value,age)=>`${COOKIE}=${value}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${age}`;
 const tokenHash=v=>createHash('sha256').update(v).digest('hex');
 export function passwordHash(password){
@@ -33,10 +54,17 @@ function localOriginOnly(req,res,next){
   }catch{}
   return res.status(403).json({error:'Origen no autorizado.'});
 }
-export function registerAuth(app,getDb){
+export function registerAuth(app,getDb,options={}){
   // Leer siempre la conexión SQLite vigente: restaurar respaldos la reemplaza.
   const db={prepare:(...args)=>getDb().prepare(...args),transaction:(fn)=>getDb().transaction(fn)};
   const ownerCount=()=>db.prepare('SELECT COUNT(*) AS n FROM access_users WHERE is_owner=1').get().n;
+  const saveRecovery=(userId,code)=>db.prepare(`INSERT INTO access_owner_recovery(user_id,code_hash)
+    VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, created_at=CURRENT_TIMESTAMP`)
+    .run(userId,recoveryHash(normalizedRecoveryCode(code)));
+  const revokeUserSessions=(userId,exceptKey=null)=>{
+    for(const [key,s] of sessions)if(s.userId===userId&&key!==exceptKey)sessions.delete(key);
+  };
+
   const settings=()=>db.prepare('SELECT idle_lock_minutes,preserve_draft_on_lock FROM access_security_settings WHERE id=1').get();
   const credentials=req=>{
     const match=String(req.headers?.cookie||'').match(/(?:^|;\s*)facturacr_session=([a-f0-9]{64})(?:;|$)/);
@@ -49,7 +77,7 @@ export function registerAuth(app,getDb){
     if(!user?.is_active){sessions.delete(key);return null;}
     return {key,session:s,user};
   };
-  const publicState=()=>({setupRequired:ownerCount()===0,...settings()});
+  const publicState=()=>({setupRequired:ownerCount()===0,emailRecoveryAvailable:isMailConfigured(),...settings()});
   const userCompanies=userId=>db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(userId);
   const displayUser=user=>({id:user.id,username:user.username,displayName:user.display_name,isOwner:!!user.is_owner,passwordChangeRequired:!!user.password_change_required,companies:user.is_owner?[]:userCompanies(user.id)});
   const audit=(userId,type,objectType='',objectId='',companyId=null)=>db.prepare('INSERT INTO access_audit_log(user_id,company_id,event_type,object_type,object_id) VALUES (?,?,?,?,?)').run(userId,companyId,type,objectType,String(objectId));
@@ -95,14 +123,70 @@ export function registerAuth(app,getDb){
       const displayName=String(req.body?.displayName||'').trim();
       if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username)||displayName.length<2||displayName.length>160)throw Error('Usuario o nombre inválido.');
       const hash=passwordHash(req.body?.password);
-      const id=db.transaction(()=>{
+      const recoveryCode=newRecoveryCode();
+      db.transaction(()=>{
         if(ownerCount())throw Error('La cuenta propietaria ya fue configurada.');
-        return Number(db.prepare(`INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required)
+        const id=Number(db.prepare(`INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required)
           VALUES (?,?,?,'scrypt',1,1,0)`).run(username,displayName,hash).lastInsertRowid);
+        saveRecovery(id,recoveryCode);
+        audit(id,'auth.owner_setup','user',id);
       })();
-      db.prepare(`INSERT INTO access_audit_log(user_id,event_type,object_type,object_id) VALUES (?,'auth.owner_setup','user',?)`).run(id,String(id));
-      res.status(201).json({ok:true});
+      // Se muestra una sola vez. SQLite conserva exclusivamente el hash SHA-256.
+      res.setHeader('Cache-Control','no-store');
+      res.status(201).json({ok:true,recoveryCode});
     }catch(e){res.status(400).json({error:e.message});}
+  });
+  // Recuperación local sin cuenta oculta: código de alta entropía, un solo uso,
+  // contraseña nueva validada y revocación de todas las sesiones del propietario.
+  app.post('/api/auth/recovery/reset',localOriginOnly,(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    const username=typeof req.body?.username==='string'?req.body.username.trim().toLowerCase():'';
+    const key=username.slice(0,80);
+    const now=Date.now(),state=recoveryFailures.get(key)||{n:0,until:0};
+    if(state.until>now)return res.status(429).json({error:'Demasiados intentos de recuperación. Inténtalo más tarde.'});
+    const fail=()=>{
+      const n=state.n+1;
+      recoveryFailures.set(key,n>=RECOVERY_LIMIT?{n,until:now+RECOVERY_WINDOW}:{n,until:0});
+      return res.status(403).json({error:'No se pudo verificar el código de recuperación y la cuenta.'});
+    };
+    if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username))return fail();
+    const user=db.prepare('SELECT id,is_active FROM access_users WHERE username=? AND is_owner=1').get(username);
+    const stored=user?.is_active?db.prepare('SELECT code_hash FROM access_owner_recovery WHERE user_id=?').get(user.id):null;
+    if(!recoveryMatches(req.body?.recoveryCode,stored?.code_hash))return fail();
+    let hash;
+    try{hash=passwordHash(req.body?.newPassword);}catch(e){return res.status(400).json({error:e.message});}
+    try{
+      const nextCode=newRecoveryCode();
+      db.transaction(()=>{
+        // Validación dentro de transacción: evita reutilizar el código en peticiones concurrentes.
+        const current=db.prepare('SELECT code_hash FROM access_owner_recovery WHERE user_id=?').get(user.id);
+        if(!current||!recoveryMatches(req.body?.recoveryCode,current.code_hash))throw Error('Código utilizado.');
+        db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_owner=1').run(hash,user.id);
+        saveRecovery(user.id,nextCode); // sustituye el código usado: no puede reutilizarse
+        audit(user.id,'auth.owner_recovered','user',user.id);
+      })();
+      revokeUserSessions(user.id);
+      failures.delete(username);recoveryFailures.delete(key);
+      res.json({ok:true,recoveryCode:nextCode});
+    }catch{return fail();}
+  });
+  app.get('/api/auth/recovery/status',(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario administra su recuperación.'});
+    const code=db.prepare('SELECT 1 AS enabled FROM access_owner_recovery WHERE user_id=?').get(a.user.id);
+    res.setHeader('Cache-Control','no-store');res.json({configured:!!code});
+  });
+  app.post('/api/auth/recovery/rotate',localOriginOnly,(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario administra su recuperación.'});
+    const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
+    if(!row||!verifyPassword(req.body?.password,row.password_hash))return res.status(403).json({error:'La contraseña actual es incorrecta.'});
+    try{
+      const code=newRecoveryCode();
+      db.transaction(()=>{saveRecovery(a.user.id,code);audit(a.user.id,'auth.recovery_rotated','user',a.user.id);})();
+      revokeUserSessions(a.user.id,a.key);
+      res.setHeader('Cache-Control','no-store');res.json({ok:true,recoveryCode:code});
+    }catch{return res.status(500).json({error:'No se pudo generar el código de recuperación.'});}
   });
   app.post('/api/auth/login',localOriginOnly,(req,res)=>{
     const username=String(req.body?.username||'').trim().toLowerCase(),key=username.slice(0,80);
@@ -237,6 +321,7 @@ export function registerAuth(app,getDb){
       res.json({ok:true});
     }catch(e){res.status(400).json({error:e.message});}
   });
+  registerEmailRecovery(app,{db,auth,localOriginOnly,audit,verifyPassword,passwordHash,revokeUserSessions,mailer:options.sendMail||sendSecurityMail,mailConfigured:options.mailConfigured||isMailConfigured});
   // Es obligatorio validar todas las rutas /api restantes en el SERVIDOR.
   // La política por roles y empresas se activará después, ANTES de crear usuarios subordinados.
   app.use('/api',(req,res,next)=>{

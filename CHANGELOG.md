@@ -1,3 +1,26 @@
+# FacturaCR v0.6.61 — Recuperación por correo verificado
+
+- **Recuperación por correo para los cuatro roles:** propietario, administrador, supervisor y cajero pueden verificar individualmente su correo y restablecer únicamente su propia contraseña. El token se vincula a `user_id`; recuperar nunca cambia rol, empresa ni permisos. Continúa el restablecimiento administrado del personal y el código de emergencia del propietario.
+- **Restablecimiento seguro:** código de un solo uso con vencimiento de 10 minutos, hash en SQLite, control de intentos, revocación de sesiones y respuesta pública que no revela la existencia de usuarios.
+- **Transporte SMTP TLS 465:** módulo Node sin dependencias externas; credenciales exclusivamente por variables de entorno, nunca incluidas en el ZIP. El envío remoto real requiere configuración y prueba independiente.
+- **Migración aditiva:** tablas `access_user_emails` y `access_email_tokens`; se preservan las credenciales, el código de emergencia del propietario, el inventario, las ventas y los borradores.
+- **QA:** pruebas de aislamiento de códigos entre cuentas y preservación de roles/cartera de permisos, correo simulado, SQLite temporal, regresión comercial y actualización de la prueba histórica de instaladores a **v0.6.34 → v0.6.61**. La compilación y el ensayo Windows siguen a cargo de Actions.
+
+---
+
+## v0.6.60 — Recuperación segura del propietario (2026-11-09)
+
+- Código de recuperación del propietario de 192 bits, generado con `randomBytes` y entregado una sola vez; solo hash SHA-256 en tabla SQLite `access_owner_recovery`.
+- Restablecimiento sin sesión únicamente con cuenta propietaria y código auténtico; código de un uso, rotación automática, contraseña nueva comprobada, revocación de sesiones y auditoría sin secretos.
+- Generación y renovación autenticadas desde **Mi sesión → Seguridad y bloqueo**; las instalaciones que ya tienen propietario no obtienen códigos secretos automáticos.
+- Interfaz con aviso para guardar el código, acceso desde «¿Olvidaste la contraseña del propietario?» y confirmaciones. Sin contraseñas maestras ni accesos ocultos.
+- Limitación de intentos fallidos y autorización exclusiva del propietario para configurar su código. Se conservan las restricciones por empresa, la administración de contraseñas temporales del personal y el bloqueo global editable por los cuatro roles.
+- `npm test`: 16 pruebas nuevas de recuperación, migración SQLite, 45 pruebas de integración existentes y controles de autenticación anteriores. Siete componentes JSX analizados sin errores sintácticos. Se amplió el QA del servidor HTTP real para Actions.
+- Metadatos y comprobación de actualización NSIS revisados a 0.6.60. Sin eliminación de datos comerciales y sin archivos extra de notas de versión.
+- La compilación real Vite y ejecución Windows de v0.6.60 quedan pendientes de GitHub Actions. Las pruebas de Actions de v0.6.59 fueron confirmadas por el usuario.
+
+---
+
 ## Corrección adicional v0.6.59 — QA migración entre versiones y autenticación HTTP
 
 - `qa:version-upgrade` deja de consultar `/api/companies` sin autenticación después de la migración real desde v0.6.34. El proceso de Electron conserva el propietario en SQLite, pero un servidor HTTP nuevo requiere iniciar una sesión nueva.
