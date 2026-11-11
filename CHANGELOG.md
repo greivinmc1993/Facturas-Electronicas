@@ -1,3 +1,10 @@
+## Interfaz v0.6.63 — Ventanas y desplegables con estilo unificado (10 de noviembre de 2026)
+- Selector universal para todos los módulos (color, flecha, bordes, foco visible y estados hover/deshabilitado); listas abiertas personalizadas con `appearance:base-select` en Chromium compatible, sin sustituir los selectores ni alterar sus eventos.
+- Diálogo reutilizable `ConfirmProvider.jsx` para operaciones sensibles; sustituye las cinco confirmaciones nativas de navegador por ventanas de FacturaCR, accesibles mediante teclado y cancelables. Se conservan las confirmaciones de eliminación y acciones previas que ya eran propias de React.
+- Menús de sesión, empresas, listas de búsqueda y opciones avanzadas con diseño homogéneo; las ventanas de empresas, usuarios, proformas y vista previa de tiquetes comparten bordes, sombras y entrada suave. Respeta `prefers-reduced-motion`.
+- Ocho nuevas comprobaciones en `tests/qa-063-estilos-interactivos.cjs`; incluye ejecución dentro de `npm test`. Prueba visual independiente con Chromium a 480 y 1440 px: selector de opciones abierto, sin scroll horizontal y con opción de teclado conservada. No se modifican API, permisos, esquema SQLite ni operaciones comerciales.
+- Pendiente comprobar compilación Vite, funciones interactivas dentro de Electron y la instalación NSIS desde GitHub Actions Windows. Las ventanas nativas de archivos, impresión y sistema siguen a cargo de Windows.
+
 ## Mejora de Ventas y Respaldos v0.6.63 — Pago protegido y días personalizables (10 de noviembre de 2026)
 - **Ventas:** la rueda del mouse ya no modifica el valor de los campos de monto recibido en efectivo ni pagos combinados cuando tienen foco. Los importes decimales introducidos voluntariamente por teclado siguen permitidos; no se redondean ni alteran los totales o el IVA.
 - **Respaldos semanales:** selector de lunes a domingo. **Mensuales:** selector del 1 al 31. Cuando el mes no contiene el día solicitado, se realiza el último día de ese mes. También se mantiene la hora local, la frecuencia diaria y la retención configurada.

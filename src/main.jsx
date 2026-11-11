@@ -11,6 +11,7 @@ import InventoryValuationPanel from './InventoryValuationPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
 import AuditPanel from './AuditPanel.jsx';
 import CashierStockPanel from './CashierStockPanel.jsx';
+import {ConfirmProvider,useConfirm} from './ConfirmProvider.jsx';
 
 const APP_VERSION = __APP_VERSION__;
 const ACTIVE_COMPANY_KEY = 'facturacr_active_company_id';
@@ -1000,6 +1001,7 @@ function App({account,securityPanel}){
 
 // Seguridad: las ventas en curso permanecen montadas debajo de la pantalla bloqueada.
 function SecureApp(){
+ const confirmAction=useConfirm();
  const [state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [username,setUsername]=useState(''),[displayName,setDisplayName]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[newPassword,setNewPassword]=useState('');
  const [locked,setLocked]=useState(false),[minutes,setMinutes]=useState(15),[savedMinutes,setSavedMinutes]=useState(15),[settingsBusy,setSettingsBusy]=useState(false),[accountMenuOpen,setAccountMenuOpen]=useState(false),[securitySettingsOpen,setSecuritySettingsOpen]=useState(false);
@@ -1123,7 +1125,7 @@ function SecureApp(){
    setOwnerAssistBusy(true);setOwnerAssistError('');setOwnerTempCredential(null);
    try{
      if(!ownerTarget)throw Error('Selecciona la cuenta que deseas recuperar.');
-     if(!window.confirm('Se cerrarán las sesiones de la cuenta seleccionada y se emitirá una nueva contraseña temporal. ¿Continuar?'))return;
+     if(!await confirmAction('Se cerrarán las sesiones de la cuenta seleccionada y se emitirá una nueva contraseña temporal.',{title:'Recuperar cuenta del personal',confirmLabel:'Generar contraseña temporal',danger:true}))return;
      const result=await api(`/api/auth/users/${Number(ownerTarget)}/owner-recovery`,{method:'POST',body:JSON.stringify({currentPassword:ownerAssistPassword})});
      const target=ownerUsers.find(u=>u.id===Number(ownerTarget));
      setOwnerTempCredential({username:target?.username||'',password:result.temporaryPassword});
@@ -1134,7 +1136,7 @@ function SecureApp(){
  const rotateRecovery=async e=>{
    e.preventDefault();setBusy(true);setSettingsFeedback(null);
    try{
-     if(!window.confirm('El código de recuperación anterior dejará de funcionar. ¿Quieres generar uno nuevo?'))return;
+     if(!await confirmAction('El código de recuperación anterior dejará de funcionar y será reemplazado por uno nuevo.',{title:'Reemplazar código de emergencia',confirmLabel:'Reemplazar código',danger:true}))return;
      const result=await api('/api/auth/recovery/rotate',{method:'POST',body:JSON.stringify({password:ownerRecoveryPassword})});
      setRecoveryCode(result.recoveryCode);setOwnerRecoveryPassword('');setOwnerRecoveryConfigured(true);
      setSettingsFeedback({type:'success',message:'Nuevo código generado. Guárdalo fuera del equipo; solo se mostrará ahora.'});
@@ -1169,7 +1171,7 @@ function SecureApp(){
    }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
  };
  const removeSmtp=async()=>{
-   if(!window.confirm('¿Eliminar la configuración de correo emisor? Se desactivará la recuperación por correo hasta configurar otro servidor.'))return;
+   if(!await confirmAction('Se desactivará la recuperación por correo hasta configurar otro servidor. Se conservarán los correos verificados.',{title:'Eliminar configuración SMTP',confirmLabel:'Eliminar configuración',danger:true}))return;
    setSmtpBusy(true);setSmtpFeedback(null);
    try{
      const result=await api('/api/auth/mail/settings',{method:'DELETE',body:JSON.stringify({currentPassword:smtpForm.ownerPassword})});
@@ -1389,4 +1391,4 @@ function SecureApp(){
  </div>
 }
 
-createRoot(document.getElementById('root')).render(<ScreenErrorBoundary><SecureApp/></ScreenErrorBoundary>);
+createRoot(document.getElementById('root')).render(<ScreenErrorBoundary><ConfirmProvider><SecureApp/></ConfirmProvider></ScreenErrorBoundary>);

@@ -1,7 +1,9 @@
 import React,{useEffect,useState} from 'react';
+import {useConfirm} from './ConfirmProvider.jsx';
 const request=async(url,options={})=>{const r=await fetch(url,{...options,headers:{'Content-Type':'application/json'}});const j=await r.json();if(!r.ok)throw Error(j.error||'Operación fallida');return j};
 const roleName={company_admin:'Administrador',supervisor:'Supervisor',cashier:'Cajero'};
 export default function UsersPanel({account}){
+ const confirmAction=useConfirm();
  const isOwner=!!account?.isOwner;
  const [users,setUsers]=useState([]),[companies,setCompanies]=useState([]),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const [form,setForm]=useState({username:'',displayName:'',password:'',companyId:'',role:'cashier'});
@@ -14,7 +16,7 @@ export default function UsersPanel({account}){
  const action=async(fn)=>{setBusy(true);setError('');setMessage('');try{await fn();await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const create=e=>{e.preventDefault();action(async()=>{await request('/api/auth/users',{method:'POST',body:JSON.stringify({...form,companyId:Number(form.companyId)})});setForm({username:'',displayName:'',password:'',companyId:'',role:'cashier'});setMessage('Usuario creado. En el primer ingreso deberá cambiar la contraseña temporal.')})};
  const update=(u,body)=>action(async()=>{await request('/api/auth/users/'+u.id,{method:'PUT',body:JSON.stringify(body)});setMessage('Cambios guardados correctamente.')});
- const revoke=(u,c)=>{if(!window.confirm(`¿Quitar el acceso de ${u.username} a esta empresa?`))return;action(async()=>{await request(`/api/auth/users/${u.id}/companies/${c.company_id}`,{method:'DELETE'});setMessage('Acceso retirado; sesiones anteriores cerradas.')})};
+ const revoke=async(u,c)=>{if(!await confirmAction(`La cuenta @${u.username} perderá el acceso a esta empresa y se cerrarán sus sesiones.`,{title:'Retirar acceso a empresa',confirmLabel:'Quitar acceso',danger:true}))return;action(async()=>{await request(`/api/auth/users/${u.id}/companies/${c.company_id}`,{method:'DELETE'});setMessage('Acceso retirado; sesiones anteriores cerradas.')})};
  const canAdminister=u=>isOwner||u.companies.length>0&&u.companies.every(c=>c.role!=='company_admin'&&adminCompanies.some(a=>a.id===c.company_id));
  const canSuspend=u=>canAdminister(u)||u.companies.length>0&&u.companies.every(c=>c.role==='cashier'&&delegated.includes(c.company_id));
  const applyDelete=e=>{e.preventDefault();if(!deleteUser)return;action(async()=>{await request('/api/auth/users/'+deleteUser.id,{method:'DELETE',body:JSON.stringify({confirmation:deleteConfirm,currentPassword:deletePassword})});setMessage('Perfil eliminado de la lista activa. Sus ventas y auditoría permanecen registradas.');setDeleteUser(null);setDeleteConfirm('');setDeletePassword('')})};

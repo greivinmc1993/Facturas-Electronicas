@@ -2,6 +2,15 @@
 
 **Versión vigente: 0.6.63 (10 de noviembre de 2026).** Continuamos desde v0.6.62. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
 
+## Estilo unificado de menús y ventanas emergentes — actualización v0.6.63
+
+Todos los módulos comparten la identidad visual de FacturaCR en **selectores, menús de usuario y empresas, opciones avanzadas y ventanas de confirmación**: verde institucional, bordes suaves, sombreado, espaciado, hover, foco visible y adaptación a ventanas estrechas.
+
+- Las confirmaciones de **retirar un acceso, registrar un movimiento de inventario, recuperar otra cuenta, reemplazar el código de emergencia y eliminar el SMTP** ya no utilizan `window.confirm`. Ahora usan un diálogo React reutilizable con **Cancelar** y una acción explícita; presionar Escape o cancelar **no ejecuta** la operación.
+- Los `<select>` existentes conservan sus opciones, validación, selección por teclado y llamadas `onChange`; en Chromium/Electron compatible, las listas abiertas muestran colores, selección y sombras de FacturaCR mediante `appearance: base-select`. Otros motores mantienen un menú nativo accesible.
+- Los formularios emergentes de empresas, eliminación de cuentas, eliminación de proformas, vista previa de tiquetes y menús propios comparten el mismo estilo. Los controles del sistema operativo como el explorador de archivos o el diálogo de impresora **conservan la interfaz de Windows**, ya que no se pueden rediseñar completamente mediante CSS de React.
+- Pruebas: `node tests/qa-063-estilos-interactivos.cjs` y `npm test`. La prueba visual independiente en Chromium verificó un selector abierto y cerrado, navegación por teclado, opciones avanzadas y adaptación a 480 y 1440 px. **Aún se debe validar el ejecutable Electron/Windows y GitHub Actions.** No se modificó SQLite ni la lógica de ventas, respaldos o permisos.
+
 ## Ventas y respaldos automáticos — mejora v0.6.63
 
 **Ventas → Cobro:** los campos *Efectivo recibido* y *Montos de pagos combinados* ya no cambian cuando se desplaza la rueda del mouse sobre un campo enfocado. La interfaz quita el foco en ese instante para permitir el desplazamiento normal; los centavos escritos voluntariamente siguen admitidos y el cálculo se mantiene inalterado.

@@ -1,10 +1,12 @@
 import React,{useCallback,useEffect,useState} from 'react';
+import {useConfirm} from './ConfirmProvider.jsx';
 
 // Kardex operativo: registro y consulta de existencias, nunca costos ni valoración.
 const initialFilters={search:'',productId:'',type:'all',from:'',to:''};
 const fmt=n=>Number(n||0).toLocaleString('es-CR',{maximumFractionDigits:2});
 async function jsonFrom(response){const data=await response.json();if(!response.ok)throw Error(data.error||'No se pudo consultar el inventario.');return data;}
 export default function CashierStockPanel({companyId}){
+ const confirmAction=useConfirm();
  const [products,setProducts]=useState([]),[productId,setProductId]=useState(''),[kind,setKind]=useState('entrada');
  const [quantity,setQuantity]=useState(''),[reason,setReason]=useState('Ingreso de mercadería'),[notes,setNotes]=useState('');
  const [filters,setFilters]=useState(initialFilters),[page,setPage]=useState(1),[history,setHistory]=useState(null),[revision,setRevision]=useState(0);
@@ -38,7 +40,7 @@ export default function CashierStockPanel({companyId}){
  const submit=async e=>{
   e.preventDefault();setError('');setMessage('');
   if(!canSave)return setError('Selecciona un artículo, una cantidad válida y un motivo de al menos 5 caracteres.');
-  if(!window.confirm(`¿Confirmas ${kind==='entrada'?'la entrada':'el ajuste'} de ${product.description}? Existencia final: ${after}.`))return;
+  if(!await confirmAction(`${kind==='entrada'?'Entrada de mercadería':'Ajuste por conteo físico'}: ${product.description}. Existencia final: ${after}.`,{title:'Confirmar movimiento de inventario',confirmLabel:'Registrar movimiento'}))return;
   setBusy(true);
   try{
    const recorded=await jsonFrom(await fetch(`/api/companies/${companyId}/inventory/movements`,{

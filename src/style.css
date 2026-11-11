@@ -1070,3 +1070,146 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .backupHero>button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px}
 .backupHero>button svg{display:block;flex:none}
 .backupSettingsGrid .backupDayHint{display:block;margin-top:6px;font-size:11px;line-height:1.45;color:#586f81;font-weight:400}
+
+/* v0.6.63 · Sistema visual unificado de ventanas, confirmaciones y desplegables.
+   Todas las pantallas reutilizan colores, radios y estados accesibles de FacturaCR.
+   Las opciones del SO se personalizan en Chromium compatible y conservan el
+   selector nativo accesible como respaldo en otros motores. */
+:root{
+ --fcr-ui-primary:#0d8072;
+ --fcr-ui-primary-hover:#086c63;
+ --fcr-ui-ink:#173a49;
+ --fcr-ui-muted:#5b7581;
+ --fcr-ui-border:#bbd3d8;
+ --fcr-ui-surface:#fff;
+ --fcr-ui-subtle:#f1f8f8;
+ --fcr-ui-radius:12px;
+ --fcr-ui-shadow:0 22px 70px rgba(8,34,50,.23);
+}
+/* Campo cerrado: aspecto coherente en TODAS las pantallas, no solo Seguridad. */
+.secureRoot select:not([multiple]):not([size]){
+ box-sizing:border-box;min-width:0;min-height:40px;
+ appearance:none;-webkit-appearance:none;
+ border:1px solid var(--fcr-ui-border);border-radius:10px;
+ padding-right:38px;
+ background-color:#fff;color:var(--fcr-ui-ink);
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230d8072' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;background-position:right 12px center;background-size:16px;
+ box-shadow:0 1px 2px rgba(17,65,78,.05);
+ transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease;
+}
+.secureRoot select:not([multiple]):not([size]):hover:not(:disabled){border-color:#0e8c7d;background-color:#fafffe}
+.secureRoot select:not([multiple]):not([size]):focus-visible{
+ outline:2px solid var(--fcr-ui-primary);outline-offset:2px;
+ box-shadow:0 0 0 4px rgba(18,153,136,.15);
+}
+.secureRoot select:disabled{background-color:#edf3f5;color:#748994;cursor:not-allowed}
+.secureRoot select option{background:#fff;color:var(--fcr-ui-ink)}
+/* Personalización de la lista realmente abierta en Electron / Chromium moderno.
+   Mantiene selección, teclado, opciones dinámicas y validación de formularios. */
+@supports (appearance:base-select){
+ .secureRoot select:not([multiple]):not([size]),
+ .secureRoot select:not([multiple]):not([size])::picker(select){
+  appearance:base-select;
+ }
+ .secureRoot select:not([multiple]):not([size]){
+  background-image:none!important;padding-right:12px;
+ }
+ .secureRoot select:not([multiple]):not([size])::picker-icon{
+  color:var(--fcr-ui-primary);transition:transform .18s ease;
+ }
+ .secureRoot select:not([multiple]):not([size]):open::picker-icon{transform:rotate(180deg)}
+ .secureRoot select:not([multiple]):not([size])::picker(select){
+  min-width:max-content;max-width:min(90vw,560px);max-height:min(340px,55vh);
+  overflow-y:auto;scrollbar-color:#a8c9ca #f4f8f9;
+  margin-top:7px;padding:6px;border:1px solid #b9d5d6;
+  border-radius:12px;background:#fff;color:var(--fcr-ui-ink);
+  box-shadow:0 17px 46px rgba(10,42,54,.22);
+  opacity:0;transform:translateY(-5px);
+  transition:opacity .16s ease,transform .16s ease,overlay .16s ease allow-discrete,display .16s ease allow-discrete;
+ }
+ .secureRoot select:not([multiple]):not([size])::picker(select):popover-open{
+  opacity:1;transform:translateY(0);
+ }
+ @starting-style{
+  .secureRoot select:not([multiple]):not([size])::picker(select):popover-open{
+   opacity:0;transform:translateY(-5px);
+  }
+ }
+ .secureRoot select:not([multiple]):not([size]) option{
+  display:flex;align-items:center;gap:9px;
+  min-height:37px;padding:9px 12px;margin:2px 0;
+  border:0;border-radius:8px;background:#fff;color:#234653;
+  font-size:13px;font-weight:550;white-space:normal;
+ }
+ .secureRoot select:not([multiple]):not([size]) option:hover,
+ .secureRoot select:not([multiple]):not([size]) option:focus-visible{
+  background:#e6f6f2;color:#086e61;
+ }
+ .secureRoot select:not([multiple]):not([size]) option:checked{
+  background:#e2f4ef;color:#09695d;font-weight:750;
+ }
+ .secureRoot select:not([multiple]):not([size]) option::checkmark{color:#0e8072}
+}
+/* Popovers propios (empresa, sesión, búsqueda y conceptos). */
+:is(.sessionMenu,.sidebarCompanyDropdown,.quoteChoices,.bizDashClientResults){
+ border-radius:var(--fcr-ui-radius);box-shadow:0 16px 48px rgba(10,36,50,.22);
+ scrollbar-color:#abc8cd #f4f9f9;overscroll-behavior:contain;
+}
+.sessionMenu{border-color:#b7d4d6;box-shadow:var(--fcr-ui-shadow);animation:fcrMenuIn .16s ease-out}
+.sessionMenu button{transition:background-color .16s ease,color .16s ease}
+.sidebarCompanyDropdown{animation:fcrMenuIn .16s ease-out}
+.quoteChoices,.bizDashClientResults{background:#fff;border-color:#bddbd8}
+.quoteChoices button,.bizDashClientResults button{border-radius:9px;transition:background-color .16s ease,transform .16s ease}
+.quoteChoices button:hover,.quoteChoices button:focus-visible,
+.bizDashClientResults button:hover,.bizDashClientResults button:focus-visible{background:#e5f6f2;outline-color:#0d8072}
+/* Dialogo reutilizable, incluido el reemplazo de confirmaciones nativas. */
+.fcrConfirmOverlay{position:fixed;inset:0;z-index:25000;display:grid;place-items:center;padding:20px;overflow-y:auto}
+:is(.fcrConfirmOverlay,.dialogOverlay,.companyModalOverlay,.quoteDeleteOverlay,.accountDeleteBackdrop,.ticketOverlay){
+ background:rgba(6,25,40,.66);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+:is(.fcrConfirmModal,.dialogCard,.companyModal,.quoteDeleteDialog,.accountDeleteDialog,.ticketModal){
+ box-sizing:border-box;border:1px solid #c8dee0;border-radius:18px;
+ box-shadow:var(--fcr-ui-shadow);background:#fff;color:var(--fcr-ui-ink);
+ animation:fcrModalIn .18s cubic-bezier(.2,.75,.3,1);
+}
+.fcrConfirmModal{width:min(100%,500px);max-height:calc(100vh - 40px);overflow-y:auto;padding:clamp(20px,4vw,30px)}
+.fcrModalIcon{display:grid;place-items:center;width:44px;height:44px;margin-bottom:14px;
+ border-radius:13px;background:#e1f4ee;color:var(--fcr-ui-primary);font-size:23px;font-weight:800}
+.fcrModalIconDanger{background:#fff0ed;color:#a42a3a}
+.fcrConfirmModal h3{margin:0 0 9px;font-size:21px;line-height:1.3;color:#143c4b}
+.fcrConfirmModal p{white-space:pre-wrap;overflow-wrap:anywhere;color:#526d7b;font-size:14px;line-height:1.65;margin:0}
+.fcrModalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:25px;flex-wrap:wrap}
+.fcrModalActions button{min-width:120px;min-height:42px;font-size:13px;font-weight:700}
+:is(.fcrConfirmModal,.dialogCard,.companyModal,.quoteDeleteDialog,.accountDeleteDialog,.ticketModal) :is(input,select,textarea){max-width:100%;min-width:0}
+:is(.fcrConfirmModal,.dialogCard,.companyModal,.quoteDeleteDialog,.accountDeleteDialog,.ticketModal) :is(button,input,select,textarea):focus-visible{
+ outline:2px solid var(--fcr-ui-primary);outline-offset:2px;
+}
+/* Desplegables de opciones avanzadas en Respaldos y formularios. */
+.secureRoot details{border:1px solid #d6e6e9;border-radius:12px;background:#f9fcfc;overflow:hidden}
+.secureRoot details>summary{
+ list-style:none;display:flex;align-items:center;justify-content:space-between;gap:14px;
+ padding:13px 15px;cursor:pointer;font-weight:700;color:#194654;
+ transition:background-color .17s ease,color .17s ease;
+}
+.secureRoot details>summary::-webkit-details-marker{display:none}
+.secureRoot details>summary::after{content:'⌄';color:#0c8073;font-size:20px;line-height:1;transition:transform .17s ease}
+.secureRoot details[open]>summary::after{transform:rotate(180deg)}
+.secureRoot details>summary:hover{background:#e7f5f3}
+.secureRoot details>summary:focus-visible{outline:2px solid var(--fcr-ui-primary);outline-offset:-3px}
+.secureRoot details[open]>summary{border-bottom:1px solid #d6e6e9;background:#eaf6f4}
+/* Sin cambiar el color original de los botones peligrosos. */
+.secureRoot button:not(:disabled){transition:background-color .16s ease,box-shadow .16s ease,transform .14s ease}
+.secureRoot button:not(:disabled):active{transform:translateY(1px)}
+@keyframes fcrModalIn{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes fcrMenuIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:540px){
+ .fcrConfirmOverlay{padding:12px}
+ .fcrConfirmModal{padding:20px}
+ .fcrModalActions{display:grid;grid-template-columns:1fr 1fr}
+ .fcrModalActions button{min-width:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+ :is(.fcrConfirmModal,.dialogCard,.companyModal,.quoteDeleteDialog,.accountDeleteDialog,.ticketModal,.sessionMenu,.sidebarCompanyDropdown){animation:none!important}
+ .secureRoot select,.secureRoot button{transition:none!important}
+}
