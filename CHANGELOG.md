@@ -1,3 +1,17 @@
+## Mejora de Ventas y Respaldos v0.6.63 — Pago protegido y días personalizables (10 de noviembre de 2026)
+- **Ventas:** la rueda del mouse ya no modifica el valor de los campos de monto recibido en efectivo ni pagos combinados cuando tienen foco. Los importes decimales introducidos voluntariamente por teclado siguen permitidos; no se redondean ni alteran los totales o el IVA.
+- **Respaldos semanales:** selector de lunes a domingo. **Mensuales:** selector del 1 al 31. Cuando el mes no contiene el día solicitado, se realiza el último día de ese mes. También se mantiene la hora local, la frecuencia diaria y la retención configurada.
+- El programador evita respaldos prematuros antes del día elegido; al iniciar el sistema verifica un respaldo vencido y no duplica una copia programada ya realizada en el período. Los nombres de archivo UTC se interpretan correctamente, sin confundirlos con la hora local.
+- Configuraciones antiguas sin `weekday`/`monthDay` conservan las reglas previas por defecto: lunes y día 1. Los dos nuevos campos se guardan en `automatic-backup-settings.json` (sin migración de SQLite). Los valores fuera de rango se rechazan desde el servidor.
+- **Crear respaldo ahora:** reemplaza el símbolo decorativo por el icono SVG profesional de respaldos ya presente en la interfaz; el respaldo manual sigue disponible sin depender del día de la programación.
+- QA: 18 comprobaciones de calendario, pruebas adicionales de interfaz y validación del guardado real en API simulada. Requiere verificación final de Electron y Windows Actions para el instalador.
+
+## Corrección QA v0.6.63 — Rutas multiplataforma de GitHub Actions (10 de noviembre de 2026)
+- Se corrigió `tests/qa-063-layout.cjs`: la transformación manual a `file://` duplicaba la unidad en Windows (`D:\D:\a\...`) y hacía fallar `qa:static` con `ENOENT`.
+- La prueba resuelve ahora `src/main.jsx` y `src/style.css` con `path.resolve(__dirname, '..', ...)`, compatible con Windows, Linux y rutas que contienen espacios.
+- Se añadieron comprobaciones de regresión para rutas Windows (`path.win32`) y POSIX (`path.posix`). No cambia la aplicación, el esquema SQLite, la seguridad ni los módulos comerciales.
+- Verificar el resultado en GitHub Actions Windows después de subir el cambio. 
+
 ## Corrección estructural v0.6.63 — Menú lateral fijo con Seguridad desplegada (10 de noviembre de 2026)
 - Se corrigió la causa raíz: `SecureApp` dibujaba **Seguridad y bloqueo** antes de `<App>` y por tanto **antes de la estructura `.layout`**, desplazando el menú entero hacia abajo. El panel se construye en `SecureApp` y se pasa a `App` para mostrarse **dentro de `<main>`**, a la derecha del menú lateral.
 - El menú permanece anclado debajo de «Sesión activa», incluso al abrir Seguridad, desplazarse o cerrar el panel. Seguridad y sus formularios comparten el ancho del resto de los módulos sin tapar la barra lateral. Al abrirlo desde otra zona de la página se lleva el panel al área visible respetando el encabezado fijo.

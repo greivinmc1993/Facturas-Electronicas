@@ -31,6 +31,7 @@ fs.copyFileSync(path.join(root,'server','access-schema.js'),path.join(staging,'a
 fs.copyFileSync(path.join(root,'server','auth.js'),path.join(staging,'auth.js'));
 for(const name of ['email-recovery.js','email-smtp.js','mail-admin.js'])fs.copyFileSync(path.join(root,'server',name),path.join(staging,name));
 fs.copyFileSync(path.join(root,'server','sale-drafts.js'),path.join(staging,'sale-drafts.js'));
+fs.copyFileSync(path.join(root,'server','backup-schedule.js'),path.join(staging,'backup-schedule.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -273,6 +274,19 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const invalid=await call('PUT','/api/backups/automatic',{enabled:true,frequency:'hourly',time:'20:00',keep:-1});assert.equal(invalid.status,400);
    const valid=await call('PUT','/api/backups/automatic',{enabled:false,frequency:'weekly',time:'21:15',keep:7});assert.equal(valid.status,200);
    const current=await call('GET','/api/backups/automatic');assert.equal(current.body.config.keep,7);assert.equal(current.body.config.frequency,'weekly');
+   assert.equal(current.body.config.weekday,1);assert.equal(current.body.config.monthDay,1);
+   const custom=await call('PUT','/api/backups/automatic',{enabled:false,frequency:'monthly',time:'19:45',keep:12,weekday:5,monthDay:31});
+   assert.equal(custom.status,200,JSON.stringify(custom.body));
+   const saved=await call('GET','/api/backups/automatic');
+   assert.equal(saved.body.config.weekday,5);assert.equal(saved.body.config.monthDay,31);
+   assert.equal(saved.body.config.frequency,'monthly');
+   const disk=JSON.parse(fs.readFileSync(path.join(temp,'db','automatic-backup-settings.json'),'utf8'));
+   assert.equal(disk.monthDay,31);assert.equal(disk.weekday,5);
+   for(const wrong of [{weekday:7,monthDay:1},{weekday:1,monthDay:32},{weekday:'viernes',monthDay:1}]){
+    const invalid=await call('PUT','/api/backups/automatic',{enabled:true,frequency:'weekly',time:'20:00',keep:7,...wrong});
+    assert.equal(invalid.status,400);
+   }
+   const after=await call('GET','/api/backups/automatic');assert.equal(after.body.config.monthDay,31);
   });
   await check('Inventario insuficiente revierte toda la transacción',async()=>{
    const sql=read(),oldStock=sql.prepare('SELECT stock FROM products WHERE id=?').get(prodId).stock,oldSales=sql.prepare('SELECT COUNT(*) AS n FROM sales').get().n;sql.close();

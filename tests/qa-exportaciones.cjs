@@ -22,6 +22,10 @@ check('Ventas no muestra spinners en efectivo ni pagos combinados',()=>{
  assert.match(source,/id="posCashTendered" className="posMoneyInput" type="number"/);
  assert.match(source,/id=\{`posOtherPayment-\$\{i\}`\}[^\n]*className="posMoneyInput" type="number"/);
  assert.match(styles,/input\.posMoneyInput\[type="number"\]::-webkit-inner-spin-button/);
+ assert.match(source,/function preventPaymentWheelChange\(event\)/);
+ assert.match(source,/if\(event\.currentTarget===document\.activeElement\)event\.currentTarget\.blur\(\)/);
+ assert.match(source,/id="posCashTendered"[^\n]*onWheel=\{preventPaymentWheelChange\}/);
+ assert.match(source,/id=\{`posOtherPayment-\$\{i\}`\}[^\n]*onWheel=\{preventPaymentWheelChange\}/);
 });
 check('Negativos numéricos sin comillas simples',()=>{assert.equal(csvCell(-10030000),'"-10030000"');assert.equal(csvCell('-1'),'"-1"')});
 check('CSV y separador regional',()=>{let c=csvDocument(['Artículo','Variación'],[['Piñata niño',-3]]);assert.ok(c.startsWith('\ufeffsep=;\r\n'));assert.ok(c.includes('Piñata niño'));assert.ok(c.includes('"-3"'))});

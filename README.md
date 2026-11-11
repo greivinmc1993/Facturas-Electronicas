@@ -2,6 +2,26 @@
 
 **Versión vigente: 0.6.63 (10 de noviembre de 2026).** Continuamos desde v0.6.62. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
 
+## Ventas y respaldos automáticos — mejora v0.6.63
+
+**Ventas → Cobro:** los campos *Efectivo recibido* y *Montos de pagos combinados* ya no cambian cuando se desplaza la rueda del mouse sobre un campo enfocado. La interfaz quita el foco en ese instante para permitir el desplazamiento normal; los centavos escritos voluntariamente siguen admitidos y el cálculo se mantiene inalterado.
+
+**Respaldos → Programación automática:**
+- **Diario:** elegir la hora local.
+- **Semanal:** elegir un día de lunes a domingo y la hora local.
+- **Mensual:** elegir el día del 1 al 31 y la hora local. Para fechas inexistentes, como el 31 de febrero, se utiliza el último día del mes.
+- **Conservar últimas copias:** sigue limitando la cantidad de archivos guardados (1–365). El botón **Crear respaldo ahora**, con icono de respaldo, genera una copia inmediata incluso si los respaldos automáticos están desactivados.
+
+Selecciona el día y pulsa **Guardar configuración**. Los nuevos ajustes se guardan en `automatic-backup-settings.json`, fuera de SQLite y del repositorio. La API comprueba rangos y mantiene compatibilidad con configuraciones antiguas (lunes/día 1). La ejecución automática requiere FacturaCR abierto y, si el programa se cerró después de la hora programada, al reabrirlo se comprueba si corresponde una copia pendiente. No se crean tareas de Windows. **La programación guardada se ejecuta según la hora local del equipo.**
+
+Pruebas del calendario: `node tests/qa-backup-schedule.cjs`; suite completa: `npm test`; comprobación real de Express/SQLite: `npm run qa:real-server`; instalador: `npm run dist:win`. Antes de actualizar, respalda los datos. La actualización no modifica el esquema SQLite ni las tablas comerciales.
+
+## Corrección del QA estático para GitHub Actions Windows — v0.6.63
+
+- Si el job `npm test` muestra `ENOENT` con una ruta como `D:\D:\a\...\src\main.jsx`, el fallo proviene del uso anterior de una URL `file://` para leer archivos fuente en `tests/qa-063-layout.cjs`; no significa que falte `src/main.jsx`.
+- La prueba usa ahora `path.resolve(__dirname, '..', 'src', 'main.jsx')` y la misma estrategia para `src/style.css`, sin duplicar la letra de unidad de Windows. Incluye validaciones para rutas Windows y Linux.
+- Compruébalo con `npm run qa:static` y `npm test`. Tras subir los cambios, confirma que el workflow de GitHub Actions Windows finalice correctamente. No hay migración SQLite ni cambios funcionales en la interfaz.
+
 ## Distribución general y simetría visual — corrección v0.6.63
 
 - Seguridad y bloqueo: los cinco apartados comparten márgenes y proporciones de columnas, se expanden para aprovechar el ancho real de pantalla y se apilan cuando no hay espacio suficiente.

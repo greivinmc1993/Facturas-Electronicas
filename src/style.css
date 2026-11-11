@@ -1065,3 +1065,8 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @media (max-width:760px){
  .secureRoot .layout>main>.securitySettingsPanel{scroll-margin-top:96px}
 }
+
+/* v0.6.63: programación flexible y botón de respaldo coherente con los iconos de FacturaCR. */
+.backupHero>button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px}
+.backupHero>button svg{display:block;flex:none}
+.backupSettingsGrid .backupDayHint{display:block;margin-top:6px;font-size:11px;line-height:1.45;color:#586f81;font-weight:400}

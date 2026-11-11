@@ -2,8 +2,26 @@
    Las medidas visuales reales también deben verificarse en navegador/Electron. */
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const jsx=fs.readFileSync(new URL('../src/main.jsx',`file://${__filename.replace(/\\/g,'/')}`).pathname,'utf8');
-const css=fs.readFileSync(new URL('../src/style.css',`file://${__filename.replace(/\\/g,'/')}`).pathname,'utf8');
+const path=require('node:path');
+// __dirname ya es una ruta absoluta de sistema de archivos. No convertirla
+// manualmente a file://: en Windows eso puede duplicar la unidad (D:\D:\...).
+const projectFile=(...parts)=>path.resolve(__dirname,'..',...parts);
+const jsx=fs.readFileSync(projectFile('src','main.jsx'),'utf8');
+const css=fs.readFileSync(projectFile('src','style.css'),'utf8');
+
+// Regresión multiplataforma para el fallo real en GitHub Actions Windows.
+const windowsRoot=String.raw`D:\a\Facturas-Electronicas\Facturas-Electronicas\tests`;
+assert.equal(
+ path.win32.resolve(windowsRoot,'..','src','main.jsx'),
+ String.raw`D:\a\Facturas-Electronicas\Facturas-Electronicas\src\main.jsx`,
+ 'La prueba debe resolver la ruta Windows sin duplicar D:'
+);
+assert.equal(
+ path.posix.resolve('/home/runner/work/facturacr/tests','..','src','main.jsx'),
+ '/home/runner/work/facturacr/src/main.jsx',
+ 'La prueba debe resolver la ruta POSIX sin file://'
+);
+console.log('OK QA: rutas de archivos multiplataforma (Windows y POSIX)');
 const changes=css.split('/* FacturaCR v0.6.63 · Distribución fluida y simétrica de todas las secciones.')[1];
 assert.ok(changes,'Falta el bloque de estilos de distribución general');
 const checks=[

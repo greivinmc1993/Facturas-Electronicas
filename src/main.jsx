@@ -462,11 +462,11 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
    <div className="actions"><button type="button" className="secondary" disabled={payments.length>=10} onClick={()=>setPayments(old=>[...old,{method:'SINPE Móvil',amount:''}])}>Agregar otro pago</button></div>
    {payments.map((pay,i)=>pay.method==='Efectivo'?null:<div className="posCashBox posOtherPaymentBox" key={`payment-panel-${i}`}>
     <label htmlFor={`posOtherPayment-${i}`} className="posCashTitle">{pay.method} · Monto recibido (₡)</label>
-    <input id={`posOtherPayment-${i}`} aria-label={`Monto de ${pay.method}`} className="posMoneyInput" type="number" min="0" step="1" placeholder="Monto pagado por este método" value={pay.amount} onChange={e=>setPayments(old=>old.map((p,j)=>i===j?{...p,amount:e.target.value}:p))}/>
+    <input id={`posOtherPayment-${i}`} aria-label={`Monto de ${pay.method}`} className="posMoneyInput" type="number" min="0" step="1" onWheel={preventPaymentWheelChange} placeholder="Monto pagado por este método" value={pay.amount} onChange={e=>setPayments(old=>old.map((p,j)=>i===j?{...p,amount:e.target.value}:p))}/>
     <p className="hint">Registra el monto pagado mediante {pay.method}. Este método no genera vuelto.</p>
     <div className="posCashResults"><span>Aplicado con {pay.method}: <strong>₡{saleMoney(roundCRC(Math.round((Number(pay.amount)||0)*100)))}</strong></span></div>
    </div>)}
-   {cashSelected&&<div className="posCashBox"><label htmlFor="posCashTendered" className="posCashTitle">Efectivo recibido (₡)</label><input id="posCashTendered" className="posMoneyInput" type="number" min="0" step="0.01" value={cashTendered} onChange={e=>setCashTendered(e.target.value)} placeholder="Monto entregado por el cliente"/><p className="hint">El sistema aplica únicamente lo necesario a la venta. El excedente se devuelve como vuelto.</p><div className="posCashResults"><span>Aplicado en efectivo: <strong>₡{saleMoney(cashApplied)}</strong></span><span className="posChange">Vuelto: <strong>₡{saleMoney(changeCents)}</strong></span></div></div>}
+   {cashSelected&&<div className="posCashBox"><label htmlFor="posCashTendered" className="posCashTitle">Efectivo recibido (₡)</label><input id="posCashTendered" className="posMoneyInput" type="number" min="0" step="0.01" onWheel={preventPaymentWheelChange} value={cashTendered} onChange={e=>setCashTendered(e.target.value)} placeholder="Monto entregado por el cliente"/><p className="hint">El sistema aplica únicamente lo necesario a la venta. El excedente se devuelve como vuelto.</p><div className="posCashResults"><span>Aplicado en efectivo: <strong>₡{saleMoney(cashApplied)}</strong></span><span className="posChange">Vuelto: <strong>₡{saleMoney(changeCents)}</strong></span></div></div>}
    <p className="posPaidSummary"><strong>Pagado:</strong> ₡{saleMoney(paid)} · <strong>Saldo:</strong> ₡{saleMoney(Math.max(0,total-paid))}</p>
    {saleType==='credito'&&<p className="hint">Las ventas a crédito requieren un cliente registrado. Puedes registrar abonos posteriores desde el historial de ventas.</p>}
    <button type="submit" disabled={draftReadyCompany!==companyId||operationBusy||!cart.length||discountInvalid||total<=0||nonCashPaid>total||(saleType==='contado'&&paid!==total)||(saleType==='credito'&&(!clientId||paid>=total))}>{operationBusy?'Procesando operación…':'Confirmar venta'}</button>
@@ -513,11 +513,18 @@ function backupFileDate(filename){
  const date=new Date(`${match[1]}T${match[2]}:${match[3]}:${match[4]}Z`);
  return Number.isNaN(date.getTime())?'Fecha no disponible':date.toLocaleString('es-CR',{dateStyle:'medium',timeStyle:'short'});
 }
+// El control numérico debe permitir centavos escritos por el cajero, pero jamás variar por la rueda.
+function preventPaymentWheelChange(event){
+ if(event.currentTarget===document.activeElement)event.currentTarget.blur();
+}
+
 function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,downloadBackup,createAutoBackup,saveAutoBackup,refreshAutoBackup,refreshBackupStatus,restoreInput,restoreBackup,restoreStage,setMessage,sizeLabel}){
  const files=Array.isArray(autoBackup?.files)?autoBackup.files:[];
  const [backupSearch,setBackupSearch]=useState('');
  const [showAllBackups,setShowAllBackups]=useState(false);
  const latest=files[0]||null;
+ const weekdayNames=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+ const scheduledDay=autoConfig.frequency==='weekly'?` · Cada ${weekdayNames[autoConfig.weekday??1]}`:autoConfig.frequency==='monthly'?` · Día ${autoConfig.monthDay??1} de cada mes`:'';
  const searchTerm=backupSearch.trim().toLocaleLowerCase('es-CR');
  const filteredBackupFiles=searchTerm?files.filter(f=>String(f).toLocaleLowerCase('es-CR').includes(searchTerm)||backupFileDate(f).toLocaleLowerCase('es-CR').includes(searchTerm)):files;
  const visibleBackupFiles=showAllBackups||searchTerm?filteredBackupFiles:filteredBackupFiles.slice(0,20);
@@ -531,7 +538,7 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
  return <section className="backupWorkspace">
   <div className="backupHero">
    <div><p className="backupEyebrow">Protección de datos · Costa Rica</p><h3>Copias de seguridad</h3><p className="hint">Protege los datos SQLite de tus empresas con copias verificadas almacenadas localmente.</p></div>
-   <button type="button" disabled={busy} onClick={createAutoBackup}>▣ Crear respaldo ahora</button>
+   <button type="button" disabled={busy} onClick={createAutoBackup}><UiIcon name="backup" size={18}/><span>Crear respaldo ahora</span></button>
   </div>
   <div className="backupProtectionBanner">
    <span className="backupShield" aria-hidden="true">♢</span>
@@ -540,14 +547,16 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
   </div>
   <div className="backupMetrics">
    <div className="backupMetric"><small>Última copia automática</small><strong>{latest?backupFileDate(latest):'Sin copias aún'}</strong><span>Fecha de la copia más reciente</span></div>
-   <div className="backupMetric"><small>Programación</small><strong>{autoConfig.enabled?({daily:'Diaria',weekly:'Semanal',monthly:'Mensual'}[autoConfig.frequency]||'Configurada'):'Desactivada'}</strong><span>{autoConfig.enabled?`Hora local: ${autoConfig.time}`:'Puedes activarla cuando quieras'}</span></div>
+   <div className="backupMetric"><small>Programación</small><strong>{autoConfig.enabled?({daily:'Diaria',weekly:'Semanal',monthly:'Mensual'}[autoConfig.frequency]||'Configurada'):'Desactivada'}</strong><span>{autoConfig.enabled?`Hora local: ${autoConfig.time}${scheduledDay}`:'Puedes activarla cuando quieras'}</span></div>
    <div className="backupMetric"><small>Copias registradas</small><strong>{files.length}</strong><span>En la carpeta automática configurada</span></div>
   </div>
   <div className="backupColumns">
    <div className="card backupSettingsCard"><div className="backupCardHeading"><div><h4>Programación automática</h4><p className="hint">Configura cuándo se generan y cuántas copias se conservan.</p></div><span aria-hidden="true">⚙</span></div>
     <label className="backupSwitch"><input type="checkbox" checked={!!autoConfig.enabled} onChange={e=>setAutoConfig({...autoConfig,enabled:e.target.checked})}/><span><strong>Activar respaldos automáticos</strong><small>Se ejecutan mientras FacturaCR está abierto; al reiniciar se revisan los pendientes.</small></span></label>
     <div className="backupSettingsGrid">
-     <Field title="Frecuencia"><select value={autoConfig.frequency} onChange={e=>setAutoConfig({...autoConfig,frequency:e.target.value})}><option value="daily">Diario</option><option value="weekly">Semanal (lunes)</option><option value="monthly">Mensual (día 1)</option></select></Field>
+     <Field title="Frecuencia"><select value={autoConfig.frequency} onChange={e=>setAutoConfig({...autoConfig,frequency:e.target.value})}><option value="daily">Diario</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option></select></Field>
+     {autoConfig.frequency==='weekly'&&<Field title="Día de la semana"><select aria-label="Día de respaldo semanal" value={autoConfig.weekday??1} onChange={e=>setAutoConfig({...autoConfig,weekday:Number(e.target.value)})}>{[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['0','Domingo']].map(([day,name])=><option key={day} value={day}>{name}</option>)}</select></Field>}
+     {autoConfig.frequency==='monthly'&&<Field title="Día del mes"><select aria-label="Día de respaldo mensual" value={autoConfig.monthDay??1} onChange={e=>setAutoConfig({...autoConfig,monthDay:Number(e.target.value)})}>{Array.from({length:31},(_,i)=><option key={i+1} value={i+1}>Día {i+1}</option>)}</select><small className="backupDayHint">Si el mes no tiene ese día, se utiliza su último día.</small></Field>}
      <Field title="Conservar últimas copias"><input type="number" min="1" max="365" value={autoConfig.keep} onChange={e=>setAutoConfig({...autoConfig,keep:Number(e.target.value)})}/></Field>
      <Field title="Hora local del respaldo"><input type="time" value={autoConfig.time} onChange={e=>setAutoConfig({...autoConfig,time:e.target.value})}/></Field>
     </div>
@@ -574,7 +583,7 @@ function App({account,securityPanel}){
  const [backupBusy,setBackupBusy]=useState(false);
  const restoreRunningRef=useRef(false);
  const [restoreStage,setRestoreStage]=useState('');
- const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14});
+ const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14,weekday:1,monthDay:1});
  const [dialog,setDialog]=useState(null);
  const askConfirm=(title,description,action,danger=false,confirmLabel)=>setDialog({title,description,action,danger,confirmLabel});
  const closeDialog=()=>setDialog(null);

@@ -231,6 +231,22 @@ async function main(){
   const separate=await request('GET',`/api/companies/${other.body.id}/dashboard?from=2026-03-01&to=2026-03-31`);
   assert.equal(separate.status,200);assert.equal(separate.body.summary.revenue_cents,0);
  });
+ await test('Respaldos semanal y mensual conservan el día seleccionado',async()=>{
+  const weekly=await request('PUT','/api/backups/automatic',{enabled:false,frequency:'weekly',time:'21:45',keep:10,weekday:0,monthDay:31});
+  assert.equal(weekly.status,200,JSON.stringify(weekly.body));
+  assert.equal(weekly.body.config.weekday,0);
+  const saved=await request('GET','/api/backups/automatic');
+  assert.equal(saved.status,200);assert.equal(saved.body.config.monthDay,31);
+  const monthly=await request('PUT','/api/backups/automatic',{enabled:false,frequency:'monthly',time:'17:00',keep:10,weekday:5,monthDay:29});
+  assert.equal(monthly.status,200,JSON.stringify(monthly.body));
+  assert.equal(monthly.body.config.monthDay,29);
+  const disk=JSON.parse(fs.readFileSync(path.join(dir,'automatic-backup-settings.json'),'utf8'));
+  assert.equal(disk.weekday,5);assert.equal(disk.monthDay,29);
+  const invalid=await request('PUT','/api/backups/automatic',{enabled:false,frequency:'monthly',time:'17:00',keep:10,weekday:5,monthDay:32});
+  assert.equal(invalid.status,400);
+  const after=await request('GET','/api/backups/automatic');
+  assert.equal(after.body.config.monthDay,29);
+ });
  await test('Se rechaza configuración de respaldo fuera de rango',async()=>{
   const r=await request('PUT','/api/backups/automatic',{enabled:true,frequency:'daily',time:'25:90',keep:0});
   assert.equal(r.status,400);

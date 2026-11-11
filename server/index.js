@@ -1,4 +1,5 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
+import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -250,10 +251,9 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   // Automatic backups are stored outside the SQLite file, using SQLite's online backup API.
   const automaticDir=join(dataDir,'automatic-backups');
   const backupConfigPath=join(dataDir,'automatic-backup-settings.json');
-  const backupDefaults={enabled:false,frequency:'daily',time:'20:00',keep:14};
   const loadBackupConfig=()=>{
-    try {const raw=JSON.parse(readFileSync(backupConfigPath,'utf8'));return {...backupDefaults,...raw};}
-    catch{return {...backupDefaults}}
+    try{return normalizeBackupSettings(JSON.parse(readFileSync(backupConfigPath,'utf8')))}
+    catch{return {...BACKUP_DEFAULTS}}
   };
   let backupConfig=loadBackupConfig();
   let backupBusy=false;
@@ -262,22 +262,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     if(!existsSync(automaticDir))return [];
     return readdirSync(automaticDir).filter(f=>/^FacturaCR_auto_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().reverse();
   };
-  const backupDue=()=>{
-    if(!backupConfig.enabled)return false;
-    const now=new Date();
-    const [hour,minute]=backupConfig.time.split(':').map(Number);
-    const scheduled=new Date(now);scheduled.setHours(hour,minute,0,0);
-    if(now<scheduled)return false;
-    const latest=backupFiles()[0];if(!latest)return true;
-    const datePart=latest.slice('FacturaCR_auto_'.length,-'.sqlite'.length);
-    const last=new Date(datePart.replace(/T(\d{2})-(\d{2})-(\d{2})$/,'T$1:$2:$3'));
-    if(Number.isNaN(last.getTime()))return true;
-    if(backupConfig.frequency==='daily')return last.toDateString()!==now.toDateString();
-    if(backupConfig.frequency==='weekly'){
-      const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-((start.getDay()+6)%7));return last<start;
-    }
-    return last.getFullYear()!==now.getFullYear()||last.getMonth()!==now.getMonth();
-  };
+  const backupDue=()=>backupIsDue(new Date(),backupConfig,backupFiles()[0]);
   const runAutoBackup=async(force=false)=>{
     if(backupBusy||(!force&&!backupDue()))return {created:false};
     backupBusy=true;
@@ -300,11 +285,16 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   setTimeout(()=>{void runAutoBackup().catch(()=>{})},2500).unref?.();
   app.get('/api/backups/automatic',(_req,res)=>res.json({config:backupConfig,files:backupFiles(),directory:automaticDir,lastError:lastBackupError,busy:backupBusy}));
   app.put('/api/backups/automatic', (req,res)=>{
-    const {enabled,frequency,time,keep}=req.body||{};
-    if(typeof enabled!=='boolean'||!['daily','weekly','monthly'].includes(frequency)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!Number.isInteger(keep)||keep<1||keep>365)return res.status(400).json({error:'Configuración de respaldos inválida.'});
-    backupConfig={enabled,frequency,time,keep};
-    try{writeFileSync(backupConfigPath,JSON.stringify(backupConfig,null,2));res.json({ok:true,config:backupConfig})}
-    catch(e){res.status(500).json({error:'No se pudieron guardar las preferencias: '+e.message})}
+    const input=req.body||{};
+    // Mantiene la compatibilidad con clientes anteriores sin weekday/monthDay.
+    const next={...backupConfig,...input};
+    if(!validateBackupSettings(next))return res.status(400).json({error:'Configuración de respaldos inválida.'});
+    const clean={enabled:next.enabled,frequency:next.frequency,time:next.time,keep:next.keep,weekday:next.weekday,monthDay:next.monthDay};
+    try{
+      writeFileSync(backupConfigPath,JSON.stringify(clean,null,2));
+      backupConfig=clean; // No activar una preferencia si falló la escritura.
+      res.json({ok:true,config:backupConfig});
+    }catch(e){res.status(500).json({error:'No se pudieron guardar las preferencias: '+e.message})}
   });
   app.post('/api/backups/automatic/run',async(_req,res)=>{
     try{res.json(await runAutoBackup(true))}catch(e){res.status(500).json({error:e.message})}

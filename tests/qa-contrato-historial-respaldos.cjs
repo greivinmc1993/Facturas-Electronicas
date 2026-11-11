@@ -25,4 +25,20 @@ check('Mostrar todas es reversible y no modifica los archivos SQLite',()=>{
  assert.match(workspace,/Mostrar solo 20/);
  assert.match(css,/\.backupHistorySearch/);
 });
+check('Semanal ofrece los siete días configurables',()=>{
+ assert.match(workspace,/Día de respaldo semanal/);
+ for(const day of ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'])assert.ok(workspace.includes(day));
+ assert.match(workspace,/weekday:Number\(e\.target\.value\)/);
+});
+check('Mensual permite elegir días 1 a 31 y aclara fin de mes',()=>{
+ assert.match(workspace,/Día de respaldo mensual/);
+ assert.match(workspace,/Array\.from\(\{length:31\}/);
+ assert.match(workspace,/monthDay:Number\(e\.target\.value\)/);
+ assert.match(workspace,/último día/);
+});
+check('Crear respaldo usa el icono de copia del proyecto',()=>{
+ assert.match(workspace,/<UiIcon name="backup" size=\{18\}\/>/);
+ assert.doesNotMatch(workspace,/▣ Crear respaldo ahora/);
+ assert.match(css,/\.backupHero>button svg/);
+});
 console.log(`QA historial respaldos: ${count}/${count}`);
