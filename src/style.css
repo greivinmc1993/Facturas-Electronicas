@@ -1217,3 +1217,18 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
  :is(.fcrConfirmModal,.dialogCard,.companyModal,.quoteDeleteDialog,.accountDeleteDialog,.ticketModal,.sessionMenu,.sidebarCompanyDropdown){animation:none!important}
  .secureRoot select,.secureRoot button{transition:none!important}
 }
+
+/* FacturaCR 0.6.64 · Selección clara y adaptativa de carpeta de respaldos. */
+.backupDestinationChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:8px 0 12px}
+.backupDestinationChoice{display:flex;align-items:flex-start;gap:10px;border:1px solid #d5e3ee;border-radius:12px;background:#fff;padding:12px;cursor:pointer;min-width:0;transition:border-color .18s,box-shadow .18s,background .18s}
+.backupDestinationChoice:has(input:checked){border-color:#0f8074;background:#edf8f5;box-shadow:0 0 0 2px rgba(15,128,116,.11)}
+.backupDestinationChoice input{margin:3px 0 0;accent-color:#0f8074;flex-shrink:0}
+.backupDestinationChoice span{min-width:0;display:grid;gap:3px}
+.backupDestinationChoice strong{font-size:12px;color:#18354b}
+.backupDestinationChoice small{color:#627c8f;font-size:11px;line-height:1.45}
+.backupDirectory .backupDirectoryLabel{font-size:11px;font-weight:750;color:#47647a;margin:10px 0 5px}
+.backupDirectory .actions{display:flex;flex-wrap:wrap;gap:8px}
+.backupDirectory .actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px}
+.backupDirectory .actions button svg{flex:none}
+.companyProfileFooter .actions{grid-template-columns:minmax(0,1fr)}
+@media(max-width:700px){.backupDestinationChoices{grid-template-columns:minmax(0,1fr)}}

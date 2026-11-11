@@ -1,3 +1,11 @@
+## FacturaCR v0.6.64 — Destino de respaldos configurable y Empresas simplificadas (11 de noviembre de 2026)
+- Respaldos automáticos y «Crear respaldo ahora» permiten seleccionar una carpeta distinta mediante el diálogo nativo de Windows; incluye opción explícita para volver al directorio predeterminado. La ruta elegida debe guardarse antes de aplicarse.
+- La carpeta activa se usa de verdad por el servidor SQLite: creación de copias, verificación de integridad, retención y listado del historial. «Abrir carpeta actual» abre el destino persistido y el espacio disponible se calcula sobre la unidad activa.
+- Rutas personalizadas validadas por el servidor (absolutas, existentes, escribibles y distintas de la ubicación de la base SQLite). El destino no cambia si no puede guardarse; unidad desconectada produce error visible sin usar silenciosamente otra carpeta. Las copias de destinos anteriores no se mueven ni eliminan.
+- El esquema SQLite y los roles siguen intactos; las preferencias se guardan en `automatic-backup-settings.json`, compatible con instalaciones antiguas. El permiso para cambiar respaldos sigue siendo exclusivo del propietario.
+- Empresas: se eliminó el botón duplicado «Editar» y se conserva «Abrir perfil», que abre el mismo formulario. Botón «Eliminar» permanece deshabilitado.
+- Nueva suite QA de rutas personalizadas, persistencia y migración de ajustes, respaldo real con API de SQLite en entorno temporal, regresión de perfil y validación de empaquetado; metadata y pruebas actualizadas a 0.6.64. La validación del cuadro de diálogo nativo/instalador de Windows queda pendiente.
+
 ## Ajuste visual v0.6.63 — Flechas de menús desplegables (10 de noviembre de 2026)
 - Se corrigió la flecha de los selectores de Seguridad, recuperación de usuarios y demás módulos: en Chromium con `appearance:base-select` el icono nativo podía saltar a una segunda línea o desaparecer cuando el campo era estrecho.
 - El control cerrado utiliza ahora una única flecha SVG del estilo FacturaCR, centrada verticalmente y separada del texto, también en selectores estrechos. El menú de opciones avanzado permanece disponible en Chromium compatible; se conserva el selector nativo de respaldo, el teclado y el estado de selección.

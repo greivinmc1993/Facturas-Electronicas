@@ -1,6 +1,42 @@
-# FacturaCR v0.6.63 — Perfiles, permisos delegados y auditoría
+# FacturaCR v0.6.64 — Ubicación de respaldos y perfiles de empresas
 
-**Versión vigente: 0.6.63 (10 de noviembre de 2026).** Continuamos desde v0.6.62. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
+**Versión vigente: 0.6.64 (11 de noviembre de 2026).** Basada en el ZIP completo de v0.6.63 con las correcciones de interfaz, respaldo calendario, flechas de desplegables, seguridad y QA Windows. Se conserva la arquitectura React, Electron, Express y SQLite, sin migraciones de tablas.
+
+## Novedades v0.6.64 — Elegir dónde guardar los respaldos
+
+En **Respaldos → Programación automática → Ubicación de los respaldos**:
+
+1. **Carpeta predeterminada:** marcada inicialmente. Las copias se crean donde siempre, dentro de los datos locales de FacturaCR, en `automatic-backups`. Las instalaciones anteriores permanecen en esta opción automáticamente.
+2. **Carpeta personalizada:** selecciona la opción y pulsa **Elegir carpeta…**. Windows abrirá el explorador nativo para escoger una carpeta existente o crear una nueva. Es útil para un disco externo, una carpeta en Documentos o una unidad adicional. La ruta se muestra antes de confirmar.
+3. Pulsa **Guardar configuración**. **Hasta guardar, la carpeta actualmente en uso no cambia.** La configuración se persiste en `automatic-backup-settings.json`, no en la base comercial SQLite.
+4. **Crear respaldo ahora** y la programación diaria/semanal/mensual utilizan el directorio activo. Los respaldos se generan con el respaldo en línea de SQLite y se verifica la integridad de cada copia.
+5. **Abrir carpeta actual** abre el destino activo (no el destino pendiente). El historial muestra solo los archivos del destino activo. La retención elimina únicamente archivos antiguos de FacturaCR en ese destino y según el límite establecido.
+6. Para **volver a la ruta original**, marca **Carpeta predeterminada** y pulsa **Guardar configuración**. Las copias existentes en la ubicación anterior **no se mueven ni se borran**.
+
+**Seguridad y comportamiento ante errores:** solo el propietario puede cambiar esta configuración, por la autorización vigente de la API. El destino personalizado debe ser una carpeta absoluta, existente y escribible; el servidor prueba la escritura antes de aceptar el cambio. No permite seleccionar el directorio de la base SQLite ni sus carpetas superiores o inferiores. Si una unidad externa se desconecta, **no guarda silenciosamente en otro sitio**: reporta el problema y sigue mostrando la ruta configurada. Conecta la unidad o vuelve a escoger la ruta predeterminada. Consulta el espacio libre en el destino desde el panel.
+
+**Importante:** el botón **Descargar copia SQLite** sigue ofreciendo una descarga manual independiente; la opción de ubicación configurable corresponde a **Crear respaldo ahora** y los **respaldos automáticos**. No sustituye una estrategia de copias externas ni garantiza que un disco USB esté conectado. Las carpetas escogidas deben poder escribirse desde la cuenta Windows que ejecuta FacturaCR.
+
+## Novedades v0.6.64 — Empresas sin acción duplicada
+
+En las tarjetas de **Empresas** queda un solo botón **Abrir perfil**; se quitó **Editar**, que abría exactamente el mismo formulario. El propietario sigue pudiendo modificar y guardar los datos desde **Abrir perfil**. La administración de usuarios, empresas y sus permisos no cambió. El botón de eliminar empresas permanece deshabilitado, como en v0.6.63.
+
+## Verificación de la versión
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+`npm test` contiene pruebas de ruta personalizada, escritura y validación en archivos temporales, persistencia de configuración, copia SQLite y retorno al directorio predeterminado. Las pruebas de integración usan un adaptador de SQLite exclusivamente para QA; hay que validar de nuevo el instalador y el cuadro nativo de selección de carpetas en Windows/GitHub Actions. Antes de actualizar, crea un respaldo verificable de la base activa. Los archivos de usuario y SMTP no deben sobrescribirse con el ZIP de código.
+
+## Manual de capacitación
+
+Existe una **edición piloto de 46 páginas**, cuyo diseño se conservará para ampliarla más adelante, cuando se estabilicen próximas funcionalidades. No forma parte de esta entrega técnica del código.
+
+---
 
 ## Estilo unificado de menús y ventanas emergentes — actualización v0.6.63
 

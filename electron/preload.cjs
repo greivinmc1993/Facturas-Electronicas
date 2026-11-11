@@ -3,4 +3,4 @@ contextBridge.exposeInMainWorld('facturacrPrinter',{print:(html,settings)=>ipcRe
 
 contextBridge.exposeInMainWorld('facturacrReports',{savePdf:(html,filename,options)=>ipcRenderer.invoke('facturacr:save-sales-pdf',html,filename,options)});
 
-contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.invoke('facturacr:open-backups-folder')});
+contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.invoke('facturacr:open-backups-folder'),chooseFolder:()=>ipcRenderer.invoke('facturacr:choose-backups-folder')});

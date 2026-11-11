@@ -32,6 +32,7 @@ fs.copyFileSync(path.join(root,'server','auth.js'),path.join(staging,'auth.js'))
 for(const name of ['email-recovery.js','email-smtp.js','mail-admin.js'])fs.copyFileSync(path.join(root,'server',name),path.join(staging,name));
 fs.copyFileSync(path.join(root,'server','sale-drafts.js'),path.join(staging,'sale-drafts.js'));
 fs.copyFileSync(path.join(root,'server','backup-schedule.js'),path.join(staging,'backup-schedule.js'));
+fs.copyFileSync(path.join(root,'server','backup-directory.js'),path.join(staging,'backup-directory.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -60,7 +61,48 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.63')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.64')});
+  await check('Respaldos: ruta predeterminada y configuración heredada',async()=>{
+   const r=await call('GET','/api/backups/automatic');
+   assert.equal(r.status,200);assert.equal(r.body.config.directoryMode,'default');
+   assert.equal(r.body.directory,path.join(temp,'db','automatic-backups'));
+   assert.equal(r.body.defaultDirectory,r.body.directory);
+  });
+  await check('Respaldos: cambiar carpeta, crear copia y consultar historial aislado',async()=>{
+   const custom=path.join(temp,'copias-personalizadas');fs.mkdirSync(custom);
+   let r=await call('PUT','/api/backups/automatic',{directoryMode:'custom',customDirectory:custom});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   r=await call('GET','/api/backups/automatic');
+   assert.equal(r.body.directory,custom);
+   assert.equal(r.body.config.customDirectory,custom);
+   assert.equal(JSON.parse(fs.readFileSync(path.join(temp,'db','automatic-backup-settings.json'),'utf8')).customDirectory,custom,'Destino persistente en disco');
+   r=await call('POST','/api/backups/automatic/run');
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   assert.ok(fs.existsSync(path.join(custom,r.body.file)),'Respaldo escrito en la carpeta elegida');
+   r=await call('GET','/api/backups/automatic');
+   assert.equal(r.body.files.length,1);
+   assert.equal(r.body.files[0].startsWith('FacturaCR_auto_'),true);
+   const original=fs.readdirSync(custom).filter(f=>f.endsWith('.sqlite'));
+   r=await call('PUT','/api/backups/automatic',{directoryMode:'default'});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   r=await call('GET','/api/backups/automatic');
+   assert.equal(r.body.directory,r.body.defaultDirectory);
+   assert.equal(r.body.config.customDirectory,'');
+   assert.equal(r.body.files.length,0,'El historial solo muestra copias de destino activo');
+   assert.deepEqual(fs.readdirSync(custom).filter(f=>f.endsWith('.sqlite')),original,'No mover ni borrar archivos anteriores');
+   r=await call('POST','/api/backups/automatic/run');
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   assert.ok(fs.existsSync(path.join(temp,'db','automatic-backups',r.body.file)));
+  });
+  await check('Respaldos: rechazar rutas inválidas sin cambiar configuración guardada',async()=>{
+   const initial=(await call('GET','/api/backups/automatic')).body.directory;
+   for(const bad of ['', 'relative/copias',path.join(temp,'db'),path.join(temp,'db','otra'),path.parse(temp).root]){
+    const r=await call('PUT','/api/backups/automatic',{directoryMode:'custom',customDirectory:bad});
+    assert.equal(r.status,400,JSON.stringify({bad,r}));
+    const checkStatus=await call('GET','/api/backups/automatic');
+    assert.equal(checkStatus.body.directory,initial);
+   }
+  });
   await check('Inicio y esquema SQLite en base nueva',async()=>{
    const sql=read();const tables=sql.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name);
    for(const name of ['companies','clients','products','sales','sale_lines','sale_payments','inventory_movements','quotations','quotation_lines','company_quote_settings','access_users','access_user_emails','access_email_tokens','access_company_roles','access_permission_overrides','access_security_settings','access_audit_log'])assert.ok(tables.includes(name),name);

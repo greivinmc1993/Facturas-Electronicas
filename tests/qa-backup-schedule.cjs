@@ -10,6 +10,16 @@ const {pathToFileURL}=require('node:url');
  const config=(changes={})=>({...BACKUP_DEFAULTS,enabled:true,...changes});
  const stamp=date=>'FacturaCR_auto_'+date.toISOString().replace(/[:.]/g,'-').slice(0,19)+'.sqlite';
  const local=(y,m,d,h=20,min=0)=>new Date(y,m-1,d,h,min);
+ check('Compatibilidad: configuración vieja toma carpeta predeterminada',()=>{
+  const old=normalizeBackupSettings({enabled:true,frequency:'weekly',time:'18:00',keep:5,weekday:3,monthDay:20});
+  assert.equal(old.directoryMode,'default');assert.equal(old.customDirectory,'');
+  assert.equal(old.weekday,3);assert.equal(old.monthDay,20);
+ });
+ check('Configuración exige carpeta al seleccionar modo personalizado',()=>{
+  assert.equal(validateBackupSettings(config({directoryMode:'custom',customDirectory:''})),false);
+  assert.equal(validateBackupSettings(config({directoryMode:'custom',customDirectory:'/carpeta'})),true);
+  for(const m of ['', 'remote', 2])assert.equal(validateBackupSettings(config({directoryMode:m})),false);
+ });
  check('Configuración antigua conserva lunes y día 1',()=>{
   const legacy=normalizeBackupSettings({enabled:true,frequency:'weekly',time:'21:00',keep:7});
   assert.equal(legacy.weekday,1);assert.equal(legacy.monthDay,1);assert.equal(legacy.keep,7);

@@ -43,7 +43,8 @@ async function runPackagedSmoke(){
      hasCompanyNavigation:nav.some(b=>b.innerText.includes('Empresas')),
      preloadPrinter:typeof window.facturacrPrinter?.list==='function',
      preloadReports:typeof window.facturacrReports?.savePdf==='function',
-     preloadBackups:typeof window.facturacrBackups?.openFolder==='function'
+     preloadBackups:typeof window.facturacrBackups?.openFolder==='function',
+     preloadBackupPicker:typeof window.facturacrBackups?.chooseFolder==='function'
    };
  })()`;
  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -75,7 +76,7 @@ async function runPackagedSmoke(){
    'No apareció el formulario seguro esperado ('+expectedHeading+')');
  if(initial.navButtons!==0||initial.hasCompanyNavigation)
    throw Error('El menú comercial no debe verse antes de iniciar sesión.');
- if(!initial.preloadPrinter||!initial.preloadReports||!initial.preloadBackups)
+ if(!initial.preloadPrinter||!initial.preloadReports||!initial.preloadBackups||!initial.preloadBackupPicker)
    throw Error('El preload de Electron no está disponible en el acceso protegido: '+JSON.stringify(initial));
  const beforeLogin=await request('GET','/api/companies');
  if(needsSetup){
@@ -109,7 +110,7 @@ async function runPackagedSmoke(){
  await mainWindow.loadURL(`http://127.0.0.1:${server.port}/`);
  const dom=await waitFor(d=>d.rootPresent&&d.visibleCharacters>100&&d.navButtons>=4&&d.hasCompanyNavigation,
    'El menú comercial no apareció después de autenticarse');
- if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups)
+ if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups||!dom.preloadBackupPicker)
    throw Error('La interfaz autenticada perdió las APIs preload: '+JSON.stringify(dom));
  const status=await request('GET','/api/auth/status');
  if(status.status!==200||status.body.authenticated!==true||status.body.user?.isOwner!==true)
@@ -165,15 +166,39 @@ ipcMain.handle('facturacr:save-sales-pdf',async(event,html,filename,options={})=
  }catch(error){return {success:false,error:String(error.message||error)}}
  finally{if(!reportWindow.isDestroyed())reportWindow.destroy()}
 });
-// Open only FacturaCR's known backups folder; the renderer cannot choose an arbitrary path.
+// El renderer nunca elige una ruta por texto. Electron muestra el explorador nativo.
+async function activeBackupFolder(){
+ if(server?.getBackupDirectory)return server.getBackupDirectory();
+ // En desktop:dev el servidor es otro proceso y usa ./data.
+ const root=dev?path.join(process.cwd(),'data'):app.getPath('userData');
+ try{
+  const cfg=JSON.parse(await fs.readFile(path.join(root,'automatic-backup-settings.json'),'utf8'));
+  if(cfg.directoryMode==='custom'&&typeof cfg.customDirectory==='string'&&path.isAbsolute(cfg.customDirectory))return cfg.customDirectory;
+ }catch{} 
+ return path.join(root,'automatic-backups');
+}
+ipcMain.handle('facturacr:choose-backups-folder',async event=>{
+ if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
+ try{
+  const result=await dialog.showOpenDialog(mainWindow,{
+   title:'Seleccionar carpeta de respaldos de FacturaCR',
+   defaultPath:app.getPath('documents'),
+   properties:['openDirectory','createDirectory']
+  });
+  if(result.canceled||!result.filePaths?.[0])return {success:false,cancelled:true};
+  return {success:true,path:result.filePaths[0]};
+ }catch(error){return {success:false,error:String(error.message||error)}}
+});
 ipcMain.handle('facturacr:open-backups-folder',async event=>{
  if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
  try{
-  const folder=path.join(app.getPath('userData'),'automatic-backups');
-  await fs.mkdir(folder,{recursive:true});
+  const folder=await activeBackupFolder();
+  if(folder===path.join(dev?path.join(process.cwd(),'data'):app.getPath('userData'),'automatic-backups'))
+   await fs.mkdir(folder,{recursive:true});
+  else if(!(await fs.stat(folder)).isDirectory())throw Error('La ruta de respaldo no es una carpeta.');
   const error=await shell.openPath(folder);
   return error?{success:false,error}:{success:true};
- }catch(e){return {success:false,error:String(e.message||e)}}
+ }catch(e){return {success:false,error:'No se pudo abrir la carpeta configurada: '+String(e.message||e)}}
 });
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);

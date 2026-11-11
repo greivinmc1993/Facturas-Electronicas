@@ -65,6 +65,8 @@ function UiIcon({name,size=18}){
   logout:<><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></>,
   clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></>,
   settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
+  folder:<><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></>,
+  "folder-open":<><path d="M3 9V7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1M3 19l3-8h16l-3 8H3Z"/></>,
   save:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></>
  };
  return <svg className="uiIcon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[name]||shapes.receipt}</svg>;
@@ -529,6 +531,16 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
  const searchTerm=backupSearch.trim().toLocaleLowerCase('es-CR');
  const filteredBackupFiles=searchTerm?files.filter(f=>String(f).toLocaleLowerCase('es-CR').includes(searchTerm)||backupFileDate(f).toLocaleLowerCase('es-CR').includes(searchTerm)):files;
  const visibleBackupFiles=showAllBackups||searchTerm?filteredBackupFiles:filteredBackupFiles.slice(0,20);
+ const chooseFolder=async()=>{
+  try{
+   if(!window.facturacrBackups?.chooseFolder)throw Error('Elegir carpeta requiere FacturaCR para Windows.');
+   const result=await window.facturacrBackups.chooseFolder();
+   if(result?.cancelled)return;
+   if(!result?.success||!result?.path)throw Error(result?.error||'No se pudo seleccionar la carpeta.');
+   setAutoConfig(prev=>({...prev,directoryMode:'custom',customDirectory:result.path}));
+   setMessage('Carpeta seleccionada. Pulsa «Guardar configuración» para utilizarla en los próximos respaldos.');
+  }catch(e){setMessage(e.message)}
+ };
  const openFolder=async()=>{
   try{
    if(!window.facturacrBackups?.openFolder)throw Error('Abrir carpeta requiere la aplicación de escritorio.');
@@ -561,8 +573,20 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
      <Field title="Conservar últimas copias"><input type="number" min="1" max="365" value={autoConfig.keep} onChange={e=>setAutoConfig({...autoConfig,keep:Number(e.target.value)})}/></Field>
      <Field title="Hora local del respaldo"><input type="time" value={autoConfig.time} onChange={e=>setAutoConfig({...autoConfig,time:e.target.value})}/></Field>
     </div>
-    <div className="backupDirectory"><small>Carpeta de respaldos automáticos</small><code title={autoBackup?.directory||''}>{autoBackup?.directory||'Consultando ruta local…'}</code><div className="actions"><button type="button" className="secondary" onClick={openFolder}>▤ Abrir carpeta</button><button type="button" className="secondary" onClick={refreshBackupStatus}>Actualizar espacio</button></div><p className="hint">Base: {sizeLabel(backupStatus?.databaseBytes)} · WAL: {sizeLabel(backupStatus?.walBytes)} · Espacio disponible: {sizeLabel(backupStatus?.freeBytes)}</p></div>
-    <div className="backupSettingsActions"><button type="button" disabled={busy} onClick={saveAutoBackup}>✓ Guardar configuración</button><button type="button" disabled={busy} className="secondary" onClick={downloadBackup}>↓ Descargar copia SQLite</button></div>
+    <div className="backupDirectory"><small>Ubicación de los respaldos</small>
+     <div className="backupDestinationChoices" role="radiogroup" aria-label="Ubicación de los respaldos">
+      <label className="backupDestinationChoice"><input type="radio" name="backup-directory-mode" checked={(autoConfig.directoryMode||'default')==='default'} onChange={()=>setAutoConfig(prev=>({...prev,directoryMode:'default',customDirectory:''}))}/><span><strong>Carpeta predeterminada</strong><small>Recomendada para empezar. No altera los respaldos anteriores.</small></span></label>
+      <label className="backupDestinationChoice"><input type="radio" name="backup-directory-mode" checked={autoConfig.directoryMode==='custom'} onChange={()=>setAutoConfig(prev=>({...prev,directoryMode:'custom'}))}/><span><strong>Carpeta personalizada</strong><small>Otra unidad, disco externo o carpeta local de Windows.</small></span></label>
+     </div>
+     <p className="backupDirectoryLabel">{autoConfig.directoryMode==='custom'?'Carpeta seleccionada (pendiente de guardar)':'Ubicación predeterminada'}</p>
+     <code title={autoConfig.directoryMode==='custom'?autoConfig.customDirectory||'':autoBackup?.defaultDirectory||''}>{autoConfig.directoryMode==='custom'?autoConfig.customDirectory||'Selecciona una carpeta para continuar…':autoBackup?.defaultDirectory||'Consultando ruta local…'}</code>
+     <div className="actions"><button type="button" className="secondary" disabled={busy} onClick={chooseFolder}><UiIcon name="folder" size={16}/> Elegir carpeta…</button><button type="button" className="secondary" onClick={openFolder}><UiIcon name="folder-open" size={16}/> Abrir carpeta actual</button><button type="button" className="secondary" onClick={refreshBackupStatus}>Actualizar espacio</button></div>
+     <p className="backupDirectoryLabel">Carpeta actualmente en uso</p><code title={autoBackup?.directory||''}>{autoBackup?.directory||'Consultando ruta local…'}</code>
+     <p className="hint">La ubicación se aplica a las copias automáticas y a «Crear respaldo ahora». Cambiarla no mueve ni elimina archivos de otras carpetas. Si eliges una carpeta sincronizada con la nube, sus archivos podrían enviarse a ese servicio.</p>
+     {autoConfig.directoryMode==='custom'&&!autoConfig.customDirectory&&<p className="warning" role="alert">Selecciona una carpeta antes de guardar esta opción.</p>}
+     {backupStatus?.storageError&&<p className="warning" role="alert">{backupStatus.storageError}</p>}
+     <p className="hint">Base: {sizeLabel(backupStatus?.databaseBytes)} · WAL: {sizeLabel(backupStatus?.walBytes)} · Espacio disponible en el destino: {sizeLabel(backupStatus?.freeBytes)}</p></div>
+    <div className="backupSettingsActions"><button type="button" disabled={busy||(autoConfig.directoryMode==='custom'&&!autoConfig.customDirectory)} onClick={saveAutoBackup}>✓ Guardar configuración</button><button type="button" disabled={busy} className="secondary" onClick={downloadBackup}>↓ Descargar copia SQLite</button></div>
    </div>
    <div className="card backupHistoryCard"><div className="backupCardHeading"><div><h4>Historial de respaldos</h4><p className="hint">Archivos creados y verificados en la carpeta automática.</p></div><button type="button" className="backupRefresh" disabled={busy} onClick={refreshAutoBackup}>⟳ Actualizar</button></div>
      {files.length>0&&<div className="backupHistorySearch"><label htmlFor="backupHistoryFilter">Buscar respaldo por fecha o nombre</label><input id="backupHistoryFilter" type="search" value={backupSearch} onChange={e=>setBackupSearch(e.target.value)} placeholder="Ej.: 2026-11-05, noviembre o 08-30" autoComplete="off"/><small>{searchTerm?`${filteredBackupFiles.length} de ${files.length} copias coinciden`:`${files.length} copias disponibles`}</small></div>}
@@ -584,7 +608,7 @@ function App({account,securityPanel}){
  const [backupBusy,setBackupBusy]=useState(false);
  const restoreRunningRef=useRef(false);
  const [restoreStage,setRestoreStage]=useState('');
- const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14,weekday:1,monthDay:1});
+ const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14,weekday:1,monthDay:1,directoryMode:'default',customDirectory:''});
  const [dialog,setDialog]=useState(null);
  const askConfirm=(title,description,action,danger=false,confirmLabel)=>setDialog({title,description,action,danger,confirmLabel});
  const closeDialog=()=>setDialog(null);
@@ -659,7 +683,7 @@ function App({account,securityPanel}){
  };
  const refreshBackupStatus=async()=>{try{const status=await api('/api/backups/status');setBackupStatus(status);setMessage('')}catch(e){setBackupStatus(null);setMessage('No se pudo consultar el espacio de respaldos: '+e.message)}};
  const refreshAutoBackup=async()=>{try{const data=await api('/api/backups/automatic');setAutoBackup(data);setAutoConfig(data.config)}catch(e){setMessage('No se pudieron consultar los respaldos automáticos: '+e.message)}};
- const saveAutoBackup=async()=>{setBackupBusy(true);try{await api('/api/backups/automatic',{method:'PUT',body:JSON.stringify(autoConfig)});await refreshAutoBackup();setMessage('Programación de respaldos guardada. Se ejecutará mientras FacturaCR esté abierto; si estaba cerrado, comprobará los respaldos pendientes al iniciar.')}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
+ const saveAutoBackup=async()=>{setBackupBusy(true);try{await api('/api/backups/automatic',{method:'PUT',body:JSON.stringify(autoConfig)});await refreshAutoBackup();await refreshBackupStatus();setMessage('Programación y carpeta de respaldos guardadas. Se utilizarán en las próximas copias mientras FacturaCR esté abierto.')}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
  const createAutoBackup=async()=>{setBackupBusy(true);try{const data=await api('/api/backups/automatic/run',{method:'POST'});await refreshAutoBackup();setMessage('Respaldo verificado: '+data.file)}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
  useEffect(()=>{if(tab==='backups'){refreshBackupStatus();refreshAutoBackup()}},[tab]);
  const sizeLabel=bytes=>bytes==null||!Number.isFinite(Number(bytes))?'—':(Number(bytes)/1048576).toLocaleString('es-CR',{maximumFractionDigits:1})+' MB';
@@ -800,7 +824,6 @@ function App({account,securityPanel}){
  const [editingCompany,setEditingCompany]=useState(null);
  const createCompanyProfile=()=>{setEditingCompany(null);resetCompanyForm();setCompanyModalError('');setCompanyModalOpen(true)};
  const openCompanyProfile=c=>{setSelected(c.id);setEditingCompany(c.id);setCompanyForm({legal_name:c.legal_name,identification:c.identification,trade_name:c.trade_name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',website:c.website||'',social:c.social||'',avatar_color:COMPANY_COLORS.includes(c.avatar_color)?c.avatar_color:COMPANY_COLORS[0]});setTab('companies');setCompanyModalError('');setCompanyModalOpen(true)};
- const editCompany=c=>openCompanyProfile(c);
  const updateCompany=async()=>{setCompanySaving(true);try{await api(`/api/companies/${editingCompany}`,{method:'PUT',body:JSON.stringify(companyForm)});await refreshCompanies();setEditingCompany(null);resetCompanyForm();setCompanyModalOpen(false);setMessage('Información de empresa actualizada.')}catch(e){setCompanyModalError(e.message)}finally{setCompanySaving(false)}};
  const persistItem=async()=>{try{
    await api(endpoint+(editing?`/${editing}`:''),{method:editing?'PUT':'POST',body:JSON.stringify(tab==='products'?{...form,price_includes_tax:'1'}:form)});
@@ -889,7 +912,7 @@ function App({account,securityPanel}){
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}
  {tab==='cashier-kardex'&&!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<CashierStockPanel companyId={selected}/>}
  {tab==='backups'&&<BackupWorkspace autoBackup={autoBackup} autoConfig={autoConfig} setAutoConfig={setAutoConfig} backupStatus={backupStatus} busy={backupBusy} downloadBackup={downloadBackup} createAutoBackup={createAutoBackup} saveAutoBackup={saveAutoBackup} refreshAutoBackup={refreshAutoBackup} refreshBackupStatus={refreshBackupStatus} restoreInput={restoreInput} restoreBackup={restoreBackup} restoreStage={restoreStage} setMessage={setMessage} sizeLabel={sizeLabel}/>}
- {['users','audit','cashier-kardex'].includes(tab)?null:tab==='companies'?<section className="companiesWorkspace"><div className="companiesHero"><div><p className="companiesOverline">Gestión de comprobantes · Costa Rica</p><h3>Perfiles de empresas</h3><p className="hint">Administra los documentos de cada empresa por separado y cambia rápidamente entre ellas.</p></div>{account?.isOwner&&<button type="button" onClick={createCompanyProfile}><UiIcon name="plus" size={15}/> Nueva empresa</button>}</div><div className="companiesInlineNotice">Las empresas comparten una base local, pero sus clientes, inventario, ventas y respaldos se manejan por separado.</div><div className="companyProfilesGrid">{companies.map(c=>{const title=c.trade_name||c.legal_name;const subtitle=c.identification||'Sin cédula configurada';const initial=(title||'E').charAt(0).toUpperCase();return <article key={c.id} className={'companyProfileCard '+(selected===c.id?'isSelected':'')}><div className="companyProfileHeader"><div className="companyProfileAvatar" style={{background:`linear-gradient(180deg, ${colorForCompany(c)}, ${colorForCompany(c)})`}}>{initial}</div>{selected===c.id&&<span className="companyProfileBadge">Activa</span>}</div><div className="companyProfileBody"><strong title={title}>{title}</strong><small title={subtitle}>{subtitle}</small></div><div className="companyProfileFooter"><button type="button" className="secondary" onClick={()=>openCompanyProfile(c)}><UiIcon name="store" size={15}/> Abrir perfil</button><div className="actions">{account?.isOwner&&<button type="button" className="secondary" onClick={()=>editCompany(c)}><UiIcon name="edit" size={14}/> Editar</button>}<button type="button" className="secondary" disabled title="Requiere autenticación del propietario"><UiIcon name="trash" size={14}/> Eliminar</button></div></div></article>})}{account?.isOwner&&<button type="button" className="companyProfileCard companyAddCard" onClick={createCompanyProfile}><span>＋</span><strong>Agregar empresa</strong><small>Crea un nuevo perfil para tus comprobantes.</small></button>}</div></section>:
+ {['users','audit','cashier-kardex'].includes(tab)?null:tab==='companies'?<section className="companiesWorkspace"><div className="companiesHero"><div><p className="companiesOverline">Gestión de comprobantes · Costa Rica</p><h3>Perfiles de empresas</h3><p className="hint">Administra los documentos de cada empresa por separado y cambia rápidamente entre ellas.</p></div>{account?.isOwner&&<button type="button" onClick={createCompanyProfile}><UiIcon name="plus" size={15}/> Nueva empresa</button>}</div><div className="companiesInlineNotice">Las empresas comparten una base local, pero sus clientes, inventario, ventas y respaldos se manejan por separado.</div><div className="companyProfilesGrid">{companies.map(c=>{const title=c.trade_name||c.legal_name;const subtitle=c.identification||'Sin cédula configurada';const initial=(title||'E').charAt(0).toUpperCase();return <article key={c.id} className={'companyProfileCard '+(selected===c.id?'isSelected':'')}><div className="companyProfileHeader"><div className="companyProfileAvatar" style={{background:`linear-gradient(180deg, ${colorForCompany(c)}, ${colorForCompany(c)})`}}>{initial}</div>{selected===c.id&&<span className="companyProfileBadge">Activa</span>}</div><div className="companyProfileBody"><strong title={title}>{title}</strong><small title={subtitle}>{subtitle}</small></div><div className="companyProfileFooter"><button type="button" className="secondary" onClick={()=>openCompanyProfile(c)}><UiIcon name="store" size={15}/> Abrir perfil</button><div className="actions"><button type="button" className="secondary" disabled title="La eliminación de empresas no está habilitada"><UiIcon name="trash" size={14}/> Eliminar</button></div></div></article>})}{account?.isOwner&&<button type="button" className="companyProfileCard companyAddCard" onClick={createCompanyProfile}><span>＋</span><strong>Agregar empresa</strong><small>Crea un nuevo perfil para tus comprobantes.</small></button>}</div></section>:
  tab==='backups'?null:
  tab==='dashboard'?<DashboardPanel companyId={selected} company={current}/>: 
  tab==='valuation'?<InventoryValuationPanel companyId={selected} company={current}/>: 

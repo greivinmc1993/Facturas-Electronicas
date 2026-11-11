@@ -41,4 +41,19 @@ check('Crear respaldo usa el icono de copia del proyecto',()=>{
  assert.doesNotMatch(workspace,/▣ Crear respaldo ahora/);
  assert.match(css,/\.backupHero>button svg/);
 });
+check('Selector de carpeta usa Electron y ofrece restaurar la ubicación predeterminada',()=>{
+ assert.match(workspace,/facturacrBackups\?\.chooseFolder/);
+ assert.match(workspace,/name="backup-directory-mode"/);
+ assert.match(workspace,/Carpeta predeterminada/);
+ assert.match(workspace,/Carpeta personalizada/);
+ assert.match(workspace,/Elegir carpeta…/);
+ assert.match(workspace,/Carpeta actualmente en uso/);
+ assert.match(workspace,/Cambiarla no mueve ni elimina archivos/);
+});
+check('Las tarjetas de empresa no repiten Abrir perfil y Editar',()=>{
+ const cards=src.split('className="companyProfilesGrid"')[1].split('</section>')[0];
+ assert.match(cards,/Abrir perfil/);
+ assert.doesNotMatch(cards,/onClick=\{\(\)=>editCompany\(c\)\}/);
+ assert.doesNotMatch(cards,/> Editar<\/button>/);
+});
 console.log(`QA historial respaldos: ${count}/${count}`);

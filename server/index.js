@@ -1,5 +1,6 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
+import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -249,7 +250,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     }catch(e){return res.status(500).json({error:'No se pudieron guardar los ajustes: '+e.message})}
   });
   // Automatic backups are stored outside the SQLite file, using SQLite's online backup API.
-  const automaticDir=join(dataDir,'automatic-backups');
+  const activeBackupDir=()=>backupDirectoryFor(dataDir,backupConfig);
   const backupConfigPath=join(dataDir,'automatic-backup-settings.json');
   const loadBackupConfig=()=>{
     try{return normalizeBackupSettings(JSON.parse(readFileSync(backupConfigPath,'utf8')))}
@@ -259,15 +260,17 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   let backupBusy=false;
   let lastBackupError='';
   const backupFiles=()=>{
-    if(!existsSync(automaticDir))return [];
-    return readdirSync(automaticDir).filter(f=>/^FacturaCR_auto_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().reverse();
+    try{return readdirSync(activeBackupDir()).filter(f=>/^FacturaCR_auto_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().reverse()}
+    catch{return []} // Unidad externa retirada o carpeta aún sin respaldos.
   };
   const backupDue=()=>backupIsDue(new Date(),backupConfig,backupFiles()[0]);
   const runAutoBackup=async(force=false)=>{
     if(backupBusy||(!force&&!backupDue()))return {created:false};
     backupBusy=true;
     try{
-      mkdirSync(automaticDir,{recursive:true});
+      const automaticDir=activeBackupDir();
+      if(backupConfig.directoryMode==='custom')checkCustomBackupDirectory(automaticDir,dataDir);
+      else mkdirSync(automaticDir,{recursive:true});
       const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
       const target=join(automaticDir,`FacturaCR_auto_${stamp}.sqlite`);
       await db.backup(target);
@@ -283,18 +286,23 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   backupTimer.unref?.();
   // At launch, catch up on a missed scheduled backup when the program was closed.
   setTimeout(()=>{void runAutoBackup().catch(()=>{})},2500).unref?.();
-  app.get('/api/backups/automatic',(_req,res)=>res.json({config:backupConfig,files:backupFiles(),directory:automaticDir,lastError:lastBackupError,busy:backupBusy}));
+  app.get('/api/backups/automatic',(_req,res)=>res.json({config:backupConfig,files:backupFiles(),directory:activeBackupDir(),defaultDirectory:join(dataDir,'automatic-backups'),lastError:lastBackupError,busy:backupBusy}));
   app.put('/api/backups/automatic', (req,res)=>{
+    if(backupBusy)return res.status(409).json({error:'Espera a que termine el respaldo actual antes de cambiar la carpeta.'});
     const input=req.body||{};
     // Mantiene la compatibilidad con clientes anteriores sin weekday/monthDay.
     const next={...backupConfig,...input};
     if(!validateBackupSettings(next))return res.status(400).json({error:'Configuración de respaldos inválida.'});
-    const clean={enabled:next.enabled,frequency:next.frequency,time:next.time,keep:next.keep,weekday:next.weekday,monthDay:next.monthDay};
+    const clean={enabled:next.enabled,frequency:next.frequency,time:next.time,keep:next.keep,weekday:next.weekday,monthDay:next.monthDay,
+      directoryMode:next.directoryMode,customDirectory:next.directoryMode==='custom'?next.customDirectory:''};
     try{
+      if(clean.directoryMode==='custom')clean.customDirectory=checkCustomBackupDirectory(clean.customDirectory,dataDir);
+      // Guardar primero en disco: si falla, seguir con la ruta anterior.
       writeFileSync(backupConfigPath,JSON.stringify(clean,null,2));
       backupConfig=clean; // No activar una preferencia si falló la escritura.
+      lastBackupError=''; // Un destino nuevo no hereda errores de la unidad anterior.
       res.json({ok:true,config:backupConfig});
-    }catch(e){res.status(500).json({error:'No se pudieron guardar las preferencias: '+e.message})}
+    }catch(e){res.status(400).json({error:'No se pudieron guardar las preferencias: '+e.message})}
   });
   app.post('/api/backups/automatic/run',async(_req,res)=>{
     try{res.json(await runAutoBackup(true))}catch(e){res.status(500).json({error:e.message})}
@@ -321,10 +329,12 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   app.get('/api/health',(_req,res)=>res.json({ok:true,version:APP_VERSION,backups:true}));
   app.get('/api/backups/status',(_req,res)=>{
     try {
-      const fs=statfsSync(dataDir);
+      let space=null,storageError='';
+      try{space=statfsSync(backupConfig.directoryMode==='custom'?activeBackupDir():dataDir)}
+      catch{storageError='La carpeta de respaldo no está disponible. Conecta la unidad o elige otra carpeta.'}
       const dbBytes=statSync(databasePath).size;
       const wal=databasePath+'-wal';
-      res.json({databaseBytes:dbBytes,walBytes:existsSync(wal)?statSync(wal).size:0,freeBytes:Number(fs.bavail)*Number(fs.bsize),totalBytes:Number(fs.blocks)*Number(fs.bsize)});
+      res.json({databaseBytes:dbBytes,walBytes:existsSync(wal)?statSync(wal).size:0,freeBytes:space?Number(space.bavail)*Number(space.bsize):null,totalBytes:space?Number(space.blocks)*Number(space.bsize):null,storageError});
     } catch(err){res.status(500).json({error:'No se pudo consultar el espacio de almacenamiento.'})}
   });
   // Inspección previa: NO reemplaza datos ni modifica la base activa.
@@ -1193,7 +1203,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     const s = app.listen(port,'127.0.0.1',()=>resolve(s));
     s.on('error',reject);
   });
-  return {port:httpServer.address().port, close:()=>new Promise(resolve=>{clearInterval(backupTimer);httpServer.close(()=>{db.close();resolve();})})};
+  return {port:httpServer.address().port, getBackupDirectory:activeBackupDir, close:()=>new Promise(resolve=>{clearInterval(backupTimer);httpServer.close(()=>{db.close();resolve();})})};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startServer().then(({port})=>console.log(`API local: http://127.0.0.1:${port}`)).catch(err=>{console.error(err);process.exitCode=1;});
