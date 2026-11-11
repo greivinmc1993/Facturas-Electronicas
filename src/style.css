@@ -1037,3 +1037,31 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
   align-self:flex-start;overflow-y:auto;overscroll-behavior:contain;
  }
 }
+
+
+/* v0.6.63 · Corrección estructural definitiva del lateral.
+   Seguridad se renderiza DENTRO de <main> (no encima de .layout).
+   El lateral es un hermano de main: la apertura del panel no lo desplaza. */
+.secureRoot .layout>main>.securitySettingsPanel{
+ width:100%;max-width:none;min-width:0;
+ margin:0 0 clamp(20px,2vw,32px);
+ padding:0 0 clamp(20px,2vw,30px);
+ border-bottom:1px solid #c9dfe2;
+ background:transparent;
+ scroll-margin-top:clamp(75px,6vw,90px);
+}
+.secureRoot .layout>main>.securitySettingsPanel>:is(
+ .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
+ .smtpAdminTools,.emailRecoveryTools){
+ width:100%;max-width:none;margin-left:0;margin-right:0;
+}
+@media (min-width:761px){
+ .secureRoot .layout>aside{
+  position:sticky!important;top:66px;bottom:auto;
+  height:calc(100vh - 66px);
+  align-self:flex-start;overflow-y:auto;overscroll-behavior:contain;
+ }
+}
+@media (max-width:760px){
+ .secureRoot .layout>main>.securitySettingsPanel{scroll-margin-top:96px}
+}

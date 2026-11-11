@@ -1,3 +1,9 @@
+## Corrección estructural v0.6.63 — Menú lateral fijo con Seguridad desplegada (10 de noviembre de 2026)
+- Se corrigió la causa raíz: `SecureApp` dibujaba **Seguridad y bloqueo** antes de `<App>` y por tanto **antes de la estructura `.layout`**, desplazando el menú entero hacia abajo. El panel se construye en `SecureApp` y se pasa a `App` para mostrarse **dentro de `<main>`**, a la derecha del menú lateral.
+- El menú permanece anclado debajo de «Sesión activa», incluso al abrir Seguridad, desplazarse o cerrar el panel. Seguridad y sus formularios comparten el ancho del resto de los módulos sin tapar la barra lateral. Al abrirlo desde otra zona de la página se lleva el panel al área visible respetando el encabezado fijo.
+- QA de regresión ampliado en `tests/qa-063-layout.cjs` para impedir que el panel vuelva a insertarse antes del layout; comprobación visual en Chromium a 480, 1024, 1440 y 1920 px, con Seguridad abierto y cerrado y desplazamiento de página.
+- Sin cambios en las rutas HTTP, permisos, credenciales, lógica comercial ni esquema SQLite. El carrito y las operaciones activas permanecen montados.
+
 ## Corrección visual v0.6.63 — Distribución simétrica de toda la interfaz (10 de noviembre de 2026)
 - Eliminados los límites antiguos de ancho (1250/1280/1540/1600 px) que dejaban huecos desiguales en Seguridad, Dashboard, Usuarios, Auditoría y otros módulos. El contenido se adapta al espacio útil y se centra hasta 2200 px en monitores muy anchos.
 - Márgenes horizontales homogéneos, retícula compartida en bloqueo, recuperación del propietario, recuperación de personal, SMTP y correo verificado. Campos, botones y tarjetas conservan sus tamaños funcionales y su alineación.

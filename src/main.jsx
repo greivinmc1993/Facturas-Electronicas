@@ -567,7 +567,7 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
  </section>;
 }
 
-function App({account}){
+function App({account,securityPanel}){
  const restoreInput=useRef(null),catalogInput=useRef(null),bulkInput=useRef(null);
  const [backupStatus,setBackupStatus]=useState(null),[catalogPreview,setCatalogPreview]=useState(null),[catalogBusy,setCatalogBusy]=useState(false);
  const [bulkPreview,setBulkPreview]=useState(null),[bulkFile,setBulkFile]=useState(null),[bulkPrice,setBulkPrice]=useState(true),[bulkStock,setBulkStock]=useState(false),[bulkCabys,setBulkCabys]=useState(false),[bulkBusy,setBulkBusy]=useState(false);
@@ -873,7 +873,7 @@ function App({account}){
   {!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<button className={tab==='cashier-kardex'?'navactive':''} onClick={()=>setTab('cashier-kardex')}><span className="navIcon"><UiIcon name="boxes" size={18}/></span><span>Kardex · Movimientos</span></button>}
   <button className={tab==='cash'?'navactive':''} onClick={()=>setTab('cash')}><span className="navIcon"><UiIcon name="receipt" size={18}/></span><span>Caja y gastos</span></button>
   {account?.isOwner&&<button className={tab==='backups'?'navactive':''} onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldos</span></button>}<span>Facturas electrónicas · Próximamente</span>{account?.isOwner&&<button className={tab==='audit'?'navactive':''} onClick={()=>setTab('audit')}><span className="navIcon"><UiIcon name="shield" size={18}/></span><span>Auditoría del propietario</span></button>}{(account?.isOwner||account?.companies?.some(c=>c.role==='company_admin')||account?.delegatedCashierCompanies?.length>0)&&<button className={tab==='users'?'navactive':''} onClick={()=>setTab('users')}><span className="navIcon"><UiIcon name="users" size={18}/></span><span>Usuarios y permisos</span></button>}
- </nav><div className="sidebarBottom"><div className="sidebarProtection"><span className="sidebarProtectionIcon" aria-hidden="true"><UiIcon name="shield" size={18}/></span><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div>{account?.isOwner&&<button type="button" className="sidebarBackupButton" onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldar base SQLite</span></button>}<small>FacturaCR · v{APP_VERSION}</small></div></aside><main>{tab!=='backups'&&<header><h2>{tab==='dashboard'?'Dashboard comercial':tab==='companies'?'Empresas':tab==='clients'?'Clientes':tab==='sales'?'Punto de venta':tab==='quotes'?'Cotizaciones y proformas':tab==='valuation'?'Valoración de inventario':tab==='cash'?'Caja y gastos':tab==='kardex'?'Kardex de inventario':tab==='users'?'Usuarios y permisos':tab==='audit'?'Auditoría del propietario':tab==='cashier-kardex'?'Kardex · Movimientos':'Inventario y servicios'}</h2><p>Información guardada localmente y separada por empresa</p></header>}
+ </nav><div className="sidebarBottom"><div className="sidebarProtection"><span className="sidebarProtectionIcon" aria-hidden="true"><UiIcon name="shield" size={18}/></span><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div>{account?.isOwner&&<button type="button" className="sidebarBackupButton" onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldar base SQLite</span></button>}<small>FacturaCR · v{APP_VERSION}</small></div></aside><main>{securityPanel}{tab!=='backups'&&<header><h2>{tab==='dashboard'?'Dashboard comercial':tab==='companies'?'Empresas':tab==='clients'?'Clientes':tab==='sales'?'Punto de venta':tab==='quotes'?'Cotizaciones y proformas':tab==='valuation'?'Valoración de inventario':tab==='cash'?'Caja y gastos':tab==='kardex'?'Kardex de inventario':tab==='users'?'Usuarios y permisos':tab==='audit'?'Auditoría del propietario':tab==='cashier-kardex'?'Kardex · Movimientos':'Inventario y servicios'}</h2><p>Información guardada localmente y separada por empresa</p></header>}
  {message&&<p className="notice" role="status">{message}</p>}
  {tab==='users'&&<UsersPanel account={account}/>}
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}
@@ -1014,6 +1014,13 @@ function SecureApp(){
  const sessionUser=state?.authenticated && state?.user ? state.user : null;
  const hasSession=!!sessionUser;
  useEffect(()=>{if(!settingsFeedback)return;const timer=setTimeout(()=>setSettingsFeedback(null),6000);return()=>clearTimeout(timer)},[settingsFeedback]);
+ // Seguridad vive dentro del área de trabajo: al abrirla se desplaza solo el contenido,
+ // sin cambiar la posición del menú lateral ni tapar la barra de sesión.
+ useEffect(()=>{
+  if(!securitySettingsOpen||locked)return;
+  const frame=requestAnimationFrame(()=>document.getElementById('facturacr-security-panel')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  return()=>cancelAnimationFrame(frame);
+ },[securitySettingsOpen,locked]);
  const activity=useRef(Date.now()),lastTouch=useRef(0);
  const lockNow=()=>{setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
  const reload=async()=>{
@@ -1215,10 +1222,8 @@ function SecureApp(){
    try{if(newPassword!==confirm)throw Error('Las contraseñas no coinciden.');await api('/api/auth/password-change',{method:'POST',body:JSON.stringify({oldPassword:password,newPassword})});setPassword('');setNewPassword('');setConfirm('');await reload();}catch(e){setError(e.message)}finally{setBusy(false)}
  };
  const needsGate=!state||!!state.setupRequired||!hasSession||locked||!!sessionUser?.passwordChangeRequired;
- return <div className="secureRoot">
-  {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button><button type="button" onClick={openSecurity}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button><button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
-  {hasSession&&securitySettingsOpen&&!sessionUser.passwordChangeRequired&&(
-   <section className="securitySettingsPanel" aria-label="Seguridad y bloqueo">
+ const securityPanel = hasSession&&securitySettingsOpen&&!sessionUser.passwordChangeRequired&&(
+   <section id="facturacr-security-panel" className="securitySettingsPanel" aria-label="Seguridad y bloqueo">
     <div className="securitySettingsInner">
      <div className="securitySettingsIntro">
       <span className="securitySettingsIcon" aria-hidden="true"><UiIcon name="clock" size={20}/></span>
@@ -1322,11 +1327,13 @@ function SecureApp(){
       {emailFeedback&&<p className={emailFeedback.type==='error'?'authError':'emailSuccess'} role="status">{emailFeedback.message}</p>}
     </div>}
    </section>
-  )}
+  );
+ return <div className="secureRoot">
+  {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button><button type="button" onClick={openSecurity}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button><button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
    {settingsFeedback&&<div className={'securitySaveToast '+(settingsFeedback.type==='error'?'securitySaveToastError':'securitySaveToastSuccess')} role={settingsFeedback.type==='error'?'alert':'status'} aria-live={settingsFeedback.type==='error'?'assertive':'polite'}><UiIcon name={settingsFeedback.type==='error'?'close':'check'} size={18}/><span>{settingsFeedback.message}</span><button type="button" onClick={()=>setSettingsFeedback(null)} aria-label="Cerrar notificación"><UiIcon name="close" size={15}/></button></div>}
   {hasSession&&recoveryCodeCard}
   {hasSession&&recoveryMessage&&<p className="recoveryInlineMessage" role="status">{recoveryMessage}</p>}
-  {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser}/></div>}
+  {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser} securityPanel={securityPanel}/></div>}
   {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':emailRecoveryMode?'Recuperar contraseña por correo':recoveryMode?'Recuperar acceso del propietario':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':emailRecoveryMode?'Cada usuario recupera únicamente su propia cuenta mediante el correo que verificó previamente. El rol y las empresas asignadas no cambian.':recoveryMode?'Restaura el acceso solo con el código privado entregado al propietario y una contraseña nueva.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
    {!hasSession&&recoveryCodeCard}
    {!hasSession&&recoveryMessage&&<p className="recoveryInlineMessage" role="status">{recoveryMessage}</p>}
