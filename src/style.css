@@ -874,3 +874,166 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .cashierInventory form label{min-width:0}.cashierInventoryGrid select,.cashierInventoryGrid input{height:42px}
 @media(max-width:900px){.cashierKardexFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.cashierKardexStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.cashierKardexFilters,.cashierKardexStats{grid-template-columns:1fr}.cashierKardexIntro>button{width:100%}.cashierKardexHistoryHead>.actions{width:100%;display:grid;grid-template-columns:1fr 1fr}}
+
+/* FacturaCR v0.6.63 · Distribución fluida y simétrica de todas las secciones.
+   Corregimos los antiguos topes de 1250/1280/1540/1600 px que dejaban
+   paneles estrechos y descentrados en monitores panorámicos. Solo CSS. */
+.secureRoot{
+ --fcr-page-gutter:clamp(16px,2.2vw,44px);
+ --fcr-column-gap:clamp(16px,2vw,36px);
+ --fcr-content-max:2200px;
+}
+.secureRoot .layout{min-width:0;width:100%;align-items:stretch}
+.secureRoot .layout>main{
+ flex:1 1 0%;width:100%;min-width:0;
+ max-width:var(--fcr-content-max);
+ margin-inline:auto;
+ padding:clamp(22px,2.3vw,44px) var(--fcr-page-gutter);
+ container-type:inline-size;container-name:facturacr-workspace;
+}
+.secureRoot .layout>main>header,
+.secureRoot .layout>main>section,
+.secureRoot .layout>main>.card,
+.secureRoot .layout>main>.grid,
+.secureRoot .layout>main>.bizDashboard,
+.secureRoot .layout>main>.quotesWorkspace,
+.secureRoot .layout>main>.usersWorkspace,
+.secureRoot .layout>main>.auditWorkspace,
+.secureRoot .layout>main>.cashierKardexWorkspace{
+ width:100%;min-width:0;max-width:none;
+}
+.secureRoot .layout>main>header{margin:0 0 clamp(14px,1.5vw,25px)}
+.secureRoot .layout>main>header p{margin-bottom:0}
+.secureRoot .layout>main .usersWorkspace,
+.secureRoot .layout>main .companiesWorkspace,
+.secureRoot .layout>main .auditWorkspace,
+.secureRoot .layout>main .bizDashboard,
+.secureRoot .layout>main .quotesWorkspace,
+.secureRoot .layout>main .cashierKardexWorkspace{
+ width:100%;max-width:none;min-width:0;margin-inline:0;
+}
+.secureRoot .layout>main .usersGrid{
+ grid-template-columns:minmax(280px,.72fr) minmax(0,1.6fr);
+ gap:var(--fcr-column-gap);
+}
+.secureRoot .layout>main .auditWorkspace{min-width:0}
+.secureRoot .layout>main .auditFilters{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));
+ gap:clamp(10px,1.3vw,18px);
+}
+.secureRoot .layout>main .auditHead{align-items:center}
+.secureRoot .layout>main .auditHead .actions{justify-content:flex-end}
+.secureRoot .layout>main .auditTableWrap{width:100%;min-width:0}
+.secureRoot .layout>main .bizDashboard,
+.secureRoot .layout>main .bizDashAdvanced{gap:var(--fcr-column-gap)}
+.secureRoot .layout>main .bizDashBalancedGrid,
+.secureRoot .layout>main .bizDashGrid{gap:var(--fcr-column-gap)}
+
+/* Una misma retícula horizontal en todas las filas de Seguridad. */
+.secureRoot .securitySettingsPanel{
+ width:100%;padding:clamp(16px,1.7vw,30px) var(--fcr-page-gutter);
+}
+.secureRoot .securitySettingsPanel>:is(
+ .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
+ .smtpAdminTools,.emailRecoveryTools){
+ width:100%;max-width:var(--fcr-content-max);min-width:0;
+ margin-left:auto;margin-right:auto;
+ grid-template-columns:minmax(250px,.95fr) minmax(0,1.65fr);
+ column-gap:var(--fcr-column-gap);
+}
+.secureRoot .securitySettingsPanel .securitySettingsInner{
+ align-items:center;row-gap:14px;
+}
+.secureRoot .securitySettingsPanel .securitySettingsCopy p{
+ max-width:75ch;
+}
+.secureRoot .securitySettingsPanel .securitySettingsControls{
+ width:100%;min-width:0;
+ grid-template-columns:minmax(185px,1fr) auto;
+ justify-content:stretch;gap:12px;
+}
+.secureRoot .securitySettingsPanel .securitySettingsActions{grid-template-columns:168px 90px}
+.secureRoot .securitySettingsPanel :is(
+ .ownerRecoveryTools,.ownerAssistedRecoveryTools,.smtpAdminTools,.emailRecoveryTools){
+ row-gap:16px;align-items:start;
+}
+.secureRoot .securitySettingsPanel :is(
+ .ownerRecoveryTools,.ownerAssistedContent,.ownerAssistedForm,
+ .smtpAdminContent,.smtpAdminForm,.smtpTestForm,
+ .emailRecoveryForm,.emailRecoveryHeading){min-width:0}
+.secureRoot .securitySettingsPanel .ownerRecoveryTools{align-items:center}
+.secureRoot .securitySettingsPanel .ownerRecoveryTools form{width:100%;max-width:none}
+.secureRoot .securitySettingsPanel .ownerAssistedForm,
+.secureRoot .securitySettingsPanel .smtpAdminForm,
+.secureRoot .securitySettingsPanel .emailRecoveryForm{width:100%}
+.secureRoot .securitySettingsPanel :is(input,select,textarea){max-width:100%;min-width:0}
+.secureRoot .securitySettingsPanel :is(.emailRecoveryTools>.authError,
+ .emailRecoveryTools>.emailSuccess,.smtpAdminTools>.authError,
+ .smtpAdminTools>.emailSuccess){min-width:0}
+
+/* Adaptación según el ancho REAL del área de trabajo, descontando el menú. */
+@container facturacr-workspace (min-width:980px){
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+ .bizDashBalancedGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@container facturacr-workspace (max-width:979px){
+ .grid,.bizDashBalancedGrid,.bizDashGrid{grid-template-columns:minmax(0,1fr);}
+ .secureRoot .layout>main .usersGrid{grid-template-columns:minmax(0,1fr);}
+}
+@container facturacr-workspace (max-width:1100px){
+ .bizDashMetrics,.bizDashMetricsExtended{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media (max-width:1190px){
+ .secureRoot .securitySettingsPanel>:is(
+  .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
+  .smtpAdminTools,.emailRecoveryTools){grid-template-columns:minmax(0,1fr);}
+ .secureRoot .securitySettingsPanel .securitySettingsControls{max-width:760px}
+ .secureRoot .securitySettingsPanel .ownerRecoveryTools form{max-width:760px}
+ .secureRoot .securitySettingsPanel .emailVerifyForm{grid-column:1}
+}
+@media (max-width:760px){
+ .secureRoot .layout>main{padding:20px var(--fcr-page-gutter)}
+ .secureRoot .layout>main .usersGrid{grid-template-columns:minmax(0,1fr)}
+ .secureRoot .securitySettingsPanel .securitySettingsControls{width:100%;max-width:100%}
+ .secureRoot .securitySettingsPanel .securitySettingsCopy p{max-width:none}
+}
+@media (max-width:620px){
+ .secureRoot .securitySettingsPanel .securitySettingsControls{grid-template-columns:minmax(0,1fr)}
+ .secureRoot .securitySettingsPanel .securitySettingsActions{
+  width:100%;grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .secureRoot .securitySettingsPanel .ownerRecoveryTools form,
+ .secureRoot .securitySettingsPanel .ownerAssistedForm,
+ .secureRoot .securitySettingsPanel .emailRecoveryForm,
+ .secureRoot .securitySettingsPanel .smtpAdminForm,
+ .secureRoot .securitySettingsPanel .smtpTestForm{grid-template-columns:minmax(0,1fr)}
+ .secureRoot .securitySettingsPanel .smtpAdminActions{justify-content:stretch}
+ .secureRoot .securitySettingsPanel .smtpAdminActions button,
+ .secureRoot .securitySettingsPanel .ownerRecoveryTools form button,
+ .secureRoot .securitySettingsPanel .ownerAssistedForm button,
+ .secureRoot .securitySettingsPanel .emailRecoveryForm button,
+ .secureRoot .securitySettingsPanel .smtpTestForm button{width:100%}
+ .secureRoot .layout>main .auditHead .actions{justify-content:flex-start}
+}
+@container facturacr-workspace (max-width:540px){
+ .bizDashMetrics,.bizDashMetricsExtended{grid-template-columns:minmax(0,1fr);}
+}
+
+/* El mismo ancho util se aplica tambien a las areas que no son dashboard. */
+.secureRoot .layout>main :is(
+ .valuationWorkspace,.kardexWorkspace,.cashWorkspace,.salesModule,
+ .inventoryReplenishment,.movementPanel,.autoBackupPanel){
+ width:100%;max-width:none;min-width:0;
+}
+.secureRoot .layout>main .cashOpening{width:min(100%,760px);margin-inline:auto}
+
+/* La barra lateral se ancla dentro del espacio de trabajo, NO encima
+   de Seguridad y bloqueo cuando este panel está desplegado. */
+.secureRoot .layout{padding-left:0}
+@media (min-width:761px){
+ .secureRoot .layout>aside{
+  position:sticky!important;top:66px;bottom:auto;left:auto;
+  flex:0 0 255px;width:255px;height:calc(100vh - 66px);
+  align-self:flex-start;overflow-y:auto;overscroll-behavior:contain;
+ }
+}

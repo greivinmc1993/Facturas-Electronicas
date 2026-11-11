@@ -1,3 +1,10 @@
+## Corrección visual v0.6.63 — Distribución simétrica de toda la interfaz (10 de noviembre de 2026)
+- Eliminados los límites antiguos de ancho (1250/1280/1540/1600 px) que dejaban huecos desiguales en Seguridad, Dashboard, Usuarios, Auditoría y otros módulos. El contenido se adapta al espacio útil y se centra hasta 2200 px en monitores muy anchos.
+- Márgenes horizontales homogéneos, retícula compartida en bloqueo, recuperación del propietario, recuperación de personal, SMTP y correo verificado. Campos, botones y tarjetas conservan sus tamaños funcionales y su alineación.
+- Dashboard y paneles comerciales: columnas adaptadas al ancho REAL del área de trabajo mediante CSS container queries, después de descontar la barra lateral. Auditoría utiliza todo el ancho del módulo, manteniendo el desplazamiento horizontal de tablas densas.
+- Menú lateral anclado dentro del área de trabajo: deja de superponerse al panel expandido de Seguridad; la barra de sesión sigue visible arriba. Diseño adaptable para pantallas estrechas.
+- Se incorpora `tests/qa-063-layout.cjs` a `npm test`, además de comprobaciones visuales de geometría en Chromium. Solo cambios de presentación y QA: no se modifican API, roles, datos, esquema SQLite ni lógica comercial.
+
 ## Corrección v0.6.63 — Kardex operativo de cajeros y auditoría legible (10 de noviembre de 2026)
 - El menú «Ingresos / Tomas físicas» se reemplazó por **Kardex · Movimientos** para cajeros, con registro de entradas y ajustes de saldo físico, historial y filtros por artículo, SKU, tipo y fechas. El Kardex completo sigue reservado a roles con permiso.
 - El botón «Actualizar inventario y movimientos» recarga existencias y la tabla de movimientos, con notificación visible de éxito o error. Los movimientos se actualizan también después de registrar una operación.

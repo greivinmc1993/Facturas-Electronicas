@@ -2,6 +2,14 @@
 
 **Versión vigente: 0.6.63 (10 de noviembre de 2026).** Continuamos desde v0.6.62. Se mantienen el instalador Windows, las funciones comerciales, el sistema de permisos, el código de emergencia del propietario y los respaldos SQLite.
 
+## Distribución general y simetría visual — corrección v0.6.63
+
+- Seguridad y bloqueo: los cinco apartados comparten márgenes y proporciones de columnas, se expanden para aprovechar el ancho real de pantalla y se apilan cuando no hay espacio suficiente.
+- Todos los módulos (Dashboard, Auditoría, Usuarios, Inventario, Kardex, Caja, Empresas, Ventas y Cotizaciones) emplean un área principal fluida y centrada. El ancho máximo de lectura es 2200 px en monitores ultrapanorámicos; en resoluciones normales se aprovecha el espacio disponible.
+- En escritorio, la barra de sesión se mantiene arriba y el menú lateral está anclado **dentro del área de trabajo**. Al desplegar Seguridad, el menú ya no tapa sus formularios. Tablas extensas conservan su desplazamiento horizontal independiente.
+- Las columnas de los módulos principales dependen del ancho **útil** disponible, no solo del ancho total de la ventana. No cambia ningún permiso, registro, operación o tabla SQLite.
+- Verificación visual de referencia: Chromium a 375, 480, 768, 1024, 1366, 1600, 1920 y 2560 píxeles. La validación final del ejecutable real corresponde a Windows y GitHub Actions.
+
 ## Corrección de inventario y auditoría de v0.6.63
 
 - **Cajeros:** utilizar **Kardex · Movimientos** (no «Ingresos / Tomas físicas»). Elegir empresa, artículo, entrada o ajuste de existencias, cantidad y motivo; revisar la variación y confirmar. Después, comprobar la tabla de historial. **Actualizar inventario y movimientos** realiza una consulta real de los dos datos y muestra una confirmación. El cajero puede filtrar el historial y exportarlo a CSV/Guardar PDF, siempre **sin costos ni valoración**. Las salidas arbitrarias y los precios/costos siguen bloqueados. Supervisores/administradores autorizados conservan el Kardex completo.
