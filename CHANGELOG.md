@@ -1,3 +1,8 @@
+## Ajuste visual v0.6.63 — Flechas de menús desplegables (10 de noviembre de 2026)
+- Se corrigió la flecha de los selectores de Seguridad, recuperación de usuarios y demás módulos: en Chromium con `appearance:base-select` el icono nativo podía saltar a una segunda línea o desaparecer cuando el campo era estrecho.
+- El control cerrado utiliza ahora una única flecha SVG del estilo FacturaCR, centrada verticalmente y separada del texto, también en selectores estrechos. El menú de opciones avanzado permanece disponible en Chromium compatible; se conserva el selector nativo de respaldo, el teclado y el estado de selección.
+- Se añadió una prueba de regresión a `tests/qa-063-estilos-interactivos.cjs` y se comprobaron tamaños 480, 1024 y 1440 px en Chromium. No se cambian datos SQLite, APIs, permisos ni operaciones comerciales. La validación de la interfaz instalada sigue pendiente en Windows.
+
 ## Interfaz v0.6.63 — Ventanas y desplegables con estilo unificado (10 de noviembre de 2026)
 - Selector universal para todos los módulos (color, flecha, bordes, foco visible y estados hover/deshabilitado); listas abiertas personalizadas con `appearance:base-select` en Chromium compatible, sin sustituir los selectores ni alterar sus eventos.
 - Diálogo reutilizable `ConfirmProvider.jsx` para operaciones sensibles; sustituye las cinco confirmaciones nativas de navegador por ventanas de FacturaCR, accesibles mediante teclado y cancelables. Se conservan las confirmaciones de eliminación y acciones previas que ya eran propias de React.

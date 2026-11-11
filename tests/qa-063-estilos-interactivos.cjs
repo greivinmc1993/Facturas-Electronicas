@@ -39,6 +39,13 @@ test('Estilos comunes de campos select y degradación para navegadores antiguos'
  assert.match(css,/option:checked/);
  assert.match(css,/select:disabled/);
 });
+test('Flechas de select permanecen centradas aun con textos largos',()=>{
+ const enhanced=css.split('@supports (appearance:base-select)')[1];
+ assert.ok(enhanced,'Debe existir diseño progresivo para Chromium');
+ assert.match(enhanced,/select:not\(\[multiple\]\):not\(\[size\]\)\{[^}]*display:flex;align-items:center;justify-content:space-between/s);
+ assert.match(enhanced,/::picker-icon\{[^}]*display:none;/s);
+ assert.match(css,/background-image:url\("data:image\/svg\+xml/,'La flecha SVG sigue disponible como alternativa nativa');
+});
 test('Ventanas existentes comparten bordes, fondo y sombras',()=>{
  for(const cls of ['dialogCard','companyModal','quoteDeleteDialog','accountDeleteDialog','ticketModal','fcrConfirmModal'])assert.ok(css.includes('.'+cls),cls);
  assert.match(css,/backdrop-filter:blur\(4px\)/);

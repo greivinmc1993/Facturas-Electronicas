@@ -4,6 +4,8 @@
 
 ## Estilo unificado de menús y ventanas emergentes — actualización v0.6.63
 
+**Corrección de flechas (v0.6.63):** los desplegables de Seguridad, usuarios y los otros módulos usan una sola flecha verde SVG fijada al borde derecho, sin la flecha interna de `base-select` que podía quedar debajo del texto en Electron. La lista abierta conserva el estilo y la navegación por teclado. Verificar con `node tests/qa-063-estilos-interactivos.cjs` y, al actualizar en Windows, abrir los selectores de «Tiempo para todos los usuarios», «Cuenta que deseas recuperar» y los filtros de Kardex.
+
 Todos los módulos comparten la identidad visual de FacturaCR en **selectores, menús de usuario y empresas, opciones avanzadas y ventanas de confirmación**: verde institucional, bordes suaves, sombreado, espaciado, hover, foco visible y adaptación a ventanas estrechas.
 
 - Las confirmaciones de **retirar un acceso, registrar un movimiento de inventario, recuperar otra cuenta, reemplazar el código de emergencia y eliminar el SMTP** ya no utilizan `window.confirm`. Ahora usan un diálogo React reutilizable con **Cancelar** y una acción explícita; presionar Escape o cancelar **no ejecuta** la operación.
