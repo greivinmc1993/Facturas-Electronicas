@@ -34,6 +34,7 @@ fs.copyFileSync(path.join(root,'server','sale-drafts.js'),path.join(staging,'sal
 fs.copyFileSync(path.join(root,'server','backup-schedule.js'),path.join(staging,'backup-schedule.js'));
 fs.copyFileSync(path.join(root,'server','backup-directory.js'),path.join(staging,'backup-directory.js'));
 fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(staging,'backup-verification.js'));
+fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging,'backup-rehearsal.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -62,7 +63,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.65')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.66')});
   await check('Respaldos: ruta predeterminada y configuración heredada',async()=>{
    const r=await call('GET','/api/backups/automatic');
    assert.equal(r.status,200);assert.equal(r.body.config.directoryMode,'default');
@@ -113,6 +114,30 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(corrupt.status,422);
    fs.unlinkSync(path.join(targetDir,malicious)); // No contaminar el QA histórico posterior.
    assert.ok(fs.existsSync(dbPath),'La base activa permanece intacta');
+  });
+  await check('Ensayar recuperación histórica mantiene la base activa y devuelve resumen',async()=>{
+   const backups=(await call('GET','/api/backups/automatic')).body;
+   const file=backups.files[0];assert.ok(file);
+   const activeBefore=fs.readFileSync(dbPath);
+   const source=path.join(backups.directory,file);
+   const backupBefore=fs.readFileSync(source);
+   const r=await call('POST','/api/backups/automatic/rehearse',{file});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   assert.equal(r.body.ok,true);assert.equal(r.body.compatible,true);
+   for(const table of ['companies','clients','products','sales','quotations'])assert.ok(Number.isInteger(r.body.totals[table]),table);
+   assert.deepEqual(fs.readFileSync(dbPath),activeBefore,'No escribir la base en uso');
+   assert.deepEqual(fs.readFileSync(source),backupBefore,'No escribir el respaldo');
+   assert.deepEqual(fs.readdirSync(path.dirname(dbPath)).filter(n=>n.startsWith('.facturacr-ensayo-')),[],'Eliminar la copia temporal');
+  });
+  await check('Ensayo rechaza rutas manipuladas, archivos corruptos y copias ausentes',async()=>{
+   let r=await call('POST','/api/backups/automatic/rehearse',{file:'../../facturacr.sqlite'});assert.equal(r.status,400);
+   r=await call('POST','/api/backups/automatic/rehearse',{file:'FacturaCR_auto_2020-01-01T00-00-00.sqlite'});assert.equal(r.status,404);
+   const file='FacturaCR_auto_2020-01-01T00-00-01.sqlite';
+   const directory=(await call('GET','/api/backups/automatic')).body.directory;
+   fs.writeFileSync(path.join(directory,file),Buffer.alloc(4096,0x42));
+   r=await call('POST','/api/backups/automatic/rehearse',{file});assert.equal(r.status,422);
+   fs.unlinkSync(path.join(directory,file));
+   assert.deepEqual(fs.readdirSync(path.dirname(dbPath)).filter(n=>n.startsWith('.facturacr-ensayo-')),[]);
   });
   await check('Respaldos: rechazar rutas inválidas sin cambiar configuración guardada',async()=>{
    const initial=(await call('GET','/api/backups/automatic')).body.directory;
@@ -330,7 +355,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   await check('Respaldo SQLite automático es íntegro',async()=>{
    const result=await call('POST','/api/backups/automatic/run');assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.created,true);
    const files=fs.readdirSync(path.join(temp,'db','automatic-backups'));assert.ok(files.length>=1);
-   const bk=new DatabaseSync(path.join(temp,'db','automatic-backups',files[0]),{readOnly:true});assert.equal(bk.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.equal(bk.prepare('SELECT COUNT(*) AS n FROM companies').get().n,2);bk.close();
+   const bk=new DatabaseSync(path.join(temp,'db','automatic-backups',result.body.file),{readOnly:true});assert.equal(bk.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.equal(bk.prepare('SELECT COUNT(*) AS n FROM companies').get().n,2);bk.close();
   });
   await check('Configuración de respaldos valida frecuencia y retención',async()=>{
    const invalid=await call('PUT','/api/backups/automatic',{enabled:true,frequency:'hourly',time:'20:00',keep:-1});assert.equal(invalid.status,400);

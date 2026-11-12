@@ -527,8 +527,10 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
  const [showAllBackups,setShowAllBackups]=useState(false);
  const [verifyingFile,setVerifyingFile]=useState('');
  const [verificationResults,setVerificationResults]=useState({});
+ const [rehearsingFile,setRehearsingFile]=useState('');
+ const [rehearsalResults,setRehearsalResults]=useState({});
  // Cada actualización del historial o cambio de carpeta invalida comprobaciones anteriores.
- useEffect(()=>{setVerificationResults({})},[autoBackup?.files,autoBackup?.directory]);
+ useEffect(()=>{setVerificationResults({});setRehearsalResults({})},[autoBackup?.files,autoBackup?.directory]);
  const verifyBackup=async(filename)=>{
   setVerifyingFile(filename);
   try{
@@ -539,6 +541,16 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
   }finally{setVerifyingFile('')}
  };
 
+ const rehearseBackup=async(filename)=>{
+  setRehearsingFile(filename);
+  setRehearsalResults(prev=>({...prev,[filename]:null}));
+  try{
+   const data=await api('/api/backups/automatic/rehearse',{method:'POST',body:JSON.stringify({file:filename})});
+   setRehearsalResults(prev=>({...prev,[filename]:{ok:true,checkedAt:data.checkedAt,totals:data.totals,companies:data.companies}}));
+  }catch(err){
+   setRehearsalResults(prev=>({...prev,[filename]:{ok:false,error:err.message}}));
+  }finally{setRehearsingFile('')}
+ };
  const latest=files[0]||null;
  const weekdayNames=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
  const scheduledDay=autoConfig.frequency==='weekly'?` · Cada ${weekdayNames[autoConfig.weekday??1]}`:autoConfig.frequency==='monthly'?` · Día ${autoConfig.monthDay??1} de cada mes`:'';
@@ -604,14 +616,14 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
    </div>
    <div className="card backupHistoryCard"><div className="backupCardHeading"><div><h4>Historial de respaldos</h4><p className="hint">Las copias se revisan al crearse; puedes volver a comprobar su integridad en cualquier momento.</p></div><button type="button" className="backupRefresh" disabled={busy} onClick={refreshAutoBackup}>⟳ Actualizar</button></div>
      {files.length>0&&<div className="backupHistorySearch"><label htmlFor="backupHistoryFilter">Buscar respaldo por fecha o nombre</label><input id="backupHistoryFilter" type="search" value={backupSearch} onChange={e=>setBackupSearch(e.target.value)} placeholder="Ej.: 2026-11-05, noviembre o 08-30" autoComplete="off"/><small>{searchTerm?`${filteredBackupFiles.length} de ${files.length} copias coinciden`:`${files.length} copias disponibles`}</small></div>}
-     {visibleBackupFiles.length>0?<div className="backupFileList">{visibleBackupFiles.map(f=><div className="backupFileRow" key={f}><span className="backupFileIcon" aria-hidden="true"><UiIcon name="database" size={18}/></span><div className="backupFileDetails"><strong title={f}>{f}</strong><small>{backupFileDate(f)} · {verificationResults[f]?(verificationResults[f].ok?'Integridad comprobada ahora':'Problema detectado en la comprobación'):'Verificada al crearla; estado actual sin comprobar'}</small>{verificationResults[f]&&<span role="status" className={verificationResults[f].ok?'backupVerifySuccess':'backupVerifyFailure'}>{verificationResults[f].ok?`Integridad correcta · ${sizeLabel(verificationResults[f].bytes)} · Revisado ${new Date(verificationResults[f].checkedAt).toLocaleString('es-CR')}`:verificationResults[f].error}</span>}</div><button type="button" className="secondary backupVerifyButton" disabled={busy||!!verifyingFile} onClick={()=>verifyBackup(f)} aria-label={`Verificar integridad de ${f}`}><UiIcon name="shield" size={15}/>{verifyingFile===f?'Verificando…':'Verificar integridad'}</button></div>)}</div>:<div className="backupEmpty"><strong>{files.length?'No se encontraron respaldos con ese filtro':'Aún no hay copias automáticas'}</strong><p className="hint">{files.length?'Prueba con otra fecha o borra la búsqueda.':'Presiona «Crear respaldo ahora» para generar la primera copia.'}</p></div>}
+     {visibleBackupFiles.length>0?<div className="backupFileList">{visibleBackupFiles.map(f=><div className="backupFileRow" key={f}><span className="backupFileIcon" aria-hidden="true"><UiIcon name="database" size={18}/></span><div className="backupFileDetails"><strong title={f}>{f}</strong><small>{backupFileDate(f)} · {verificationResults[f]?(verificationResults[f].ok?'Integridad comprobada ahora':'Problema detectado en la comprobación'):'Verificada al crearla; estado actual sin comprobar'}</small>{verificationResults[f]&&<span role="status" className={verificationResults[f].ok?'backupVerifySuccess':'backupVerifyFailure'}>{verificationResults[f].ok?`Integridad correcta · ${sizeLabel(verificationResults[f].bytes)} · Revisado ${new Date(verificationResults[f].checkedAt).toLocaleString('es-CR')}`:verificationResults[f].error}</span>}{rehearsalResults[f]&&<div role="status" className={rehearsalResults[f].ok?'backupRehearsalSuccess':'backupVerifyFailure'}>{rehearsalResults[f].ok?<><strong>Ensayo de recuperación satisfactorio (copia aislada)</strong><small>Empresas: {rehearsalResults[f].totals.companies} · Clientes: {rehearsalResults[f].totals.clients} · Productos: {rehearsalResults[f].totals.products} · Ventas: {rehearsalResults[f].totals.sales} · Proformas: {rehearsalResults[f].totals.quotations}</small><small>{rehearsalResults[f].companies?.length?`Empresas incluidas: ${rehearsalResults[f].companies.join(', ')}`:'Sin empresas registradas'} · {new Date(rehearsalResults[f].checkedAt).toLocaleString('es-CR')}</small><small>Los datos activos no se modificaron. No sustituye una restauración completa.</small></>:rehearsalResults[f].error}</div>}</div><div className="backupFileActions"><button type="button" className="secondary backupVerifyButton" disabled={busy||!!verifyingFile||!!rehearsingFile} onClick={()=>verifyBackup(f)} aria-label={`Verificar integridad de ${f}`}><UiIcon name="shield" size={15}/>{verifyingFile===f?'Verificando…':'Verificar integridad'}</button><button type="button" className="secondary backupRehearseButton" disabled={busy||!!verifyingFile||!!rehearsingFile} onClick={()=>rehearseBackup(f)} aria-label={`Ensayar recuperación de ${f}`}><UiIcon name="backup" size={15}/>{rehearsingFile===f?'Ensayando…':'Ensayar recuperación'}</button></div></div>)}</div>:<div className="backupEmpty"><strong>{files.length?'No se encontraron respaldos con ese filtro':'Aún no hay copias automáticas'}</strong><p className="hint">{files.length?'Prueba con otra fecha o borra la búsqueda.':'Presiona «Crear respaldo ahora» para generar la primera copia.'}</p></div>}
      {!searchTerm&&files.length>20&&<div className="backupHistoryMore"><span>{showAllBackups?`Mostrando las ${files.length} copias`:`Mostrando las primeras 20 de ${files.length} copias`}</span><button type="button" className="secondary" onClick={()=>setShowAllBackups(v=>!v)}>{showAllBackups?'Mostrar solo 20':'Mostrar todas'}</button></div>}
      {autoBackup?.lastError&&<p className="warning">Último error: {autoBackup.lastError}</p>}
    </div>
   </div>
   {restoreStage&&<div className="backupRestoreProgress" role="status" aria-live="polite"><span className="backupRestoreSpinner" aria-hidden="true"/><div><strong>Procesando respaldo</strong><p>{restoreStage}</p></div></div>}
   <div className="backupAdvanced"><details><summary>Restauración y opciones avanzadas</summary><p>Antes de restaurar, FacturaCR inspecciona el respaldo y muestra cuántas empresas, clientes, productos, ventas y proformas contiene. Solo tras tu confirmación reemplaza la información actual y crea una copia previa.</p><div className="actions"><button type="button" className="danger" disabled={busy} onClick={()=>restoreInput.current?.click()}>Restaurar archivo .sqlite</button><button type="button" className="secondary" disabled={busy} onClick={refreshAutoBackup}>Actualizar historial</button></div><input ref={restoreInput} type="file" accept=".sqlite" style={{display:'none'}} onChange={restoreBackup}/></details></div>
-  <p className="backupFooterInfo">ⓘ Verificar integridad comprueba el archivo SQLite de solo lectura; no equivale a probar una restauración completa. Los respaldos automáticos solo se ejecutan con FacturaCR abierto. Si el programa estuvo cerrado, comprueba los respaldos pendientes cuando se vuelva a abrir. Mantén también una copia en un disco externo.</p>
+  <p className="backupFooterInfo">ⓘ «Verificar integridad» lee la copia original; «Ensayar recuperación» trabaja sobre un clon temporal, comprueba apertura, compatibilidad y datos principales, sin tocar SQLite activo. Ninguna de estas acciones equivale a restaurar por completo el sistema. Los respaldos automáticos solo se ejecutan con FacturaCR abierto. Si el programa estuvo cerrado, comprueba los respaldos pendientes cuando se vuelva a abrir. Mantén también una copia en un disco externo.</p>
  </section>;
 }
 

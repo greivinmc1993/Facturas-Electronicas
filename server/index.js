@@ -2,6 +2,7 @@ import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
 import {verifyStoredBackup} from './backup-verification.js';
+import {rehearseStoredBackup} from './backup-rehearsal.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -259,6 +260,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   };
   let backupConfig=loadBackupConfig();
   let backupBusy=false;
+  let rehearsalBusy=false;
   let lastBackupError='';
   const backupFiles=()=>{
     try{return readdirSync(activeBackupDir()).filter(f=>/^FacturaCR_auto_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().reverse()}
@@ -266,6 +268,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   };
   const backupDue=()=>backupIsDue(new Date(),backupConfig,backupFiles()[0]);
   const runAutoBackup=async(force=false)=>{
+    if(rehearsalBusy)throw Error('Hay un ensayo de recuperación en curso. Intenta crear la copia después de finalizarlo.');
     if(backupBusy||(!force&&!backupDue()))return {created:false};
     backupBusy=true;
     try{
@@ -289,7 +292,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   setTimeout(()=>{void runAutoBackup().catch(()=>{})},2500).unref?.();
   app.get('/api/backups/automatic',(_req,res)=>res.json({config:backupConfig,files:backupFiles(),directory:activeBackupDir(),defaultDirectory:join(dataDir,'automatic-backups'),lastError:lastBackupError,busy:backupBusy}));
   app.put('/api/backups/automatic', (req,res)=>{
-    if(backupBusy)return res.status(409).json({error:'Espera a que termine el respaldo actual antes de cambiar la carpeta.'});
+    if(backupBusy||rehearsalBusy)return res.status(409).json({error:'Espera a que terminen las comprobaciones antes de cambiar la carpeta.'});
     const input=req.body||{};
     // Mantiene la compatibilidad con clientes anteriores sin weekday/monthDay.
     const next={...backupConfig,...input};
@@ -309,7 +312,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   // La capa global de autenticación reserva toda la familia /api/backups al propietario.
   app.post('/api/backups/automatic/verify',(req,res)=>{
     res.setHeader('Cache-Control','no-store');
-    if(backupBusy)return res.status(409).json({error:'Espera a que termine el respaldo antes de verificar una copia.'});
+    if(backupBusy||rehearsalBusy)return res.status(409).json({error:'Hay una operación de respaldos en curso. Inténtalo al finalizar.'});
     try{
       const checked=verifyStoredBackup(activeBackupDir(),req.body?.file,
         file=>new Database(file,{readonly:true,fileMustExist:true}));
@@ -318,6 +321,21 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       const status=err.code==='INVALID_BACKUP_NAME'?400:err.code==='BACKUP_NOT_ACCESSIBLE'?404:422;
       return res.status(status).json({error:err.message});
     }
+  });
+  // Ensayo aislado de recuperación: abrir una copia de trabajo sin reemplazar datos reales.
+  // La autenticación global protege la familia /api/backups (solo propietario).
+  app.post('/api/backups/automatic/rehearse',async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    if(backupBusy||rehearsalBusy)return res.status(409).json({error:'Hay una operación de respaldos en curso. Inténtalo al finalizar.'});
+    rehearsalBusy=true;
+    try{
+      const result=await rehearseStoredBackup(activeBackupDir(),req.body?.file,dataDir,
+        file=>new Database(file,{fileMustExist:true}),db);
+      return res.json(result);
+    }catch(err){
+      const status=err.code==='INVALID_BACKUP_NAME'?400:err.code==='BACKUP_NOT_ACCESSIBLE'?404:err.code==='REHEARSAL_NO_SPACE'?507:422;
+      return res.status(status).json({error:err.message});
+    }finally{rehearsalBusy=false}
   });
   app.post('/api/backups/automatic/run',async(_req,res)=>{
     try{res.json(await runAutoBackup(true))}catch(e){res.status(500).json({error:e.message})}

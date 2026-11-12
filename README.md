@@ -1,3 +1,25 @@
+# FacturaCR v0.6.66 — Ensayo aislado de recuperación de respaldos
+
+**Versión vigente: 0.6.66 (12 de noviembre de 2026).** Continúa desde v0.6.65, sin cambiar las tablas SQLite ni los permisos existentes. Los respaldos automáticos, la selección de carpeta, la verificación de integridad y la restauración con confirmación permanecen disponibles.
+
+## Novedades v0.6.66 — Ensayar recuperación sin afectar el negocio
+
+En **Respaldos → Historial de respaldos**, cada copia incluye un nuevo botón **Ensayar recuperación** junto a **Verificar integridad**. Es una comprobación voluntaria reservada al propietario, especialmente útil para copias alojadas en unidades externas o carpetas personalizadas.
+
+1. Abre **Respaldos** y selecciona una copia del historial.
+2. Pulsa **Ensayar recuperación**. La aplicación crea una copia temporal en el directorio de datos de FacturaCR, *sin reemplazar* `facturacr.sqlite`.
+3. Comprueba íntegramente el clon SQLite, la existencia y compatibilidad de tablas centrales, la apertura en modo lectura/escritura, la activación de WAL y la posibilidad de iniciar y revertir una transacción.
+4. Muestra los totales presentes en el respaldo: **empresas, clientes, productos, ventas y proformas**, además de hasta seis nombres de empresas.
+5. Cierra SQLite y elimina la carpeta temporal al finalizar o si se produce un error. Si no hay espacio libre suficiente para crear el clon, informa el problema antes de empezar.
+
+**Diferencias importantes:** **Verificar integridad** examina el archivo original en lectura; **Ensayar recuperación** comprueba la apertura y lectura de una copia temporal compatible con la versión instalada. **Ninguna acción garantiza una restauración completa ni prueba reinicio, permisos de Windows, cuentas o funcionamiento comercial posterior**; para ello hace falta una restauración controlada en un entorno de pruebas. Nunca seleccionar un respaldo como si fuera un archivo para migración automática sin revisar las empresas que contiene.
+
+**Seguridad:** el navegador solo envía un nombre de archivo con formato permitido. El servidor resuelve la copia dentro de la carpeta activa, rechaza enlaces simbólicos y rutas arbitrarias, exige una sesión propietaria y bloquea operaciones concurrentes de respaldo mientras dura el ensayo. No se envía información a la nube. Los respaldos originales y la base activa no se modifican.
+
+**Pruebas:** `node --no-warnings tests/qa-066-backup-rehearsal.cjs`, `node tests/qa-066-backup-rehearsal-ui.cjs`, `npm test`. QA local utiliza SQLite temporal mediante Node.js; es necesario validar el instalador con `npm run qa:real-server`, `npm run dist:win` y GitHub Actions Windows.
+
+---
+
 # FacturaCR v0.6.65 — Verificación de respaldos históricos y gestión segura
 
 **Versión vigente: 0.6.65 (11 de noviembre de 2026).** Basada en el ZIP completo de v0.6.64 corregido, con respaldos en carpetas personalizadas, controles de seguridad, correcciones visuales y QA. Se conserva la arquitectura React, Electron, Express y SQLite, sin migraciones de tablas.

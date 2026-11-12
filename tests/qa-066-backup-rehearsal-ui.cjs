@@ -1,0 +1,18 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+const frontend=fs.readFileSync(path.join(root,'src/main.jsx'),'utf8');
+const css=fs.readFileSync(path.join(root,'src/style.css'),'utf8');
+const server=fs.readFileSync(path.join(root,'server/index.js'),'utf8');
+const auth=fs.readFileSync(path.join(root,'server/auth.js'),'utf8');
+const workspace=frontend.split('function BackupWorkspace(')[1].split('function App(')[0];
+let passed=0;const check=(name,fn)=>{fn();passed++;console.log('OK Interfaz 0.6.66:',name)};
+check('Historial incluye ensayo voluntario y accesible por copia',()=>{assert.match(workspace,/Ensayar recuperación/);assert.match(workspace,/rehearseBackup\(f\)/);assert.match(workspace,/aria-label=\{`Ensayar recuperación de/)});
+check('El ensayo invoca API POST protegida y no la restauración',()=>{assert.match(workspace,/api\/backups\/automatic\/rehearse/);assert.match(server,/rehearseStoredBackup\(activeBackupDir\(\),req\.body\?\.file,dataDir/);assert.doesNotMatch(workspace.split('const rehearseBackup=async')[1].split('const latest=')[0],/api\/backups\/restore/)});
+check('No permite acciones paralelas mientras se ensaya',()=>{assert.match(workspace,/disabled=\{busy\|\|!!verifyingFile\|\|!!rehearsingFile\}/);assert.match(server,/let rehearsalBusy=false/)});
+check('Resultados incluyen resumen y aclaración de límites',()=>{for(const term of ['totals.companies','totals.clients','totals.products','totals.sales','totals.quotations','Los datos activos no se modificaron','No sustituye una restauración completa'])assert.ok(workspace.includes(term),term)});
+check('Resultados antiguos se limpian al cambiar de carpeta',()=>assert.match(workspace,/setVerificationResults\(\{\}\);setRehearsalResults\(\{\}\).*autoBackup\?\.files,autoBackup\?\.directory/s));
+check('Nueva API queda bajo el control propietario existente',()=>{assert.ok(server.indexOf('registerAuth(app,')<server.indexOf("app.post('/api/backups/automatic/rehearse'"));assert.match(auth,/Operación reservada al propietario/)});
+check('El diseño conserva estados y adaptación móvil',()=>{assert.match(css,/\.backupFileRow \.backupFileActions/);assert.match(css,/\.backupRehearsalSuccess/);assert.match(css,/@media\(max-width:460px\)/)});
+check('El botón original de verificar integridad permanece',()=>{assert.match(workspace,/verifyBackup\(f\)/);assert.match(workspace,/Verificar integridad/)});
+console.log(`QA interfaz recuperación v0.6.66: ${passed}/${passed}`);

@@ -1,3 +1,13 @@
+## FacturaCR v0.6.66 — Ensayo seguro de recuperación (12 de noviembre de 2026)
+
+- Nuevo botón «Ensayar recuperación» junto a «Verificar integridad» en el historial de respaldos: crea un clon SQLite temporal, comprueba integridad, esquema, WAL, apertura de transacción y consultas de empresas, clientes, productos, ventas y proformas sin afectar el archivo original ni la base activa.
+- Solo propietario autenticado, validación estricta de nombres y archivos, bloqueo de acciones concurrentes, protección ante falta de espacio y limpieza del temporal aun si ocurre un error.
+- Resumen accesible con cantidades y nombres de hasta seis empresas; estilos responsive de botones en la lista a 480–1600 px y mensajes diferenciados de éxito/error. No se presenta como una restauración completa.
+- Nuevas suites QA de servicio y pantalla, comprobación real de ruta HTTP con SQLite temporal; se actualiza a v0.6.66 el paquete, lockfile, pruebas de upgrade y nombre de workflow Windows.
+- Sin migración SQLite ni eliminación de funciones anteriores. Compilación Electron/NSIS y pruebas con dependencias nativas pendientes de validación en Windows.
+
+---
+
 ## FacturaCR v0.6.65 — Verificación de integridad del historial de respaldos (11 de noviembre de 2026)
 - El propietario dispone de **Verificar integridad** en cada copia del historial del destino activo. Relee el archivo de solo lectura y ejecuta `PRAGMA integrity_check` más la comprobación de tablas principales.
 - Los resultados se distinguen entre **integridad correcta** y **copia no válida / inaccesible**. Se muestran tamaño y fecha de la comprobación; al actualizar historial o cambiar carpeta el resultado anterior se descarta, para no confundir comprobaciones antiguas con estado actual.
