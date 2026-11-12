@@ -1218,17 +1218,53 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
  .secureRoot select,.secureRoot button{transition:none!important}
 }
 
-/* FacturaCR 0.6.64 · Selección clara y adaptativa de carpeta de respaldos. */
-.backupDestinationChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:8px 0 12px}
-.backupDestinationChoice{display:flex;align-items:flex-start;gap:10px;border:1px solid #d5e3ee;border-radius:12px;background:#fff;padding:12px;cursor:pointer;min-width:0;transition:border-color .18s,box-shadow .18s,background .18s}
-.backupDestinationChoice:has(input:checked){border-color:#0f8074;background:#edf8f5;box-shadow:0 0 0 2px rgba(15,128,116,.11)}
-.backupDestinationChoice input{margin:3px 0 0;accent-color:#0f8074;flex-shrink:0}
-.backupDestinationChoice span{min-width:0;display:grid;gap:3px}
-.backupDestinationChoice strong{font-size:12px;color:#18354b}
-.backupDestinationChoice small{color:#627c8f;font-size:11px;line-height:1.45}
+/* FacturaCR 0.6.64 · Las opciones de carpeta nunca desbordan la tarjeta.
+   La regla general input{width:100%;padding:...} no debe aplicarse al radio.
+   El grid se adapta al ANCHO DISPONIBLE del módulo, no al viewport. */
+.backupDirectory .backupDestinationChoices{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr));
+ gap:10px;margin:10px 0 14px;min-width:0;
+}
+.backupDirectory label.backupDestinationChoice{
+ box-sizing:border-box;display:grid;grid-template-columns:18px minmax(0,1fr);
+ align-items:center;justify-content:start;column-gap:12px;
+ width:100%;min-width:0;min-height:84px;margin:0;padding:13px 14px;
+ border:1px solid #d5e3ee;border-radius:12px;background:#fff;
+ text-align:left;white-space:normal;cursor:pointer;
+ transition:border-color .18s,box-shadow .18s,background-color .18s;
+}
+.backupDirectory .backupDestinationChoice input[type="radio"]{
+ box-sizing:border-box;display:block;appearance:auto;-webkit-appearance:radio;
+ width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;
+ margin:0;padding:0;border:0;border-radius:50%;
+ accent-color:#0f8074;justify-self:start;align-self:center;
+}
+.backupDirectory .backupDestinationChoice>span{
+ box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;
+ gap:4px;width:100%;min-width:0;max-width:100%;overflow-wrap:anywhere;
+}
+.backupDirectory .backupDestinationChoice strong{
+ display:block;font-size:12px;line-height:1.35;color:#18354b;
+}
+.backupDirectory .backupDestinationChoice small{
+ display:block;font-size:11px;line-height:1.45;font-weight:400;color:#627c8f;
+}
+.backupDirectory .backupDestinationChoice:has(input:checked){
+ border-color:#0f8074;background:#edf8f5;box-shadow:0 0 0 2px rgba(15,128,116,.11);
+}
+.backupDirectory .backupDestinationChoice:hover{border-color:#55aaa0}
+.backupDirectory .backupDestinationChoice:focus-within{outline:2px solid #0f8074;outline-offset:2px}
 .backupDirectory .backupDirectoryLabel{font-size:11px;font-weight:750;color:#47647a;margin:10px 0 5px}
 .backupDirectory .actions{display:flex;flex-wrap:wrap;gap:8px}
 .backupDirectory .actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px}
 .backupDirectory .actions button svg{flex:none}
 .companyProfileFooter .actions{grid-template-columns:minmax(0,1fr)}
-@media(max-width:700px){.backupDestinationChoices{grid-template-columns:minmax(0,1fr)}}
+
+/* FacturaCR v0.6.65 · Comprobación voluntaria de copias históricas */
+.backupFileRow{min-width:0;gap:10px;flex-wrap:wrap}
+.backupFileRow .backupFileDetails{min-width:160px;flex:1 1 230px;overflow-wrap:anywhere}
+.backupFileRow .backupVerifyButton{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;min-height:36px;margin-left:auto;white-space:normal}
+.backupVerifySuccess,.backupVerifyFailure{display:block;margin-top:5px;font-size:11px;line-height:1.5;font-weight:650;overflow-wrap:anywhere}
+.backupVerifySuccess{color:#087366}.backupVerifyFailure{color:#ad3f30}
+@media(max-width:540px){.backupFileRow .backupVerifyButton{width:100%;margin-left:0}.backupFileRow .backupFileDetails{flex-basis:calc(100% - 45px)}}

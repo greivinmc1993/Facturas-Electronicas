@@ -1,6 +1,12 @@
-# FacturaCR v0.6.64 — Ubicación de respaldos y perfiles de empresas
+# FacturaCR v0.6.65 — Verificación de respaldos históricos y gestión segura
 
-**Versión vigente: 0.6.64 (11 de noviembre de 2026).** Basada en el ZIP completo de v0.6.63 con las correcciones de interfaz, respaldo calendario, flechas de desplegables, seguridad y QA Windows. Se conserva la arquitectura React, Electron, Express y SQLite, sin migraciones de tablas.
+**Versión vigente: 0.6.65 (11 de noviembre de 2026).** Basada en el ZIP completo de v0.6.64 corregido, con respaldos en carpetas personalizadas, controles de seguridad, correcciones visuales y QA. Se conserva la arquitectura React, Electron, Express y SQLite, sin migraciones de tablas.
+
+## Novedades v0.6.65 — Comprobar respaldos históricos
+
+En **Respaldos → Historial de respaldos**, el propietario puede pulsar **Verificar integridad** en cualquiera de las copias guardadas en la carpeta activa. FacturaCR abre ese archivo **solo para lectura**, ejecuta la prueba completa de integridad de SQLite y confirma que existan las tablas básicas del sistema. Muestra tamaño y fecha de verificación si pasa, o una advertencia si está corrupto/no accesible. No restaura datos, no edita SQLite y no elimina ninguna copia. Al actualizar el historial o cambiar de carpeta se descartan los resultados viejos.
+
+No confundas **integridad SQLite** con restauración completa: se recomienda ensayar una restauración únicamente en un ambiente de prueba y mantener copias adicionales fuera del mismo equipo. Una unidad externa desconectada aparecerá como no disponible. La verificación está reservada al propietario por el control de autorizaciones vigente; no se aceptan rutas libres enviadas desde el navegador.
 
 ## Novedades v0.6.64 — Elegir dónde guardar los respaldos
 
@@ -851,3 +857,8 @@ Los CSV de caja exportan cifras sin el símbolo ₡, con columnas identificadas 
 - **Correo futuro:** evaluar un proveedor transaccional HTTPS con dominio verificado (p. ej., Resend) frente a OAuth 2.0 Gmail para reemplazar el uso de contraseñas de aplicación, manteniendo secretos cifrados y envío local. No está integrado en esta versión.
 
 Las pruebas locales y workflows se ejecutan como antes: `npm test`, `npm run qa:real-server`, `npm run dist:win`. Hacer respaldo antes de actualizar. La migración agrega `access_users.is_deleted` y un índice de auditoría sin borrar registros.
+
+
+### Ajuste visual de las opciones de ubicación de respaldos
+
+Las tarjetas «Carpeta predeterminada» y «Carpeta personalizada» se adaptan al ancho disponible sin salirse ni desplazar el radio. El cambio es únicamente visual; el destino seleccionado se guarda con «Guardar configuración», y el botón «Elegir carpeta…» sigue usando el explorador nativo de Windows.

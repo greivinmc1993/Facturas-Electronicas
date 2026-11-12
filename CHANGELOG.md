@@ -1,3 +1,10 @@
+## FacturaCR v0.6.65 — Verificación de integridad del historial de respaldos (11 de noviembre de 2026)
+- El propietario dispone de **Verificar integridad** en cada copia del historial del destino activo. Relee el archivo de solo lectura y ejecuta `PRAGMA integrity_check` más la comprobación de tablas principales.
+- Los resultados se distinguen entre **integridad correcta** y **copia no válida / inaccesible**. Se muestran tamaño y fecha de la comprobación; al actualizar historial o cambiar carpeta el resultado anterior se descarta, para no confundir comprobaciones antiguas con estado actual.
+- Seguridad: la API rechaza nombres fuera del patrón de respaldo, secuencias de ruta, enlaces simbólicos, archivos que no sean SQLite, y operaciones simultáneas con un respaldo en curso. La verificación no modifica la base activa, no restaura, no borra, no mueve ni cambia permisos.
+- Se evita afirmar que cualquier archivo encontrado sigue siendo «copia verificada» cuando solo fue revisado al momento de su creación. La verificación de integridad no sustituye una restauración de prueba ni confirma recuperabilidad completa de todos los datos.
+- Nuevas pruebas unitarias, de API y contrato visual; actualización de metadatos y documentacion a v0.6.65. Windows/Electron/NSIS requieren validación con instalación real.
+
 ## FacturaCR v0.6.64 — Destino de respaldos configurable y Empresas simplificadas (11 de noviembre de 2026)
 - Respaldos automáticos y «Crear respaldo ahora» permiten seleccionar una carpeta distinta mediante el diálogo nativo de Windows; incluye opción explícita para volver al directorio predeterminado. La ruta elegida debe guardarse antes de aplicarse.
 - La carpeta activa se usa de verdad por el servidor SQLite: creación de copias, verificación de integridad, retención y listado del historial. «Abrir carpeta actual» abre el destino persistido y el espacio disponible se calcula sobre la unidad activa.
@@ -5,6 +12,10 @@
 - El esquema SQLite y los roles siguen intactos; las preferencias se guardan en `automatic-backup-settings.json`, compatible con instalaciones antiguas. El permiso para cambiar respaldos sigue siendo exclusivo del propietario.
 - Empresas: se eliminó el botón duplicado «Editar» y se conserva «Abrir perfil», que abre el mismo formulario. Botón «Eliminar» permanece deshabilitado.
 - Nueva suite QA de rutas personalizadas, persistencia y migración de ajustes, respaldo real con API de SQLite en entorno temporal, regresión de perfil y validación de empaquetado; metadata y pruebas actualizadas a 0.6.64. La validación del cuadro de diálogo nativo/instalador de Windows queda pendiente.
+
+### Corrección visual de las opciones de carpeta (v0.6.64)
+- Corregida la distribución de «Carpeta predeterminada» y «Carpeta personalizada»: la regla global de `input` provocaba que los radio botones ocuparan todo el ancho y expulsaran el texto de la tarjeta. Radios de 18 px con texto contenido, opciones que pasan de dos columnas a una automáticamente según el ancho real, y enfoque visible por teclado.
+- Añadida prueba `tests/qa-064-backup-options-ui.cjs` al QA estático. No cambia las rutas de respaldo, la programación ni SQLite.
 
 ## Ajuste visual v0.6.63 — Flechas de menús desplegables (10 de noviembre de 2026)
 - Se corrigió la flecha de los selectores de Seguridad, recuperación de usuarios y demás módulos: en Chromium con `appearance:base-select` el icono nativo podía saltar a una segunda línea o desaparecer cuando el campo era estrecho.

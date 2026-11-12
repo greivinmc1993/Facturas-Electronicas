@@ -1,6 +1,7 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
+import {verifyStoredBackup} from './backup-verification.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -303,6 +304,20 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       lastBackupError=''; // Un destino nuevo no hereda errores de la unidad anterior.
       res.json({ok:true,config:backupConfig});
     }catch(e){res.status(400).json({error:'No se pudieron guardar las preferencias: '+e.message})}
+  });
+  // Comprobación voluntaria de una copia guardada: lectura únicamente, sin restauración.
+  // La capa global de autenticación reserva toda la familia /api/backups al propietario.
+  app.post('/api/backups/automatic/verify',(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    if(backupBusy)return res.status(409).json({error:'Espera a que termine el respaldo antes de verificar una copia.'});
+    try{
+      const checked=verifyStoredBackup(activeBackupDir(),req.body?.file,
+        file=>new Database(file,{readonly:true,fileMustExist:true}));
+      return res.json(checked);
+    }catch(err){
+      const status=err.code==='INVALID_BACKUP_NAME'?400:err.code==='BACKUP_NOT_ACCESSIBLE'?404:422;
+      return res.status(status).json({error:err.message});
+    }
   });
   app.post('/api/backups/automatic/run',async(_req,res)=>{
     try{res.json(await runAutoBackup(true))}catch(e){res.status(500).json({error:e.message})}

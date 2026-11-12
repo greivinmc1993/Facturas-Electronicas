@@ -33,6 +33,7 @@ for(const name of ['email-recovery.js','email-smtp.js','mail-admin.js'])fs.copyF
 fs.copyFileSync(path.join(root,'server','sale-drafts.js'),path.join(staging,'sale-drafts.js'));
 fs.copyFileSync(path.join(root,'server','backup-schedule.js'),path.join(staging,'backup-schedule.js'));
 fs.copyFileSync(path.join(root,'server','backup-directory.js'),path.join(staging,'backup-directory.js'));
+fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(staging,'backup-verification.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -61,7 +62,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.64')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.65')});
   await check('Respaldos: ruta predeterminada y configuración heredada',async()=>{
    const r=await call('GET','/api/backups/automatic');
    assert.equal(r.status,200);assert.equal(r.body.config.directoryMode,'default');
@@ -93,6 +94,25 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    r=await call('POST','/api/backups/automatic/run');
    assert.equal(r.status,200,JSON.stringify(r.body));
    assert.ok(fs.existsSync(path.join(temp,'db','automatic-backups',r.body.file)));
+  });
+  await check('Verificación histórica: archivo válido, corrupto y nombre peligroso',async()=>{
+   const copies=(await call('GET','/api/backups/automatic')).body.files;
+   assert.equal(copies.length>0,true);
+   const valid=await call('POST','/api/backups/automatic/verify',{file:copies[0]});
+   assert.equal(valid.status,200,JSON.stringify(valid.body));
+   assert.equal(valid.body.ok,true);
+   assert.ok(valid.body.bytes>=512);
+   const invalid=await call('POST','/api/backups/automatic/verify',{file:'../../facturacr.sqlite'});
+   assert.equal(invalid.status,400);
+   const absent=await call('POST','/api/backups/automatic/verify',{file:'FacturaCR_auto_2020-01-01T00-00-00.sqlite'});
+   assert.equal(absent.status,404);
+   const malicious='FacturaCR_auto_2020-01-01T00-00-00.sqlite';
+   const targetDir=path.join(temp,'db','automatic-backups');
+   fs.writeFileSync(path.join(targetDir,malicious),Buffer.alloc(2048,0x59));
+   const corrupt=await call('POST','/api/backups/automatic/verify',{file:malicious});
+   assert.equal(corrupt.status,422);
+   fs.unlinkSync(path.join(targetDir,malicious)); // No contaminar el QA histórico posterior.
+   assert.ok(fs.existsSync(dbPath),'La base activa permanece intacta');
   });
   await check('Respaldos: rechazar rutas inválidas sin cambiar configuración guardada',async()=>{
    const initial=(await call('GET','/api/backups/automatic')).body.directory;
