@@ -1,3 +1,4 @@
+import {COMPANY_ACTIVITY_PATTERN,validateCompanyIdentification,validateCompanyActivity} from './company-identity.js';
 // FacturaCR v0.6.70. Preparación fiscal local para futuros generadores XML 4.4.
 // Este módulo NO emite, firma, valida XSD ni transmite comprobantes a Hacienda.
 export const FE_PREPARATION_EMPTY=Object.freeze({
@@ -6,7 +7,7 @@ export const FE_PREPARATION_EMPTY=Object.freeze({
 });
 const PATTERNS=Object.freeze({
   identification_type:/^(?:01|02|03|04|05)$/,
-  activity_code:/^\d{6}$/,
+  activity_code:COMPANY_ACTIVITY_PATTERN,
   province:/^[1-7]$/,
   canton:/^\d{2}$/,
   district:/^\d{2}$/,
@@ -24,7 +25,7 @@ export function parseFePreparation(input){
     if(typeof input[key]!=='string'&&input[key]!==undefined)throw Error(NAMES[key]+': dato inválido.');
     const value=String(input[key]??'').trim();
     if(value&&!PATTERNS[key].test(value))throw Error(NAMES[key]+': formato inválido.');
-    result[key]=value;
+    result[key]=key==='activity_code'?validateCompanyActivity(value):value;
   }
   // Código postal costarricense: provincia (1) + cantón (2) + distrito (2).
   // No aceptar códigos contradictorios con la ubicación fiscal guardada.
@@ -38,12 +39,13 @@ export function parseFePreparation(input){
 export function describeFePreparation(company,settings={},catalog={}){
   const s={...FE_PREPARATION_EMPTY,...settings},c=company||{};
   const total=Number(catalog.total)||0,missingCabys=Number(catalog.missingCabys)||0;
-  const validIdent=/^\d{9,12}$/.test(String(c.identification||''));
+  let validIdent=false;
+  try{validateCompanyIdentification(s.identification_type,c.identification);validIdent=true}catch{}
   const checks=[
     {key:'legal_name',title:'Razón social registrada',ok:!!String(c.legal_name||'').trim(),place:'perfil'},
     {key:'identification',title:'Número de identificación',ok:validIdent,place:'perfil'},
     {key:'identification_type',title:'Tipo de identificación',ok:!!s.identification_type,place:'fiscal'},
-    {key:'activity_code',title:'Actividad económica (6 dígitos)',ok:!!s.activity_code,place:'fiscal'},
+    {key:'activity_code',title:'Actividad económica (RUT)',ok:!!s.activity_code&&COMPANY_ACTIVITY_PATTERN.test(s.activity_code),place:'fiscal'},
     {key:'location',title:'Ubicación: provincia, cantón y distrito',ok:!!(s.province&&s.canton&&s.district),place:'fiscal'},
     {key:'address',title:'Dirección del establecimiento',ok:!!String(c.address||'').trim()&&String(c.address).trim().length<=160,place:'perfil'},
     {key:'email',title:'Correo de la empresa',ok:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(c.email||'')),place:'perfil'},

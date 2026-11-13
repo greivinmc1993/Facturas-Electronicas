@@ -860,3 +860,24 @@ Limitaciones deliberadas:
 Antes de probar: crear respaldo en la v0.5.15 que funciona.
 
 ---
+
+
+### v0.6.70 — Corrección de identificación y actividad económica en Empresas
+
+La ventana **Nueva empresa / Abrir perfil** reúne **Tipo de identificación** y **Número de identificación** en una misma sección, con ambos campos obligatorios para perfiles que registran su ficha fiscal. El formulario adapta el patrón de entrada, longitud máxima, texto orientativo y validación de HTML al tipo elegido. En el servidor también se valida, para impedir que una solicitud directa omita las reglas o altere parcialmente una empresa.
+
+| Tipo | Validación local de formato |
+| --- | --- |
+| 01 · Cédula física | 9 dígitos sin cero inicial ni guiones |
+| 02 · Cédula jurídica | 10 dígitos, sin guiones |
+| 03 · DIMEX | 11 o 12 dígitos, sin cero inicial ni guiones |
+| 04 · NITE | 10 dígitos, sin guiones |
+| 05 · Extranjero no domiciliado | Hasta 20 caracteres alfanuméricos; aplicabilidad restringida según el comprobante |
+
+**Actividad económica (RUT):** se admite el formato `4019.0` y, por compatibilidad, códigos de seis dígitos. La escritura se almacena tal como la proporciona el RUT. **No se convierte automáticamente** `4019.0` en un supuesto código de emisión de Hacienda: el XML 4.4 utiliza `CodigoActividadEmisor` de seis dígitos y requiere validar el padrón real antes de emitir. La ficha sigue siendo preparatoria y no firma, genera ni envía comprobantes.
+
+**Compatibilidad:** las empresas históricas conservan sus datos en SQLite; al editar una ficha anterior sin tipo de identificación, se deberá seleccionar uno válido. La API sin ficha fiscal mantiene la compatibilidad de solicitudes comerciales antiguas con identificaciones numéricas de 9 a 12 dígitos. Las solicitudes que incluyen tipo fiscal se validan estrictamente. Las rutas de crear/editar siguen siendo transaccionales y el administrador de empresa no puede asignar un tipo incompatible con el número existente.
+
+QA añadido: 11 pruebas de identificación por tipo, cinco controles nuevos de interfaz, cuatro pruebas de integración para alta/edición y restricción del administrador. `npm test` y 66/66 pruebas de integración superadas. Comprobación visual en Chromium a 375, 480, 768, 1100 y 1440 px. La ejecución del instalador Electron/Windows sigue pendiente.
+
+Fuente normativa: Anexo técnico de comprobantes electrónicos 4.4, Ministerio de Hacienda / PGR, `https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf`.

@@ -17,5 +17,28 @@ check('Editar lee la fiscal real de cada empresa y mantiene aislamiento',()=>{as
 check('Pantalla de preparación pasa a resumen con edición centralizada para propietario',()=>{assert.match(panel,/canEditProfile\?<div/);assert.match(panel,/Editar perfil y ficha fiscal/);assert.match(main,/refreshToken=\{companyFiscalRevision\}/)});
 check('Administrador conserva su ruta de configuración fiscal, sin editar empresa comercial',()=>{assert.match(panel,/!canEditProfile|<form className="fePreparationForm"/);assert.match(auth,/tax\.configure/);assert.match(main,/if\(!account\?\.isOwner\)/)});
 check('Modal grande tiene contenido desplazable y distribución responsive',()=>{assert.match(css,/\.companyModal\{width:min\(100%,820px\)/);assert.match(css,/\.companyFiscalGrid\{display:grid/);assert.match(css,/@media\(max-width:650px\)/)});
+check('Tipo y número de identificación están en la misma sección y son obligatorios',()=>{
+ assert.match(main,/className="companyIdentitySection"/);assert.match(main,/className="companyIdentityRow"/);
+ assert.match(main,/<Field title="Tipo de identificación \*"><select required/);
+ assert.match(main,/<Field title="Número de identificación \*"><input required/);
+});
+check('El formulario sólo muestra un selector de tipo y mantiene la ficha fiscal',()=>{
+ assert.match(main,/showIdentificationType=\{false\}/);
+ assert.match(widget,/showIdentificationType&&<label/);
+});
+check('El campo de identificación usa patrón y longitud del tipo seleccionado',()=>{
+ assert.match(main,/companyIdRule\?\.pattern\.source/);
+ assert.match(main,/companyIdRule\?\.maxLength/);
+ assert.match(main,/COMPANY_ID_RULES/);
+});
+check('Actividad económica admite el formato 4019.0',()=>{
+ assert.match(widget,/Ej\. 4019\.0/);
+ assert.match(widget,/inputMode="decimal"/);
+ assert.match(widget,/El XML 4\.4 exige validar un código/);
+});
+check('Grupo de identificación se adapta a pantallas pequeñas',()=>{
+ assert.match(css,/\.companyIdentityRow\{display:grid/);
+ assert.match(css,/@media\(max-width:570px\)/);
+});
 check('No hay proceso de firma o emisión habilitado en la UI',()=>{assert.match(panel,/todavía no emite ni firma documentos/);assert.match(load('server/fe-preparation.js'),/canEmit:false/)});
 console.log(`QA perfil+fiscal UI: ${n}/${n} aprobadas`);

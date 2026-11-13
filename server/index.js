@@ -1,5 +1,6 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {FE_PREPARATION_EMPTY,parseFePreparation,describeFePreparation} from './fe-preparation.js';
+import {validateCompanyIdentification} from './company-identity.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
 import {verifyStoredBackup} from './backup-verification.js';
@@ -535,10 +536,11 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     const extra=Object.fromEntries(['trade_name','phone','email','address','website','social'].map(k=>[k,String(req.body?.[k]??'').trim()]));
     const avatar_color=companyColors.includes(req.body?.avatar_color)?req.body.avatar_color:companyColors[0];
     if(Object.values(extra).some(v=>v.length>300))return res.status(400).json({error:'Los datos adicionales no pueden superar 300 caracteres.'});
-    if(!legal_name||legal_name.length>160||!/^[0-9]{9,12}$/.test(identification))
-      return res.status(400).json({error:'Ingrese una razón social (máx. 160 caracteres) y una identificación de 9 a 12 dígitos.'});
+    if(!legal_name||legal_name.length>160)
+      return res.status(400).json({error:'Ingrese una razón social de máximo 160 caracteres.'});
     let fiscal;
-    try{fiscal=fiscalFromBody(req.body)}catch(err){return res.status(400).json({error:err.message})}
+    try{fiscal=fiscalFromBody(req.body);validateCompanyIdentification(fiscal?.identification_type,identification,{allowUntyped:!fiscal})}
+    catch(err){return res.status(400).json({error:err.message})}
     try{
       const createdId=db.transaction(()=>{
         const row=db.prepare('INSERT INTO companies(legal_name,identification,trade_name,phone,email,address,website,social,avatar_color) VALUES (?,?,?,?,?,?,?,?,?)').run(legal_name,identification,...Object.values(extra),avatar_color);
@@ -560,10 +562,14 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     const fields=['legal_name','identification','trade_name','phone','email','address','website','social','avatar_color'];
     const values=Object.fromEntries(fields.map(k=>[k,String(req.body?.[k]??previous[k]??'').trim()]));
     if(!companyColors.includes(values.avatar_color))return res.status(400).json({error:'El color seleccionado no es válido.'});
-    if(!values.legal_name||values.legal_name.length>160||!/^[0-9]{9,12}$/.test(values.identification)||fields.slice(2,8).some(k=>values[k].length>300))
+    if(!values.legal_name||values.legal_name.length>160||fields.slice(2,8).some(k=>values[k].length>300))
       return res.status(400).json({error:'Revise los datos de la empresa.'});
     let fiscal;
-    try{fiscal=fiscalFromBody(req.body)}catch(err){return res.status(400).json({error:err.message})}
+    try{
+      fiscal=fiscalFromBody(req.body);
+      const originalType=db.prepare('SELECT identification_type FROM company_fe_preparation WHERE company_id=?').get(id)?.identification_type||'';
+      validateCompanyIdentification(fiscal?.identification_type??originalType,values.identification,{allowUntyped:!fiscal&&!originalType});
+    }catch(err){return res.status(400).json({error:err.message})}
     try{
       db.transaction(()=>{
         db.prepare(`UPDATE companies SET ${fields.map(k=>k+'=?').join(',')} WHERE id=?`).run(...fields.map(k=>values[k]),id);
@@ -597,7 +603,11 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     if(!db.prepare('SELECT 1 FROM companies WHERE id=?').get(id))return res.status(404).json({error:'Empresa no encontrada.'});
     // La política central autoriza tax.configure por empresa; sin credenciales en esta ficha.
     let settings;
-    try{settings=parseFePreparation(req.body)}catch(err){return res.status(400).json({error:err.message})}
+    try{
+      settings=parseFePreparation(req.body);
+      const company=db.prepare('SELECT identification FROM companies WHERE id=?').get(id);
+      if(settings.identification_type)validateCompanyIdentification(settings.identification_type,company.identification);
+    }catch(err){return res.status(400).json({error:err.message})}
     upsertFiscal(id,settings);
     res.setHeader('Cache-Control','no-store');
     return res.json({...feReadinessFor(id),ok:true});

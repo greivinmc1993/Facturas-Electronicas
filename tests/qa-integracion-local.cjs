@@ -37,6 +37,7 @@ fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(stag
 fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging,'backup-rehearsal.js'));
 fs.copyFileSync(path.join(root,'server','backup-health.js'),path.join(staging,'backup-health.js'));
 fs.copyFileSync(path.join(root,'server','fe-preparation.js'),path.join(staging,'fe-preparation.js'));
+fs.copyFileSync(path.join(root,'server','company-identity.js'),path.join(staging,'company-identity.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -578,12 +579,12 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const wrong=await call('GET','/api/companies/999999/fe/preparation');assert.equal(wrong.status,404);
   });
   await check('Preparación FE 4.4: formulario guarda localmente datos fiscales sin transmitir',async()=>{
-   const settings={identification_type:'02',activity_code:'123456',province:'1',canton:'01',district:'02',branch:'001',terminal:'00001'};
+   const settings={identification_type:'01',activity_code:'4019.0',province:'1',canton:'01',district:'02',branch:'001',terminal:'00001'};
    const r=await call('PUT',`/api/companies/${a}/fe/preparation`,settings);
    assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.settings.terminal,'00001');
    assert.equal(r.body.report.canEmit,false);
    const loaded=await call('GET',`/api/companies/${a}/fe/preparation`);
-   assert.equal(loaded.body.settings.activity_code,'123456');
+   assert.equal(loaded.body.settings.activity_code,'4019.0');
    const other=await call('GET',`/api/companies/${b}/fe/preparation`);
    assert.equal(other.status,200);assert.equal(other.body.settings.activity_code,'');
   });
@@ -617,11 +618,42 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const final=(await call('GET','/api/companies')).body.find(c=>c.id===a);
    assert.equal(final.legal_name,before.legal_name);assert.equal(final.fe_preparation.postal_code,'20103');
   });
+  await check('Formato de cédula obligatorio y dependiente del tipo en nuevas empresas',async()=>{
+   const invalid=[['01','015460323'],['01','11546032'],['02','123456789'],['02','12345678901'],['03','01234567890'],['03','1234567890'],['04','123456789'],['05','ABC-123'],['','115460323']];
+   for(const [type,ident] of invalid){
+    const r=await call('POST','/api/companies',{legal_name:'Inválida por cédula',identification:ident,fe_preparation:{identification_type:type}});
+    assert.equal(r.status,400,`${type}: ${ident} -> ${JSON.stringify(r.body)}`);
+   }
+   const after=(await call('GET','/api/companies')).body;
+   assert.equal(after.some(c=>c.legal_name==='Inválida por cédula'),false);
+  });
+  await check('Crear empresas con cédulas jurídica DIMEX NITE y extranjera válidas',async()=>{
+   const cases=[['02','3101900555'],['03','12345678901'],['03','123456789012'],['04','4001234567'],['05','FOREIGNCODE7']];
+   for(const [type,id] of cases){
+    const r=await call('POST','/api/companies',{legal_name:'Identidad QA '+type+' '+id,identification:id,fe_preparation:{identification_type:type,activity_code:'4019.0'}});
+    assert.equal(r.status,201,JSON.stringify(r.body));assert.equal(r.body.fe_preparation.identification_type,type);
+    assert.equal(r.body.fe_preparation.activity_code,'4019.0');
+   }
+  });
+  await check('Editar tipo incompatible rechaza cambio sin sobrescribir datos existentes',async()=>{
+   const old=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   const r=await call('PUT',`/api/companies/${a}`,{legal_name:'No debe sobrescribir',identification:old.identification,fe_preparation:{...old.fe_preparation,identification_type:'02'}});
+   assert.equal(r.status,400,JSON.stringify(r.body));
+   const now=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   assert.equal(now.legal_name,old.legal_name);assert.equal(now.fe_preparation.identification_type,old.fe_preparation.identification_type);
+  });
+  await check('Administrador no puede guardar tipo fiscal incompatible con cédula existente',async()=>{
+   const original=(await call('GET',`/api/companies/${a}/fe/preparation`)).body.settings;
+   const r=await call('PUT',`/api/companies/${a}/fe/preparation`,{...original,identification_type:'02'});
+   assert.equal(r.status,400);
+   const now=(await call('GET',`/api/companies/${a}/fe/preparation`)).body.settings;
+   assert.equal(now.identification_type,original.identification_type);
+  });
   await check('Preparación FE 4.4: rechaza cambios inválidos conservando la ficha anterior',async()=>{
    const r=await call('PUT',`/api/companies/${a}/fe/preparation`,{activity_code:'ABC123'});
    assert.equal(r.status,400,JSON.stringify(r.body));
    const original=await call('GET',`/api/companies/${a}/fe/preparation`);
-   assert.equal(original.body.settings.activity_code,'123456');
+   assert.equal(original.body.settings.activity_code,'4019.0');
   });
  } finally{await started.close()}
  console.log(`QA integración local: ${passed} superadas / ${passed+failed}, ${failed} errores`);

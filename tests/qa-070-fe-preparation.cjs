@@ -8,7 +8,7 @@ const {pathToFileURL}=require('node:url');
  const valid={identification_type:'02',activity_code:'123456',province:'1',canton:'01',district:'02',branch:'001',terminal:'00001'};
  check('Los campos permanecen vacíos en perfiles existentes',()=>assert.equal(Object.values(FE_PREPARATION_EMPTY).filter(Boolean).length,0));
  check('Permite guardar una ficha parcial sin bloquear la empresa',()=>assert.deepEqual(parseFePreparation({activity_code:'123456'}).activity_code,'123456'));
- check('Valida actividad con seis dígitos',()=>assert.throws(()=>parseFePreparation({activity_code:'3333.3'}),/Actividad económica/));
+ check('Acepta actividad RUT con punto y código histórico de seis dígitos',()=>{assert.equal(parseFePreparation({activity_code:'4019.0'}).activity_code,'4019.0');assert.equal(parseFePreparation({activity_code:'123456'}).activity_code,'123456');assert.throws(()=>parseFePreparation({activity_code:'4019.a'}),/Actividad económica/);});
  check('Rechaza dígitos incompletos y caracteres extraños',()=>{
   for(const [key,v] of [['branch','1'],['terminal','1'],['canton','5a'],['district','001'],['province','8'],['identification_type','99']])assert.throws(()=>parseFePreparation({[key]:v}),/formato inválido/,key);
  });

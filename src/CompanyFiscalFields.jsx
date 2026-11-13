@@ -35,7 +35,7 @@ function useGeoCatalog(path){
 }
 const TYPES=[['','Seleccionar tipo'],['01','Cédula física'],['02','Cédula jurídica'],['03','DIMEX'],['04','NITE'],['05','Identificación extranjera (comprobar aplicabilidad)']];
 const optionRows=(rows)=>Object.entries(rows).sort((a,b)=>Number(a[0])-Number(b[0]));
-export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange=()=>{},idPrefix='company-fe'}){
+export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange=()=>{},idPrefix='company-fe',showIdentificationType=true}){
  const fiscal={...EMPTY_COMPANY_FISCAL,...value};
  const cantonPath=fiscal.province?`/provincia/${Number(fiscal.province)}/cantones.json`:null;
  const districtPath=fiscal.province&&fiscal.canton?`/provincia/${Number(fiscal.province)}/canton/${Number(fiscal.canton)}/distritos.json`:null;
@@ -48,8 +48,8 @@ export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange
  return <div className="companyFiscalFields">
   <div className="companyFiscalSectionTitle"><strong>Datos fiscales y ubicación de la empresa</strong><small>Preparación XML 4.4 · Selecciona las ubicaciones por nombre. Los códigos se conservan internamente.</small></div>
   <div className="companyFiscalGrid">
-   <label className="field" htmlFor={idPrefix+'-type'}>Tipo de identificación<select id={idPrefix+'-type'} value={fiscal.identification_type} onChange={set('identification_type')}>{TYPES.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
-   <label className="field" htmlFor={idPrefix+'-activity'}>Actividad económica (RUT)<input id={idPrefix+'-activity'} type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="6 dígitos" value={fiscal.activity_code} onChange={set('activity_code')}/></label>
+   {showIdentificationType&&<label className="field" htmlFor={idPrefix+'-type'}>Tipo de identificación<select id={idPrefix+'-type'} value={fiscal.identification_type} onChange={set('identification_type')}>{TYPES.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>}
+   <label className="field" htmlFor={idPrefix+'-activity'}>Actividad económica (RUT)<input id={idPrefix+'-activity'} type="text" inputMode="decimal" pattern="([0-9]{4}\.[0-9]|[0-9]{6})" maxLength={6} placeholder="Ej. 4019.0" value={fiscal.activity_code} onChange={set('activity_code')}/></label>
    <label className="field" htmlFor={idPrefix+'-province'}>Provincia<select id={idPrefix+'-province'} value={fiscal.province} onChange={e=>onChange({province:e.target.value,canton:'',district:'',postal_code:''})}><option value="">Seleccionar provincia</option>{optionRows(PROVINCES).map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
    <label className="field" htmlFor={idPrefix+'-canton'}>Cantón<select id={idPrefix+'-canton'} value={fiscal.canton} disabled={!fiscal.province||cantons.loading} onChange={e=>onChange({canton:e.target.value,district:'',postal_code:''})}><option value="">{cantons.loading?'Cargando cantones…':'Seleccionar cantón'}</option>{cantonMissing&&<option value={fiscal.canton}>Cantón guardado (código {fiscal.canton})</option>}{cantonOptions.map(([code,label])=><option key={code} value={pad2(code)}>{label}</option>)}</select></label>
    <label className="field" htmlFor={idPrefix+'-district'}>Distrito<select id={idPrefix+'-district'} value={fiscal.district} disabled={!fiscal.canton||districts.loading} onChange={e=>onChange({district:e.target.value,postal_code:''})}><option value="">{districts.loading?'Cargando distritos…':'Seleccionar distrito'}</option>{districtMissing&&<option value={fiscal.district}>Distrito guardado (código {fiscal.district})</option>}{districtOptions.map(([code,label])=><option key={code} value={pad2(code)}>{label}</option>)}</select></label>
@@ -58,6 +58,6 @@ export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange
    <label className="field" htmlFor={idPrefix+'-terminal'}>Terminal (5 dígitos)<input id={idPrefix+'-terminal'} type="text" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="Ej. 00001" value={fiscal.terminal} onChange={set('terminal')}/></label>
   </div>
   {(cantons.error||districts.error)&&<p className="companyFiscalGeoWarning" role="status">{cantons.error||districts.error} Se respetan los códigos ya guardados.</p>}
-  <p className="hint companyFiscalHint">El código postal se calcula automáticamente. Estos datos son preparatorios: aún no se firman ni envían comprobantes a Hacienda.</p>
+  <p className="hint companyFiscalHint">Actividad económica: use el dato registrado en el RUT, por ejemplo 4019.0. El XML 4.4 exige validar un código de seis dígitos vigente en Hacienda; no se convertirá automáticamente el código con punto. El código postal se calcula automáticamente. Estos datos son preparatorios: aún no se firman ni envían comprobantes a Hacienda.</p>
  </div>;
 }

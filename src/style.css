@@ -1397,3 +1397,11 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .fePreparationOwnerAction button{width:auto;max-width:100%}
 @media(max-width:650px){.companyFiscalGrid{grid-template-columns:minmax(0,1fr)}.companyModalFields .companyFiscalGrid .field{margin:0}.companyFiscalFields{padding:12px}.companyModal{max-height:96vh}}
 @media(max-width:410px){.companyModalHeader{padding:14px}.companyModalFields{padding:12px}.companyModalFooter{padding:12px}}
+
+/* v0.6.70: el tipo y el número de identificación forman una sola unidad visual. */
+.companyIdentitySection{border:1px solid #d4e4eb;border-radius:12px;background:#f6fafb;padding:14px 16px;min-width:0}
+.companyIdentityRow{display:grid;grid-template-columns:minmax(190px,.9fr) minmax(0,1.1fr);gap:14px;align-items:start}
+.companyIdentityRow>.field{min-width:0;margin:0}
+.companyIdentityRow :is(input,select){width:100%;max-width:100%;box-sizing:border-box;min-width:0}
+.companyIdentityHint{font-size:12px;line-height:1.45;margin:10px 0 0;color:#557386;overflow-wrap:anywhere}
+@media(max-width:570px){.companyIdentityRow{grid-template-columns:minmax(0,1fr);gap:10px}.companyIdentitySection{padding:12px}}
