@@ -1378,3 +1378,22 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .fePreparationError{background:#fff2f0;color:#9a342b;border:1px solid #f1c6bf}
 .fePreparationDisclaimer{background:#f2f5f9;color:#536879;border:1px solid #e0e7ee}
 @media(max-width:720px){.fePreparationSummary,.fePreparationChecks,.fePreparationFields{grid-template-columns:minmax(0,1fr)}.fePreparationCheck{grid-template-columns:24px minmax(0,1fr) auto}.fePreparationActions>button{flex:1 1 190px}}
+
+/* v0.6.70: ficha fiscal integrada en Nueva empresa / Abrir perfil. */
+.companyModal{width:min(100%,820px);max-height:min(94vh,930px)}
+.companyModalFields{padding-bottom:16px}
+.companyFiscalFields{min-width:0;margin:17px 0 14px;border:1px solid #dce8ec;background:linear-gradient(180deg,#f5fafb,#fff);border-radius:13px;padding:clamp(12px,2vw,19px)}
+.companyFiscalSectionTitle{display:flex;flex-direction:column;gap:5px;margin:0 0 15px;padding-bottom:12px;border-bottom:1px solid #dce8ec}
+.companyFiscalSectionTitle strong{font-size:14px;color:#17415c}
+.companyFiscalSectionTitle small{font-size:12px;line-height:1.5;color:#5e7486}
+.companyFiscalGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 16px;min-width:0}
+.companyFiscalGrid .field{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0;color:#4c687b;font-size:12px;font-weight:650}
+.companyFiscalGrid :is(input,select){box-sizing:border-box;min-width:0;max-width:100%;width:100%;min-height:41px;font-size:13px;border-radius:9px}
+.companyFiscalGrid input[readonly]{background:#e9f2f4;color:#24546a;cursor:default;font-weight:750;letter-spacing:.05em}
+.companyFiscalGrid select:disabled{opacity:.72;cursor:not-allowed}
+.companyFiscalGeoWarning{margin:12px 0 0;padding:10px 12px;border-radius:9px;border:1px solid #ead4aa;background:#fff9ed;color:#7c5a22;font-size:12px;line-height:1.5}
+.companyFiscalHint{margin:12px 0 0!important;font-size:11.5px;line-height:1.5;color:#68808c!important}
+.fePreparationOwnerAction{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.fePreparationOwnerAction button{width:auto;max-width:100%}
+@media(max-width:650px){.companyFiscalGrid{grid-template-columns:minmax(0,1fr)}.companyModalFields .companyFiscalGrid .field{margin:0}.companyFiscalFields{padding:12px}.companyModal{max-height:96vh}}
+@media(max-width:410px){.companyModalHeader{padding:14px}.companyModalFields{padding:12px}.companyModalFooter{padding:12px}}

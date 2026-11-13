@@ -92,6 +92,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     terminal TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );`);
+  addColumn('company_fe_preparation','postal_code',"TEXT NOT NULL DEFAULT ''");
   // Historial inmutable de entradas, salidas y ajustes, separado por empresa.
   db.exec(`CREATE TABLE IF NOT EXISTS inventory_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -508,26 +509,50 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     }finally{await cleanTempDir(dir)}
   });
   const companyColors=['#2563eb','#0891b2','#0f766e','#7c3aed','#d97706','#dc5265'];
-  app.get('/api/companies', (req,res) => {const rows=db.prepare('SELECT id,legal_name,identification,trade_name,phone,email,address,website,social,avatar_color FROM companies ORDER BY id DESC').all();res.json(req.authUser.is_owner?rows:rows.filter(c=>!!db.prepare('SELECT 1 FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser.id,c.id)))});
+  // Crear/editar empresa junto con su ficha fiscal en una sola transacción.
+  // El administrador de empresa mantiene su ruta fiscal independiente;
+  // la edición general sigue reservada a propietario por middleware de acceso.
+  const fiscalKeys=Object.keys(FE_PREPARATION_EMPTY);
+  const upsertFiscal=(companyId,settings)=>{
+    db.prepare(`INSERT INTO company_fe_preparation(company_id,${fiscalKeys.join(',')}) VALUES (?,${fiscalKeys.map(()=>'?').join(',')}) ON CONFLICT(company_id) DO UPDATE SET ${fiscalKeys.map(k=>`${k}=excluded.${k}`).join(',')},updated_at=CURRENT_TIMESTAMP`)
+      .run(companyId,...fiscalKeys.map(k=>settings[k]));
+  };
+  const fiscalFromBody=body=>body?.fe_preparation===undefined?null:parseFePreparation(body.fe_preparation);
+  const companyView=id=>{
+    const record=db.prepare('SELECT id,legal_name,identification,trade_name,phone,email,address,website,social,avatar_color FROM companies WHERE id=?').get(id);
+    if(!record)return null;
+    const fiscal=db.prepare(`SELECT ${fiscalKeys.join(',')} FROM company_fe_preparation WHERE company_id=?`).get(id);
+    return {...record,fe_preparation:{...FE_PREPARATION_EMPTY,...fiscal}};
+  };
+  app.get('/api/companies', (req,res) => {
+    const rows=db.prepare('SELECT id FROM companies ORDER BY id DESC').all();
+    res.setHeader('Cache-Control','no-store');
+    res.json(rows.filter(c=>req.authUser.is_owner||!!db.prepare('SELECT 1 FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser.id,c.id)).map(c=>companyView(c.id)));
+  });
   app.post('/api/companies',(req,res)=>{
-    const legal_name = String(req.body?.legal_name ?? '').trim();
-    const identification = String(req.body?.identification ?? '').trim();
-    const extra = Object.fromEntries(['trade_name','phone','email','address','website','social'].map(k=>[k,String(req.body?.[k]??'').trim()]));
+    const legal_name=String(req.body?.legal_name??'').trim();
+    const identification=String(req.body?.identification??'').trim();
+    const extra=Object.fromEntries(['trade_name','phone','email','address','website','social'].map(k=>[k,String(req.body?.[k]??'').trim()]));
     const avatar_color=companyColors.includes(req.body?.avatar_color)?req.body.avatar_color:companyColors[0];
     if(Object.values(extra).some(v=>v.length>300))return res.status(400).json({error:'Los datos adicionales no pueden superar 300 caracteres.'});
-    if (!legal_name || legal_name.length > 160 || !/^\d{9,12}$/.test(identification)) {
+    if(!legal_name||legal_name.length>160||!/^[0-9]{9,12}$/.test(identification))
       return res.status(400).json({error:'Ingrese una razón social (máx. 160 caracteres) y una identificación de 9 a 12 dígitos.'});
-    }
-    try {
-      const result = db.prepare('INSERT INTO companies(legal_name,identification,trade_name,phone,email,address,website,social,avatar_color) VALUES (?,?,?,?,?,?,?,?,?)').run(legal_name,identification,...Object.values(extra),avatar_color);
-      res.status(201).json({id:Number(result.lastInsertRowid),legal_name,identification,...extra,avatar_color});
-    } catch (err) {
-      if (err.code?.startsWith('SQLITE_CONSTRAINT')) return res.status(409).json({error:'La identificación ya está registrada.'});
-      console.error(err);
-      res.status(500).json({error:'No se pudo guardar la empresa.'});
+    let fiscal;
+    try{fiscal=fiscalFromBody(req.body)}catch(err){return res.status(400).json({error:err.message})}
+    try{
+      const createdId=db.transaction(()=>{
+        const row=db.prepare('INSERT INTO companies(legal_name,identification,trade_name,phone,email,address,website,social,avatar_color) VALUES (?,?,?,?,?,?,?,?,?)').run(legal_name,identification,...Object.values(extra),avatar_color);
+        const id=Number(row.lastInsertRowid);
+        if(fiscal)upsertFiscal(id,fiscal);
+        return id;
+      })();
+      return res.status(201).json(companyView(createdId));
+    }catch(err){
+      if(err.code?.startsWith('SQLITE_CONSTRAINT'))return res.status(409).json({error:'La identificación ya está registrada.'});
+      console.error(err);return res.status(500).json({error:'No se pudo guardar la empresa.'});
     }
   });
-  app.put('/api/companies/:id', (req,res)=>{
+  app.put('/api/companies/:id',(req,res)=>{
     const id=Number(req.params.id);
     if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Empresa inválida.'});
     const previous=db.prepare('SELECT * FROM companies WHERE id=?').get(id);
@@ -535,17 +560,23 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     const fields=['legal_name','identification','trade_name','phone','email','address','website','social','avatar_color'];
     const values=Object.fromEntries(fields.map(k=>[k,String(req.body?.[k]??previous[k]??'').trim()]));
     if(!companyColors.includes(values.avatar_color))return res.status(400).json({error:'El color seleccionado no es válido.'});
-    if(!values.legal_name||values.legal_name.length>160||!/^[0-9]{9,12}$/.test(values.identification)||fields.slice(2,8).some(k=>values[k].length>300))return res.status(400).json({error:'Revise los datos de la empresa.'});
+    if(!values.legal_name||values.legal_name.length>160||!/^[0-9]{9,12}$/.test(values.identification)||fields.slice(2,8).some(k=>values[k].length>300))
+      return res.status(400).json({error:'Revise los datos de la empresa.'});
+    let fiscal;
+    try{fiscal=fiscalFromBody(req.body)}catch(err){return res.status(400).json({error:err.message})}
     try{
-      db.prepare(`UPDATE companies SET ${fields.map(k=>k+'=?').join(',')} WHERE id=?`).run(...fields.map(k=>values[k]),id);
-      res.json(db.prepare('SELECT * FROM companies WHERE id=?').get(id));
-    }catch(err){res.status(err.code?.startsWith('SQLITE_CONSTRAINT')?409:500).json({error:'No se pudo actualizar la empresa.'});}
+      db.transaction(()=>{
+        db.prepare(`UPDATE companies SET ${fields.map(k=>k+'=?').join(',')} WHERE id=?`).run(...fields.map(k=>values[k]),id);
+        if(fiscal)upsertFiscal(id,fiscal);
+      })();
+      res.json(companyView(id));
+    }catch(err){res.status(err.code?.startsWith('SQLITE_CONSTRAINT')?409:500).json({error:'No se pudo actualizar la empresa.'})}
   });
   // FacturaCR v0.6.70: ficha fiscal y diagnóstico LOCAL. No genera ni envía XML.
   const feReadinessFor=companyId=>{
     const company=db.prepare('SELECT id,legal_name,identification,email,address,trade_name FROM companies WHERE id=?').get(companyId);
     if(!company)return null;
-    const stored=db.prepare('SELECT identification_type,activity_code,province,canton,district,branch,terminal FROM company_fe_preparation WHERE company_id=?').get(companyId);
+    const stored=db.prepare('SELECT identification_type,activity_code,province,canton,district,branch,terminal,postal_code FROM company_fe_preparation WHERE company_id=?').get(companyId);
     const settings={...FE_PREPARATION_EMPTY,...stored};
     const counts=db.prepare(`SELECT COUNT(*) AS total,
       SUM(CASE WHEN cabys NOT GLOB '[0-9]*' OR LENGTH(cabys)<>13 OR cabys GLOB '*[^0-9]*' THEN 1 ELSE 0 END) AS missingCabys
@@ -567,9 +598,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     // La política central autoriza tax.configure por empresa; sin credenciales en esta ficha.
     let settings;
     try{settings=parseFePreparation(req.body)}catch(err){return res.status(400).json({error:err.message})}
-    const keys=Object.keys(FE_PREPARATION_EMPTY);
-    db.prepare(`INSERT INTO company_fe_preparation(company_id,${keys.join(',')}) VALUES (?,${keys.map(()=>'?').join(',')}) ON CONFLICT(company_id) DO UPDATE SET ${keys.map(key=>`${key}=excluded.${key}`).join(',')},updated_at=CURRENT_TIMESTAMP`)
-      .run(id,...keys.map(key=>settings[key]));
+    upsertFiscal(id,settings);
     res.setHeader('Cache-Control','no-store');
     return res.json({...feReadinessFor(id),ok:true});
   });

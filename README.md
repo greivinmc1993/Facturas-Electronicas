@@ -2,18 +2,41 @@
 
 **Versión vigente: 0.6.70 (13 de noviembre de 2026).** Conserva todas las funciones de 0.6.69 (avisos preventivos de respaldos, monitoreo, restauración segura y operaciones comerciales).
 
+## Ficha fiscal integrada en Nueva empresa y Abrir perfil (corrección de v0.6.70)
+
+Para el **propietario**, la ficha fiscal se completa ahora **dentro de las ventanas Empresas → Nueva empresa y Empresas → Abrir perfil**. Una sola confirmación guarda los datos generales (razón social, identificación, dirección exacta, correo, etc.) y los fiscales (tipo de identificación, actividad económica de 6 dígitos, ubicación, sucursal de 3 dígitos y terminal de 5 dígitos). Se emplea una transacción SQLite: si un dato fiscal es inválido, no se crea ni se modifica parcialmente la empresa.
+
+La ubicación se selecciona **por nombre**: primero provincia, luego cantón y luego distrito. Internamente se conservan códigos de 1, 2 y 2 dígitos para la futura facturación electrónica. El **código postal de cinco dígitos** se calcula automáticamente al seleccionar distrito: provincia + cantón + distrito, por ejemplo `1 + 10 + 01 = 11001`. No se permite guardarlo si contradice la ubicación. El campo **Dirección exacta (otras señas)** admite hasta 160 caracteres, pensado para su futura integración en XML 4.4.
+
+Los nombres de cantones y distritos provienen del catálogo territorial que el sistema ya usa en Clientes: `https://ubicaciones-cr.ryze-cr.workers.dev`. Requiere Internet en la primera consulta de cada ubicación; las respuestas se guardan en caché local para usos posteriores. Si el servicio está inaccesible, los códigos previamente almacenados se conservan y se indica la situación; no se inventan nombres. Corrobora la ubicación con la División Territorial Administrativa vigente antes de emitir.
+
+La sección **Preparación para factura electrónica 4.4**, bajo Empresas, muestra al propietario el **diagnóstico de las 10 comprobaciones**, con un enlace a **Editar perfil y ficha fiscal**, en lugar de duplicar el formulario. El **administrador de empresa** conserva su pantalla independiente para modificar exclusivamente los datos fiscales permitidos por `tax.configure`; no puede editar los datos comerciales ni crear empresas. El cajero y el supervisor no obtienen permisos adicionales.
+
+La nueva columna `postal_code` se agrega de manera **aditiva** a `company_fe_preparation` sin sobrescribir registros históricos. Los datos anteriores de las empresas, las ventas y los respaldos permanecen intactos; las fichas previas recalculan el código postal al guardarse. La creación y edición integradas conservan todos los demás módulos. El sistema aún **no genera ni envía XML a Hacienda**.
+
+### Procedimiento de uso
+
+1. Entra como **Propietario → Empresas → Nueva empresa**, o pulsa **Abrir perfil** en una empresa existente.
+2. Completa los datos generales y la **Dirección exacta**.
+3. En **Datos fiscales y ubicación de la empresa**, elige el tipo de identificación y la actividad económica inscrita en el RUT.
+4. Selecciona **Provincia → Cantón → Distrito** por sus nombres. El **Código postal** aparece automáticamente.
+5. Introduce sucursal y terminal si los conoces (la ficha admite información parcial).
+6. Pulsa **Crear empresa** o **Guardar cambios** y confirma. Revisa el diagnóstico de preparación que aparece debajo de las tarjetas.
+
+**Validación:** ejecutar `npm ci`, `npm test`, `npm run qa:real-server` y `npm run dist:win` en Windows; el último paso debe comprobarse en tu instalación. Las pruebas automatizadas incluyen creación, modificación, rollback de validaciones, aislamiento entre empresas, migración, cálculo del código postal y compatibilidad con roles.
+
 ## Nueva ficha fiscal por empresa
 
-Desde **Empresas**, el propietario o administrador de empresa autorizado puede completar la sección **Preparación para factura electrónica 4.4**. Cada empresa conserva sus propios campos: tipo de identificación, código de actividad económica inscrito (6 dígitos), provincia, cantón, distrito, sucursal (3 dígitos) y terminal (5 dígitos). Se guardan en SQLite, en una tabla aditiva `company_fe_preparation`, sin cambiar las ventas anteriores. Una ficha puede guardarse parcialmente para completar después; se verifican los formatos.
+Desde **Empresas**, el propietario o administrador de empresa autorizado puede completar los datos de preparación para factura electrónica 4.4. Cada empresa conserva sus campos: tipo de identificación, código de actividad económica inscrito (6 dígitos), provincia, cantón, distrito, sucursal (3 dígitos) y terminal (5 dígitos). Se guardan en SQLite, en la tabla `company_fe_preparation`, sin cambiar las ventas anteriores. Una ficha puede guardarse parcialmente para completar después; se verifican los formatos.
 
-La nueva pantalla muestra **10 comprobaciones locales** que incluyen razón social, identificación, datos fiscales, correo, dirección y cobertura CAByS de los artículos y servicios activos. Indica los artículos cuyo CAByS no tiene 13 dígitos. El botón **Completar datos generales** abre el perfil de empresa. Los resultados son orientativos: no consultan RUT ni certifican correspondencia de códigos. Las credenciales de Hacienda y el certificado digital **no se solicitan ni se almacenan en esta versión**.
+La nueva pantalla muestra **10 comprobaciones locales** que incluyen razón social, identificación, datos fiscales, correo, dirección y cobertura CAByS de los artículos y servicios activos. Indica los artículos cuyo CAByS no tiene 13 dígitos. El acceso **Editar perfil y ficha fiscal** abre el formulario unificado para el propietario; el administrador autorizado conserva su formulario fiscal específico. Los resultados son orientativos: no consultan RUT ni certifican correspondencia de códigos. Las credenciales de Hacienda y el certificado digital **no se solicitan ni se almacenan en esta versión**.
 
 **Importante:** aunque se completen las 10 comprobaciones, FacturaCR **todavía no emite ni valida comprobantes electrónicos ante Hacienda**. En próximas etapas habrá que generar XML 4.4, validarlo con XSD y catálogos, firmarlo con XAdES-EPES, autenticar el envío, consultar su recepción, gestionar estados y notas. Los tiquetes actuales continúan siendo internos.
 
 ### Operación y seguridad
 
 - La ficha y su diagnóstico se consultan y guardan en endpoints locales `GET/PUT /api/companies/:id/fe/preparation` con el permiso `tax.configure`, por empresa. Cajeros y supervisores no reciben este permiso.
-- Solo cambia el esquema de forma **aditiva**: una nueva tabla vinculada a `companies(id)`; no modifica clientes, ventas, movimientos, pagos ni perfiles de acceso. Una restauración de respaldo también migra la tabla como el resto del esquema.
+- Solo cambia el esquema de forma **aditiva**: una nueva tabla vinculada a `companies(id)` y su columna de código postal; no modifica clientes, ventas, movimientos, pagos ni perfiles de acceso. Una restauración de respaldo también migra la tabla como el resto del esquema.
 - El catálogo se consulta sin modificar productos ni CAByS. La ficha no genera XML y nunca realiza solicitudes a la API de Hacienda.
 - Recomendación: comprobar actividad inscrita, ubicación y códigos oficiales antes de rellenar la ficha. No utilizar números inventados como definitivos.
 

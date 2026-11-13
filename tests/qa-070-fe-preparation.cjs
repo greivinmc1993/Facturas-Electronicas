@@ -20,6 +20,18 @@ const {pathToFileURL}=require('node:url');
   const result=parseFePreparation({...valid,terminal:' 00001 '});assert.equal(result.terminal,'00001');
  });
  const company={legal_name:'Empresa QA',identification:'3101123456',email:'emisor@example.com',address:'Avenida principal'};
+ check('Calcula código postal automáticamente a partir de provincia cantón y distrito',()=>{
+  assert.equal(parseFePreparation(valid).postal_code,'10102');
+  assert.equal(parseFePreparation({...valid,province:'7',canton:'03',district:'01'}).postal_code,'70301');
+ });
+ check('No permite código postal ajeno al distrito ni códigos arbitrarios',()=>{
+  assert.throws(()=>parseFePreparation({...valid,postal_code:'20102'}),/Código postal/);
+  assert.throws(()=>parseFePreparation({postal_code:'12345'}),/Código postal/);
+  assert.throws(()=>parseFePreparation({...valid,postal_code:'ABCDE'}),/Código postal/);
+ });
+ check('Compatibilidad: mantiene vacía la ficha anterior que no tenía código postal',()=>{
+  assert.equal(parseFePreparation({activity_code:'123456'}).postal_code,'');
+ });
  check('Señala campos pendientes y productos sin CABYS',()=>{
   const result=describeFePreparation(company,{}, {total:4,missingCabys:2});
   assert.equal(result.canEmit,false);assert.ok(result.missing.some(x=>x.includes('CAByS')));assert.ok(result.missing.some(x=>x.includes('Actividad')));

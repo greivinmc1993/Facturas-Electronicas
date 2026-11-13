@@ -2,7 +2,7 @@
 // Este módulo NO emite, firma, valida XSD ni transmite comprobantes a Hacienda.
 export const FE_PREPARATION_EMPTY=Object.freeze({
   identification_type:'',activity_code:'',province:'',canton:'',district:'',
-  branch:'',terminal:''
+  branch:'',terminal:'',postal_code:''
 });
 const PATTERNS=Object.freeze({
   identification_type:/^(?:01|02|03|04|05)$/,
@@ -11,9 +11,10 @@ const PATTERNS=Object.freeze({
   canton:/^\d{2}$/,
   district:/^\d{2}$/,
   branch:/^\d{3}$/,
-  terminal:/^\d{5}$/
+  terminal:/^\d{5}$/,
+  postal_code:/^\d{5}$/
 });
-const NAMES={identification_type:'Tipo de identificación',activity_code:'Actividad económica',province:'Provincia',canton:'Cantón',district:'Distrito',branch:'Sucursal',terminal:'Terminal'};
+const NAMES={identification_type:'Tipo de identificación',activity_code:'Actividad económica',province:'Provincia',canton:'Cantón',district:'Distrito',branch:'Sucursal',terminal:'Terminal',postal_code:'Código postal'};
 export function parseFePreparation(input){
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('La ficha fiscal debe ser un objeto.');
   const extra=Object.keys(input).filter(key=>!Object.hasOwn(FE_PREPARATION_EMPTY,key));
@@ -25,6 +26,13 @@ export function parseFePreparation(input){
     if(value&&!PATTERNS[key].test(value))throw Error(NAMES[key]+': formato inválido.');
     result[key]=value;
   }
+  // Código postal costarricense: provincia (1) + cantón (2) + distrito (2).
+  // No aceptar códigos contradictorios con la ubicación fiscal guardada.
+  const expected = result.province&&result.canton&&result.district
+    ? result.province+result.canton+result.district : '';
+  if(result.postal_code && result.postal_code!==expected)
+    throw Error('Código postal: no coincide con la provincia, cantón y distrito seleccionados.');
+  result.postal_code=expected;
   return result;
 }
 export function describeFePreparation(company,settings={},catalog={}){
@@ -37,7 +45,7 @@ export function describeFePreparation(company,settings={},catalog={}){
     {key:'identification_type',title:'Tipo de identificación',ok:!!s.identification_type,place:'fiscal'},
     {key:'activity_code',title:'Actividad económica (6 dígitos)',ok:!!s.activity_code,place:'fiscal'},
     {key:'location',title:'Ubicación: provincia, cantón y distrito',ok:!!(s.province&&s.canton&&s.district),place:'fiscal'},
-    {key:'address',title:'Dirección del establecimiento',ok:!!String(c.address||'').trim(),place:'perfil'},
+    {key:'address',title:'Dirección del establecimiento',ok:!!String(c.address||'').trim()&&String(c.address).trim().length<=160,place:'perfil'},
     {key:'email',title:'Correo de la empresa',ok:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(c.email||'')),place:'perfil'},
     {key:'branch',title:'Código de sucursal (3 dígitos)',ok:!!s.branch,place:'fiscal'},
     {key:'terminal',title:'Código de terminal (5 dígitos)',ok:!!s.terminal,place:'fiscal'},

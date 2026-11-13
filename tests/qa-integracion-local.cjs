@@ -587,6 +587,36 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const other=await call('GET',`/api/companies/${b}/fe/preparation`);
    assert.equal(other.status,200);assert.equal(other.body.settings.activity_code,'');
   });
+  await check('Empresa nueva registra perfil + ficha fiscal + código postal en una sola operación',async()=>{
+   const fiscal={identification_type:'02',activity_code:'123456',province:'1',canton:'10',district:'01',branch:'001',terminal:'00001',postal_code:'11001'};
+   const create=await call('POST','/api/companies',{legal_name:'Nueva empresa QA Fiscal',identification:'3101900123',email:'fiscal@example.com',address:'100 metros al sur del parque',avatar_color:'#2563eb',fe_preparation:fiscal});
+   assert.equal(create.status,201,JSON.stringify(create.body));
+   assert.equal(create.body.fe_preparation.postal_code,'11001');
+   const fromList=await call('GET','/api/companies');
+   assert.equal(fromList.status,200);assert.equal(fromList.body.find(c=>c.id===create.body.id).fe_preparation.canton,'10');
+   const loaded=await call('GET',`/api/companies/${create.body.id}/fe/preparation`);
+   assert.equal(loaded.body.settings.district,'01');assert.equal(loaded.body.settings.postal_code,'11001');
+   assert.equal(loaded.body.report.canEmit,false);
+  });
+  await check('Empresa nueva inválida revierte el perfil, sin dejar registros huérfanos',async()=>{
+   const before=(await call('GET','/api/companies')).body.length;
+   const result=await call('POST','/api/companies',{legal_name:'Empresa inválida',identification:'3101900555',fe_preparation:{province:'1',canton:'01',district:'01',postal_code:'79999'}});
+   assert.equal(result.status,400,JSON.stringify(result.body));
+   const after=(await call('GET','/api/companies')).body;
+   assert.equal(after.length,before);assert.equal(after.some(c=>c.identification==='3101900555'),false);
+  });
+  await check('Editar perfil y fiscal funciona junto y respeta los datos si hay error',async()=>{
+   const before=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   assert.ok(before);assert.equal(before.fe_preparation.postal_code,'10102');
+   const fiscal={...before.fe_preparation,province:'2',canton:'01',district:'03',postal_code:'20103'};
+   let updated=await call('PUT',`/api/companies/${a}`,{legal_name:before.legal_name,email:'contacto@example.com',address:'Costado oeste del colegio, local 5',fe_preparation:fiscal});
+   assert.equal(updated.status,200,JSON.stringify(updated.body));assert.equal(updated.body.fe_preparation.postal_code,'20103');
+   assert.equal(updated.body.address,'Costado oeste del colegio, local 5');
+   updated=await call('PUT',`/api/companies/${a}`,{legal_name:'Cambio no autorizado por validación',fe_preparation:{...fiscal,postal_code:'20199'}});
+   assert.equal(updated.status,400);
+   const final=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   assert.equal(final.legal_name,before.legal_name);assert.equal(final.fe_preparation.postal_code,'20103');
+  });
   await check('Preparación FE 4.4: rechaza cambios inválidos conservando la ficha anterior',async()=>{
    const r=await call('PUT',`/api/companies/${a}/fe/preparation`,{activity_code:'ABC123'});
    assert.equal(r.status,400,JSON.stringify(r.body));

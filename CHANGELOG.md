@@ -1,3 +1,11 @@
+### Corrección de v0.6.70 · 2026-11-13 — Ficha fiscal dentro de Nueva empresa y Editar perfil
+
+- Unificado el registro/edición de empresa con los datos fiscales en el modal existente; creación y actualización atómicas mediante transacciones SQLite, sin crear empresas parciales si falla una validación.
+- Selectores encadenados por nombre para provincias, cantones y distritos de Costa Rica, utilizando el catálogo territorial existente y su caché local. Se almacenan los códigos internos para XML 4.4.
+- Código postal de 5 dígitos autocalculado con provincia+cantón+distrito, validado en backend, con columna SQLite `postal_code` aditiva. Dirección exacta (otras señas) de hasta 160 caracteres en perfil de empresa.
+- La sección de diagnóstico FE queda como resumen para el propietario, con acceso a editar el perfil; los administradores autorizados conservan edición fiscal separada sin acceso a datos comerciales; no se amplían roles.
+- Nuevas pruebas de interfaz, creación y edición integradas, rechazo de códigos postales inconsistentes y preservación de datos; misma versión 0.6.70. Sin emisión, firma ni envíos a Hacienda.
+
 ## v0.6.70 · 2026-11-13 — Ficha fiscal y diagnóstico de preparación FE 4.4
 
 - Ficha fiscal por empresa (tipo de identificación, actividad, ubicación y códigos de sucursal y terminal), guardada localmente y validada; migración SQLite únicamente aditiva.
