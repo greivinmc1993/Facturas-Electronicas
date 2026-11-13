@@ -1,3 +1,23 @@
+# FacturaCR v0.6.67 — Diagnóstico de salud de los respaldos
+
+**Versión vigente: 0.6.67 (13 de noviembre de 2026).** Continúa desde v0.6.66 con el historial de copias simétrico, la verificación de integridad y el ensayo de recuperación. Se conserva SQLite, la configuración por empresa, los permisos y el mecanismo de restauración anterior.
+
+## Novedades de la v0.6.67: diagnóstico y alertas del almacenamiento
+
+En **Respaldos → Copias de seguridad**, arriba de las métricas aparece el panel **Diagnóstico de respaldos**. Consulta la **programación ya guardada** en el servidor y el destino activo; indica si los respaldos están al día, pendientes, desactivados o todavía sin primera copia. También alerta si la carpeta o unidad externa no está disponible, si hay un error reciente o si el espacio libre es inferior al margen estimado para generar una copia segura.
+
+- **Estado y fecha:** calcula la siguiente fecha y hora según frecuencia diaria, día semanal o día mensual. Si se eligió el 29, 30 o 31, aplica el último día de los meses más cortos. Si falta una copia después de la hora programada, la marca como pendiente (la generación automática se realiza cuando FacturaCR está abierto).
+- **Última copia y almacenamiento:** muestra tipo de destino (carpeta predeterminada/personalizada), disponibilidad y espacio estimado, sin crear archivos ni cambiar silenciosamente de unidad.
+- **Actualizar estado:** vuelve a consultar el servidor, actualiza el espacio y **no descarta cambios aún no guardados** en el formulario de programación.
+- **Límites:** el diagnóstico es **solo de programación y disponibilidad**. Que aparezca «al día» **no demuestra que la copia siga íntegra**; utiliza «Verificar integridad» y «Ensayar recuperación» sobre la copia concreta. La comprobación de espacio es una estimación y no sustituye crear un respaldo real.
+- **Seguridad y compatibilidad:** el diagnóstico continúa bajo autenticación del propietario, no envía datos a servicios externos, no mueve ni elimina copias y no requiere migración SQLite.
+
+**Cómo comprobarlo en Windows:** abre Respaldos y pulsa «Actualizar estado». Revisa la fecha de la próxima copia, crea una copia manual, verifica que el historial se actualice y prueba una carpeta personalizada disponible. Si utilizas una unidad externa, desconéctala con la aplicación en reposo y confirma que el diagnóstico muestra la indisponibilidad; conéctala de nuevo antes de generar otra copia. **No desconectes unidades durante una escritura.**
+
+**QA nueva:** `tests/qa-067-backup-health.cjs` (17 casos), `tests/qa-067-backup-health-ui.cjs` (8 casos), más tres escenarios en integración HTTP/SQLite temporal. Ejecutar `npm test`, `npm run qa:real-server`, `npm run build` y `npm run dist:win` en Windows. Las últimas dos acciones necesitan dependencias y el instalador de Electron.
+
+---
+
 # FacturaCR v0.6.66 — Ensayo aislado de recuperación de respaldos
 
 **Versión vigente: 0.6.66 (12 de noviembre de 2026).** Continúa desde v0.6.65, sin cambiar las tablas SQLite ni los permisos existentes. Los respaldos automáticos, la selección de carpeta, la verificación de integridad y la restauración con confirmación permanecen disponibles.

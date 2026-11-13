@@ -1,3 +1,11 @@
+## FacturaCR v0.6.67 — Diagnóstico de respaldos y almacenamiento (13 de noviembre de 2026)
+
+- Añadido diagnóstico de programación, fecha prevista, falta de primera copia, posibles atrasos, últimas copias, errores del destino y espacio disponible en Respaldos.
+- Detección de carpeta personalizada inaccesible sin sustituirla automáticamente; modo predeterminado consulta espacio en el área de datos si todavía no existe el subdirectorio.
+- El botón «Actualizar estado» consulta de nuevo el servidor sin borrar la configuración todavía no guardada por el propietario.
+- Funciones puras de calendario con días 29/30/31, pruebas unitarias, pruebas de interfaz y rutas de integración; se actualiza toda la metadata y workflow a v0.6.67.
+- Sin cambios de esquema SQLite, restauración, permisos de roles ni módulos comerciales. Windows/NSIS requiere ejecución final en GitHub Actions o PC Windows.
+
 ### Ajuste visual de los botones del historial (v0.6.66)
 - Los botones «Verificar integridad» y «Ensayar recuperación» ahora tienen ancho equivalente, altura de 46 px, iconos centrados de 16 px y etiquetas sin saltos de línea cuando caben en la misma fila.
 - Adaptación al ancho efectivo de cada tarjeta: ambos se redistribuyen y se apilan conjuntamente en espacios estrechos, con foco y estados de carga intactos. No se modifican APIs, roles, SQLite ni lógica de respaldo.

@@ -67,7 +67,8 @@ function UiIcon({name,size=18}){
   settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   folder:<><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></>,
   "folder-open":<><path d="M3 9V7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1M3 19l3-8h16l-3 8H3Z"/></>,
-  save:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></>
+  save:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></>,
+  refresh:<><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.5-2"/></>
  };
  return <svg className="uiIcon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[name]||shapes.receipt}</svg>;
 }
@@ -521,7 +522,7 @@ function preventPaymentWheelChange(event){
  if(event.currentTarget===document.activeElement)event.currentTarget.blur();
 }
 
-function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,downloadBackup,createAutoBackup,saveAutoBackup,refreshAutoBackup,refreshBackupStatus,restoreInput,restoreBackup,restoreStage,setMessage,sizeLabel}){
+function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,downloadBackup,createAutoBackup,saveAutoBackup,refreshAutoBackup,refreshBackupHealth,refreshBackupStatus,restoreInput,restoreBackup,restoreStage,setMessage,sizeLabel}){
  const files=Array.isArray(autoBackup?.files)?autoBackup.files:[];
  const [backupSearch,setBackupSearch]=useState('');
  const [showAllBackups,setShowAllBackups]=useState(false);
@@ -552,6 +553,8 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
   }finally{setRehearsingFile('')}
  };
  const latest=files[0]||null;
+ const backupHealth=autoBackup?.health||null;
+ const healthNext=backupHealth?.nextScheduledAt?new Date(backupHealth.nextScheduledAt).toLocaleString('es-CR',{dateStyle:'medium',timeStyle:'short'}):null;
  const weekdayNames=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
  const scheduledDay=autoConfig.frequency==='weekly'?` · Cada ${weekdayNames[autoConfig.weekday??1]}`:autoConfig.frequency==='monthly'?` · Día ${autoConfig.monthDay??1} de cada mes`:'';
  const searchTerm=backupSearch.trim().toLocaleLowerCase('es-CR');
@@ -584,6 +587,14 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
    <div><p className="backupEyebrow">Protección de datos locales</p><h4>Tu historial, protegido</h4><p>Las copias incluyen los datos de las empresas registrados en SQLite. No se envían a un servidor externo.</p></div>
    <span className={'backupStateBadge '+(autoConfig.enabled?'enabled':'disabled')}>{autoConfig.enabled?'● Automáticos activos':'○ Automáticos desactivados'}</span>
   </div>
+  <section className={'backupHealthPanel backupHealth-'+(backupHealth?.state||'waiting')} aria-label="Diagnóstico de respaldos" role="status" aria-live="polite">
+   <span className="backupHealthIcon" aria-hidden="true"><UiIcon name="shield" size={21}/></span>
+   <div className="backupHealthContent"><strong>{backupHealth?.title||'Consultando protección de los respaldos...'}</strong><p>{backupHealth?.detail||'Actualiza para consultar el estado de la carpeta y la programación.'}</p>
+    <div className="backupHealthFacts"><span>Destino: {autoBackup?.config?.directoryMode==='custom'?'Carpeta personalizada':'Carpeta predeterminada'}</span><span>{backupHealth?.directoryAvailable===false?'Unidad o carpeta no disponible':'Ubicación accesible'}</span>{healthNext&&<span>{backupHealth?.state==='pending'?'Respaldo previsto':'Próxima copia'}: {healthNext}</span>}{backupHealth?.freeBytes!=null&&<span>Espacio libre: {sizeLabel(backupHealth.freeBytes)}</span>}</div>
+    <small className="backupHealthScope">Estado de programación y almacenamiento; usa «Verificar integridad» para comprobar el contenido de cada copia.</small>
+   </div>
+   <button type="button" className="secondary backupHealthRefresh" disabled={busy} onClick={refreshBackupHealth} aria-label="Actualizar diagnóstico de respaldos"><UiIcon name="refresh" size={15}/><span>Actualizar estado</span></button>
+  </section>
   <div className="backupMetrics">
    <div className="backupMetric"><small>Última copia automática</small><strong>{latest?backupFileDate(latest):'Sin copias aún'}</strong><span>Fecha de la copia más reciente</span></div>
    <div className="backupMetric"><small>Programación</small><strong>{autoConfig.enabled?({daily:'Diaria',weekly:'Semanal',monthly:'Mensual'}[autoConfig.frequency]||'Configurada'):'Desactivada'}</strong><span>{autoConfig.enabled?`Hora local: ${autoConfig.time}${scheduledDay}`:'Puedes activarla cuando quieras'}</span></div>
@@ -709,6 +720,13 @@ function App({account,securityPanel}){
  };
  const refreshBackupStatus=async()=>{try{const status=await api('/api/backups/status');setBackupStatus(status);setMessage('')}catch(e){setBackupStatus(null);setMessage('No se pudo consultar el espacio de respaldos: '+e.message)}};
  const refreshAutoBackup=async()=>{try{const data=await api('/api/backups/automatic');setAutoBackup(data);setAutoConfig(data.config)}catch(e){setMessage('No se pudieron consultar los respaldos automáticos: '+e.message)}};
+ const refreshBackupHealth=async()=>{
+  try{
+   const data=await api('/api/backups/automatic');
+   setAutoBackup(data); // No descartar los cambios todavía no guardados del formulario.
+   await refreshBackupStatus();
+  }catch(e){setMessage('No se pudo actualizar el diagnóstico: '+e.message)}
+ };
  const saveAutoBackup=async()=>{setBackupBusy(true);try{await api('/api/backups/automatic',{method:'PUT',body:JSON.stringify(autoConfig)});await refreshAutoBackup();await refreshBackupStatus();setMessage('Programación y carpeta de respaldos guardadas. Se utilizarán en las próximas copias mientras FacturaCR esté abierto.')}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
  const createAutoBackup=async()=>{setBackupBusy(true);try{const data=await api('/api/backups/automatic/run',{method:'POST'});await refreshAutoBackup();setMessage('Respaldo verificado: '+data.file)}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
  useEffect(()=>{if(tab==='backups'){refreshBackupStatus();refreshAutoBackup()}},[tab]);
@@ -937,7 +955,7 @@ function App({account,securityPanel}){
  {tab==='users'&&<UsersPanel account={account}/>}
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}
  {tab==='cashier-kardex'&&!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<CashierStockPanel companyId={selected}/>}
- {tab==='backups'&&<BackupWorkspace autoBackup={autoBackup} autoConfig={autoConfig} setAutoConfig={setAutoConfig} backupStatus={backupStatus} busy={backupBusy} downloadBackup={downloadBackup} createAutoBackup={createAutoBackup} saveAutoBackup={saveAutoBackup} refreshAutoBackup={refreshAutoBackup} refreshBackupStatus={refreshBackupStatus} restoreInput={restoreInput} restoreBackup={restoreBackup} restoreStage={restoreStage} setMessage={setMessage} sizeLabel={sizeLabel}/>}
+ {tab==='backups'&&<BackupWorkspace autoBackup={autoBackup} autoConfig={autoConfig} setAutoConfig={setAutoConfig} backupStatus={backupStatus} busy={backupBusy} downloadBackup={downloadBackup} createAutoBackup={createAutoBackup} saveAutoBackup={saveAutoBackup} refreshAutoBackup={refreshAutoBackup} refreshBackupHealth={refreshBackupHealth} refreshBackupStatus={refreshBackupStatus} restoreInput={restoreInput} restoreBackup={restoreBackup} restoreStage={restoreStage} setMessage={setMessage} sizeLabel={sizeLabel}/>}
  {['users','audit','cashier-kardex'].includes(tab)?null:tab==='companies'?<section className="companiesWorkspace"><div className="companiesHero"><div><p className="companiesOverline">Gestión de comprobantes · Costa Rica</p><h3>Perfiles de empresas</h3><p className="hint">Administra los documentos de cada empresa por separado y cambia rápidamente entre ellas.</p></div>{account?.isOwner&&<button type="button" onClick={createCompanyProfile}><UiIcon name="plus" size={15}/> Nueva empresa</button>}</div><div className="companiesInlineNotice">Las empresas comparten una base local, pero sus clientes, inventario, ventas y respaldos se manejan por separado.</div><div className="companyProfilesGrid">{companies.map(c=>{const title=c.trade_name||c.legal_name;const subtitle=c.identification||'Sin cédula configurada';const initial=(title||'E').charAt(0).toUpperCase();return <article key={c.id} className={'companyProfileCard '+(selected===c.id?'isSelected':'')}><div className="companyProfileHeader"><div className="companyProfileAvatar" style={{background:`linear-gradient(180deg, ${colorForCompany(c)}, ${colorForCompany(c)})`}}>{initial}</div>{selected===c.id&&<span className="companyProfileBadge">Activa</span>}</div><div className="companyProfileBody"><strong title={title}>{title}</strong><small title={subtitle}>{subtitle}</small></div><div className="companyProfileFooter"><button type="button" className="secondary" onClick={()=>openCompanyProfile(c)}><UiIcon name="store" size={15}/> Abrir perfil</button><div className="actions"><button type="button" className="secondary" disabled title="La eliminación de empresas no está habilitada"><UiIcon name="trash" size={14}/> Eliminar</button></div></div></article>})}{account?.isOwner&&<button type="button" className="companyProfileCard companyAddCard" onClick={createCompanyProfile}><span>＋</span><strong>Agregar empresa</strong><small>Crea un nuevo perfil para tus comprobantes.</small></button>}</div></section>:
  tab==='backups'?null:
  tab==='dashboard'?<DashboardPanel companyId={selected} company={current}/>: 

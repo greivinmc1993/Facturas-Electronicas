@@ -1305,3 +1305,30 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 /* Respaldo de compatibilidad para navegadores sin container queries. */
 @media(max-width:760px){.backupFileRow .backupFileActions{width:100%;flex:1 1 100%;max-width:none;margin-left:0}}
 @media(max-width:460px){.backupFileRow .backupFileActions button{width:100%}}
+
+
+/* FacturaCR v0.6.67 · Estado real de los respaldos con diseño adaptable */
+.backupHealthPanel{
+ display:flex;align-items:flex-start;gap:13px;min-width:0;
+ padding:15px 17px;border:1px solid #bcded9;border-radius:14px;
+ background:#f2faf8;color:#164d48;
+}
+.backupHealthPanel.backupHealth-attention,.backupHealthPanel.backupHealth-pending{
+ background:#fff9ee;border-color:#e8d1a8;color:#865823;
+}
+.backupHealthPanel.backupHealth-disabled,.backupHealthPanel.backupHealth-waiting{
+ background:#f5f8fc;border-color:#d7e2ee;color:#395a71;
+}
+.backupHealthPanel .backupHealthIcon{
+ width:35px;height:35px;display:grid;place-items:center;border-radius:10px;
+ background:rgba(15,128,116,.1);flex:0 0 35px;
+}
+.backupHealthPanel .backupHealthContent{flex:1;min-width:0;overflow-wrap:anywhere}
+.backupHealthPanel .backupHealthContent>strong{display:block;font-size:13px;line-height:1.45}
+.backupHealthPanel .backupHealthContent>p{margin:4px 0 8px;font-size:11.5px;line-height:1.55;color:inherit;opacity:.86}
+.backupHealthPanel .backupHealthFacts{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:10.5px;font-weight:600;line-height:1.5;opacity:.9}
+.backupHealthPanel .backupHealthRefresh{margin-left:auto;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:11px;white-space:nowrap;min-height:36px;padding:8px 11px}
+.backupHealthPanel .backupHealthRefresh svg{flex-shrink:0}
+@media(max-width:760px){.backupHealthPanel{flex-wrap:wrap}.backupHealthPanel .backupHealthRefresh{width:100%;margin-left:0}}
+
+.backupHealthPanel .backupHealthScope{display:block;margin-top:7px;font-size:10px;font-weight:500;line-height:1.5;opacity:.77}

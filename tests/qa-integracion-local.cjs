@@ -35,6 +35,7 @@ fs.copyFileSync(path.join(root,'server','backup-schedule.js'),path.join(staging,
 fs.copyFileSync(path.join(root,'server','backup-directory.js'),path.join(staging,'backup-directory.js'));
 fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(staging,'backup-verification.js'));
 fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging,'backup-rehearsal.js'));
+fs.copyFileSync(path.join(root,'server','backup-health.js'),path.join(staging,'backup-health.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -63,7 +64,16 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.66')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.67')});
+  await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
+   const before=fs.statSync(dbPath).size;
+   const r=await call('GET','/api/backups/automatic');
+   assert.equal(r.status,200);assert.equal(r.body.health.state,'disabled');
+   assert.equal(r.body.health.directoryAvailable,true);
+   assert.equal(r.body.health.nextScheduledAt,null);
+   assert.ok(r.body.health.checkedAt);
+   assert.equal(fs.statSync(dbPath).size,before);
+  });
   await check('Respaldos: ruta predeterminada y configuración heredada',async()=>{
    const r=await call('GET','/api/backups/automatic');
    assert.equal(r.status,200);assert.equal(r.body.config.directoryMode,'default');
@@ -95,6 +105,28 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    r=await call('POST','/api/backups/automatic/run');
    assert.equal(r.status,200,JSON.stringify(r.body));
    assert.ok(fs.existsSync(path.join(temp,'db','automatic-backups',r.body.file)));
+  });
+  await check('Diagnóstico de respaldos: historia del destino activo y espacio disponible',async()=>{
+   const r=await call('GET','/api/backups/automatic');
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   assert.equal(r.body.health.hasCopies,true);
+   assert.equal(r.body.health.copyCount,r.body.files.length);
+   assert.ok(r.body.health.freeBytes>0);
+   assert.match(r.body.health.lastBackupAt,/^20\d{2}-/);
+  });
+  await check('Diagnóstico detecta unidad externa ausente sin cambiar destino',async()=>{
+   const unplugged=path.join(temp,'unidad-extraible');fs.mkdirSync(unplugged);
+   let r=await call('PUT','/api/backups/automatic',{directoryMode:'custom',customDirectory:unplugged});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   fs.rmdirSync(unplugged);
+   r=await call('GET','/api/backups/automatic');
+   assert.equal(r.status,200);assert.equal(r.body.health.state,'attention');
+   assert.equal(r.body.health.directoryAvailable,false);
+   assert.equal(r.body.directory,unplugged,'Nunca cambiar silenciosamente a la ruta predeterminada');
+   r=await call('PUT','/api/backups/automatic',{directoryMode:'default'});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   r=await call('GET','/api/backups/automatic');
+   assert.equal(r.body.health.directoryAvailable,true);
   });
   await check('Verificación histórica: archivo válido, corrupto y nombre peligroso',async()=>{
    const copies=(await call('GET','/api/backups/automatic')).body.files;

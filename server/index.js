@@ -3,6 +3,7 @@ import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backup
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
 import {verifyStoredBackup} from './backup-verification.js';
 import {rehearseStoredBackup} from './backup-rehearsal.js';
+import {describeBackupHealth} from './backup-health.js';
 import {registerAuth} from './auth.js';
 import {ensureAccessSchema} from './access-schema.js';
 import {registerCashRoutes,ensureCashSchema} from './cash.js';
@@ -290,7 +291,32 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   backupTimer.unref?.();
   // At launch, catch up on a missed scheduled backup when the program was closed.
   setTimeout(()=>{void runAutoBackup().catch(()=>{})},2500).unref?.();
-  app.get('/api/backups/automatic',(_req,res)=>res.json({config:backupConfig,files:backupFiles(),directory:activeBackupDir(),defaultDirectory:join(dataDir,'automatic-backups'),lastError:lastBackupError,busy:backupBusy}));
+  const getBackupHealth=(files)=>{
+    // No escribe ni crea carpetas: una unidad externa desconectada debe
+    // señalarse como no disponible, nunca cambiarse por la ubicación predeterminada.
+    let directoryAvailable=true,freeBytes=null;
+    const configured=activeBackupDir();
+    try{
+      const location=backupConfig.directoryMode==='default'&&!existsSync(configured)?dataDir:configured;
+      const storage=statfsSync(location);
+      const entry=statSync(location);
+      if(!entry.isDirectory())throw Error('Destino no es una carpeta.');
+      freeBytes=Number(storage.bavail)*Number(storage.bsize);
+    }catch{directoryAvailable=false}
+    let requiredBytes=null;
+    try{
+      const live=statSync(databasePath).size;
+      const wal=existsSync(databasePath+'-wal')?statSync(databasePath+'-wal').size:0;
+      requiredBytes=(live+wal)*2+20*1024*1024;
+    }catch{}
+    return describeBackupHealth({now:new Date(),settings:backupConfig,files,directoryAvailable,
+      freeBytes,requiredBytes,lastError:lastBackupError,busy:backupBusy});
+  };
+  app.get('/api/backups/automatic',(_req,res)=>{
+    const files=backupFiles();
+    res.setHeader('Cache-Control','no-store');
+    res.json({config:backupConfig,files,directory:activeBackupDir(),defaultDirectory:join(dataDir,'automatic-backups'),lastError:lastBackupError,busy:backupBusy,health:getBackupHealth(files)});
+  });
   app.put('/api/backups/automatic', (req,res)=>{
     if(backupBusy||rehearsalBusy)return res.status(409).json({error:'Espera a que terminen las comprobaciones antes de cambiar la carpeta.'});
     const input=req.body||{};
