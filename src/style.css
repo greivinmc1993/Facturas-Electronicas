@@ -1351,3 +1351,30 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @container facturacr-workspace (max-width: 660px){.ownerBackupNotice{flex-wrap:wrap}.ownerBackupNoticeAction{flex:1 1 100%!important;justify-content:center}}
 @media(max-width:690px){.ownerBackupNotice{flex-wrap:wrap}.ownerBackupNotice .ownerBackupNoticeAction{flex:1 1 100%;width:100%;justify-content:center}}
 @media(prefers-reduced-motion:reduce){.ownerBackupNotice .ownerBackupNoticeAction:hover{transform:none}}
+
+/* FacturaCR v0.6.70: ficha fiscal para preparación de XML 4.4, solo local. */
+.fePreparation{margin-top:24px;border:1px solid #d2e4e7;background:#fff;border-radius:18px;padding:clamp(16px,2.5vw,28px);box-shadow:0 8px 28px rgba(16,48,73,.045);min-width:0}
+.fePreparationHeader{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.fePreparationHeader h3{margin:4px 0 6px;color:#173951;font-size:clamp(18px,1.5vw,23px)}
+.fePreparationHeader .hint{max-width:870px}
+.fePreparationStage{white-space:nowrap;border:1px solid #9fdad2;background:#e6f6f3;color:#0b736b;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800}
+.fePreparationSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}
+.fePreparationSummary>div{display:flex;flex-direction:column;gap:3px;min-width:0;padding:16px;border-radius:12px;background:#f3f8fa;border:1px solid #dce9ed}
+.fePreparationSummary strong{font-size:clamp(20px,2vw,27px);color:#0e6f72}
+.fePreparationSummary small{font-size:12px;color:#556b7c}
+.fePreparationChecks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 24px}
+.fePreparationCheck{min-width:0;display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;border-radius:10px;padding:10px 12px;font-size:13px;border:1px solid #e0e8ee;background:#fafbfd;color:#26455f}
+.fePreparationCheck>span:first-child{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:#fbead6;color:#996219}
+.fePreparationCheck.isReady>span:first-child{background:#dbf4e9;color:#157348}
+.fePreparationCheck small{color:#657786;font-weight:700;font-size:11px}
+.fePreparationForm{border-top:1px solid #e3edf0;padding-top:20px}
+.fePreparationForm h4{margin:0 0 6px;color:#173951}
+.fePreparationFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.fePreparationFields .field{min-width:0}
+.fePreparationFields .field>input,.fePreparationFields .field>select{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.fePreparationActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:18px}
+.fePreparationSuccess,.fePreparationError,.fePreparationDisclaimer{border-radius:10px;padding:12px 15px;font-size:13px;margin-top:14px}
+.fePreparationSuccess{background:#eaf9f1;color:#126744;border:1px solid #c6e5d7}
+.fePreparationError{background:#fff2f0;color:#9a342b;border:1px solid #f1c6bf}
+.fePreparationDisclaimer{background:#f2f5f9;color:#536879;border:1px solid #e0e7ee}
+@media(max-width:720px){.fePreparationSummary,.fePreparationChecks,.fePreparationFields{grid-template-columns:minmax(0,1fr)}.fePreparationCheck{grid-template-columns:24px minmax(0,1fr) auto}.fePreparationActions>button{flex:1 1 190px}}

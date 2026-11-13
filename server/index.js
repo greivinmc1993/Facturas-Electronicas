@@ -1,4 +1,5 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
+import {FE_PREPARATION_EMPTY,parseFePreparation,describeFePreparation} from './fe-preparation.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
 import {verifyStoredBackup} from './backup-verification.js';
@@ -78,6 +79,19 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   }
   for (const [k,v] of Object.entries(clientExtra)) addColumn('clients',k,v);
   for (const [k,v] of Object.entries(productExtra)) addColumn('products',k,v);
+  // v0.6.70: datos fiscales por empresa, SIN credenciales ni emisión activa.
+  // Tabla aditiva: no modifica ni reemplaza registros comerciales anteriores.
+  db.exec(`CREATE TABLE IF NOT EXISTS company_fe_preparation (
+    company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    identification_type TEXT NOT NULL DEFAULT '',
+    activity_code TEXT NOT NULL DEFAULT '',
+    province TEXT NOT NULL DEFAULT '',
+    canton TEXT NOT NULL DEFAULT '',
+    district TEXT NOT NULL DEFAULT '',
+    branch TEXT NOT NULL DEFAULT '',
+    terminal TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );`);
   // Historial inmutable de entradas, salidas y ajustes, separado por empresa.
   db.exec(`CREATE TABLE IF NOT EXISTS inventory_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -526,6 +540,38 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       db.prepare(`UPDATE companies SET ${fields.map(k=>k+'=?').join(',')} WHERE id=?`).run(...fields.map(k=>values[k]),id);
       res.json(db.prepare('SELECT * FROM companies WHERE id=?').get(id));
     }catch(err){res.status(err.code?.startsWith('SQLITE_CONSTRAINT')?409:500).json({error:'No se pudo actualizar la empresa.'});}
+  });
+  // FacturaCR v0.6.70: ficha fiscal y diagnóstico LOCAL. No genera ni envía XML.
+  const feReadinessFor=companyId=>{
+    const company=db.prepare('SELECT id,legal_name,identification,email,address,trade_name FROM companies WHERE id=?').get(companyId);
+    if(!company)return null;
+    const stored=db.prepare('SELECT identification_type,activity_code,province,canton,district,branch,terminal FROM company_fe_preparation WHERE company_id=?').get(companyId);
+    const settings={...FE_PREPARATION_EMPTY,...stored};
+    const counts=db.prepare(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN cabys NOT GLOB '[0-9]*' OR LENGTH(cabys)<>13 OR cabys GLOB '*[^0-9]*' THEN 1 ELSE 0 END) AS missingCabys
+      FROM products WHERE company_id=? AND is_deleted=0`).get(companyId);
+    return {companyId,settings,report:describeFePreparation(company,settings,counts)};
+  };
+  app.get('/api/companies/:companyId/fe/preparation',(req,res)=>{
+    const id=Number(req.params.companyId);
+    if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Empresa inválida.'});
+    const report=feReadinessFor(id);
+    if(!report)return res.status(404).json({error:'Empresa no encontrada.'});
+    res.setHeader('Cache-Control','no-store');
+    return res.json(report);
+  });
+  app.put('/api/companies/:companyId/fe/preparation',(req,res)=>{
+    const id=Number(req.params.companyId);
+    if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Empresa inválida.'});
+    if(!db.prepare('SELECT 1 FROM companies WHERE id=?').get(id))return res.status(404).json({error:'Empresa no encontrada.'});
+    // La política central autoriza tax.configure por empresa; sin credenciales en esta ficha.
+    let settings;
+    try{settings=parseFePreparation(req.body)}catch(err){return res.status(400).json({error:err.message})}
+    const keys=Object.keys(FE_PREPARATION_EMPTY);
+    db.prepare(`INSERT INTO company_fe_preparation(company_id,${keys.join(',')}) VALUES (?,${keys.map(()=>'?').join(',')}) ON CONFLICT(company_id) DO UPDATE SET ${keys.map(key=>`${key}=excluded.${key}`).join(',')},updated_at=CURRENT_TIMESTAMP`)
+      .run(id,...keys.map(key=>settings[key]));
+    res.setHeader('Cache-Control','no-store');
+    return res.json({...feReadinessFor(id),ok:true});
   });
   // All records are scoped to an existing company. Parameters are bound in SQL.
   const configs = {

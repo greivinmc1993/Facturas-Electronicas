@@ -1,6 +1,43 @@
+# FacturaCR v0.6.70 — Preparación de Facturación Electrónica 4.4
+
+**Versión vigente: 0.6.70 (13 de noviembre de 2026).** Conserva todas las funciones de 0.6.69 (avisos preventivos de respaldos, monitoreo, restauración segura y operaciones comerciales).
+
+## Nueva ficha fiscal por empresa
+
+Desde **Empresas**, el propietario o administrador de empresa autorizado puede completar la sección **Preparación para factura electrónica 4.4**. Cada empresa conserva sus propios campos: tipo de identificación, código de actividad económica inscrito (6 dígitos), provincia, cantón, distrito, sucursal (3 dígitos) y terminal (5 dígitos). Se guardan en SQLite, en una tabla aditiva `company_fe_preparation`, sin cambiar las ventas anteriores. Una ficha puede guardarse parcialmente para completar después; se verifican los formatos.
+
+La nueva pantalla muestra **10 comprobaciones locales** que incluyen razón social, identificación, datos fiscales, correo, dirección y cobertura CAByS de los artículos y servicios activos. Indica los artículos cuyo CAByS no tiene 13 dígitos. El botón **Completar datos generales** abre el perfil de empresa. Los resultados son orientativos: no consultan RUT ni certifican correspondencia de códigos. Las credenciales de Hacienda y el certificado digital **no se solicitan ni se almacenan en esta versión**.
+
+**Importante:** aunque se completen las 10 comprobaciones, FacturaCR **todavía no emite ni valida comprobantes electrónicos ante Hacienda**. En próximas etapas habrá que generar XML 4.4, validarlo con XSD y catálogos, firmarlo con XAdES-EPES, autenticar el envío, consultar su recepción, gestionar estados y notas. Los tiquetes actuales continúan siendo internos.
+
+### Operación y seguridad
+
+- La ficha y su diagnóstico se consultan y guardan en endpoints locales `GET/PUT /api/companies/:id/fe/preparation` con el permiso `tax.configure`, por empresa. Cajeros y supervisores no reciben este permiso.
+- Solo cambia el esquema de forma **aditiva**: una nueva tabla vinculada a `companies(id)`; no modifica clientes, ventas, movimientos, pagos ni perfiles de acceso. Una restauración de respaldo también migra la tabla como el resto del esquema.
+- El catálogo se consulta sin modificar productos ni CAByS. La ficha no genera XML y nunca realiza solicitudes a la API de Hacienda.
+- Recomendación: comprobar actividad inscrita, ubicación y códigos oficiales antes de rellenar la ficha. No utilizar números inventados como definitivos.
+
+**Documentación oficial:**
+- Anexos y formatos v4.4: https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf
+- API y XSD v4.4: https://atv.hacienda.go.cr/ATV/ComprobanteElectronico/frmAnexosyEstructuras.aspx
+- Firma XAdES: https://www.pgrweb.go.cr/DOCS/NORMAS/1/VIGENTE/S/2020-2029/2020-2024/2024/1936C/1701B8.HTML
+
+### QA para Windows / GitHub Actions
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+No se reemplaza la información SQLite al instalar. Hacer un respaldo comprobado antes de migrar sigue siendo obligatorio como precaución operativa.
+
+---
+
 # FacturaCR v0.6.69 — Alertas preventivas de respaldos para el propietario
 
-**Versión vigente: 0.6.69 (13 de noviembre de 2026).** Conserva las funciones de v0.6.68, incluido el monitoreo cada 60 segundos **solo dentro de Respaldos**.
+**Versión histórica: 0.6.69 (13 de noviembre de 2026).** Conserva las funciones de v0.6.68, incluido el monitoreo cada 60 segundos **solo dentro de Respaldos**.
 
 ## Avisos preventivos en Empresas y Dashboard
 

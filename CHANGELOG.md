@@ -1,3 +1,11 @@
+## v0.6.70 · 2026-11-13 — Ficha fiscal y diagnóstico de preparación FE 4.4
+
+- Ficha fiscal por empresa (tipo de identificación, actividad, ubicación y códigos de sucursal y terminal), guardada localmente y validada; migración SQLite únicamente aditiva.
+- Diagnóstico de 10 comprobaciones y cobertura de CAByS; acceso restringido a propietario/administrador con permiso `tax.configure`.
+- Diseño responsive integrado en Empresas, sin modificar ventas ni generar XML, firmar o enviar a Hacienda.
+- QA unitario, QA estático y pruebas de integración de persistencia, aislamiento y rechazo de datos inválidos.
+- Metadatos y workflow de GitHub Actions actualizados a 0.6.70; README único y CHANGELOG consolidado.
+
 # 0.6.69 — Avisos preventivos de protección de datos (13-11-2026)
 
 - Nuevo aviso compacto en **Empresas** y **Dashboard** para el propietario cuando el diagnóstico ya existente de Respaldos detecta falta de carpeta, poco espacio, error reciente, copia pendiente o ausencia de la primera copia. Acceso directo a Respaldos sin mostrar rutas privadas.

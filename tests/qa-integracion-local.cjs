@@ -36,6 +36,7 @@ fs.copyFileSync(path.join(root,'server','backup-directory.js'),path.join(staging
 fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(staging,'backup-verification.js'));
 fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging,'backup-rehearsal.js'));
 fs.copyFileSync(path.join(root,'server','backup-health.js'),path.join(staging,'backup-health.js'));
+fs.copyFileSync(path.join(root,'server','fe-preparation.js'),path.join(staging,'fe-preparation.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
 let passed=0,failed=0;
@@ -64,7 +65,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.69')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.70')});
   await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
    const before=fs.statSync(dbPath).size;
    const r=await call('GET','/api/backups/automatic');
@@ -568,6 +569,29 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    for(const suffix of ['from=2026-02-30&to=2026-03-01','from=2026-12-31&to=2026-01-01','from=2026-01-01&to=2026-12-31&type=incorrecto','from=2026-01-01&to=2026-12-31&method=Inexistente']){
     const r=await call('GET',`/api/companies/${a}/dashboard?${suffix}`);assert.equal(r.status,400,suffix);
    }
+  });
+  await check('Preparación FE 4.4: ficha nueva por empresa sin alterar ventas',async()=>{
+   const r=await call('GET',`/api/companies/${a}/fe/preparation`);
+   assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.report.canEmit,false);
+   assert.equal(r.body.report.version,'4.4');assert.equal(r.body.report.total,10);
+   assert.equal(r.body.settings.activity_code,'');
+   const wrong=await call('GET','/api/companies/999999/fe/preparation');assert.equal(wrong.status,404);
+  });
+  await check('Preparación FE 4.4: formulario guarda localmente datos fiscales sin transmitir',async()=>{
+   const settings={identification_type:'02',activity_code:'123456',province:'1',canton:'01',district:'02',branch:'001',terminal:'00001'};
+   const r=await call('PUT',`/api/companies/${a}/fe/preparation`,settings);
+   assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.settings.terminal,'00001');
+   assert.equal(r.body.report.canEmit,false);
+   const loaded=await call('GET',`/api/companies/${a}/fe/preparation`);
+   assert.equal(loaded.body.settings.activity_code,'123456');
+   const other=await call('GET',`/api/companies/${b}/fe/preparation`);
+   assert.equal(other.status,200);assert.equal(other.body.settings.activity_code,'');
+  });
+  await check('Preparación FE 4.4: rechaza cambios inválidos conservando la ficha anterior',async()=>{
+   const r=await call('PUT',`/api/companies/${a}/fe/preparation`,{activity_code:'ABC123'});
+   assert.equal(r.status,400,JSON.stringify(r.body));
+   const original=await call('GET',`/api/companies/${a}/fe/preparation`);
+   assert.equal(original.body.settings.activity_code,'123456');
   });
  } finally{await started.close()}
  console.log(`QA integración local: ${passed} superadas / ${passed+failed}, ${failed} errores`);
