@@ -1,3 +1,12 @@
+## FacturaCR v0.6.68 — Diagnóstico automático de respaldos (13 de noviembre de 2026)
+
+- El diagnóstico se actualiza al entrar en Respaldos y cada **60 segundos** mientras el módulo esté abierto. Al salir se desactiva el temporizador; también se evita consultar si la ventana está oculta o durante otra operación de respaldo.
+- «Actualizar estado» continúa funcionando manualmente y comparte solicitudes en curso para no duplicar consultas. Al volver a mostrar la ventana se solicita una comprobación inmediata.
+- No se reemplazan cambios sin guardar de programación o carpeta. Los resultados de verificación de integridad y ensayo de recuperación siguen visibles cuando los nombres de archivo y el destino son idénticos.
+- Resultado de la última consulta y advertencia no invasiva cuando la actualización automática falla; sin restauraciones, escrituras en SQLite ni migraciones de esquema.
+- Se agregaron pruebas unitarias del monitor y pruebas de contrato de interfaz, y se actualizan metadatos, pruebas de versión y GitHub Actions.
+- La compilación del instalador Windows debe validarse en GitHub Actions y en el equipo de destino.
+
 ## FacturaCR v0.6.67 — Diagnóstico de respaldos y almacenamiento (13 de noviembre de 2026)
 
 - Añadido diagnóstico de programación, fecha prevista, falta de primera copia, posibles atrasos, últimas copias, errores del destino y espacio disponible en Respaldos.

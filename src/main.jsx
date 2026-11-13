@@ -12,6 +12,7 @@ import UsersPanel from './UsersPanel.jsx';
 import AuditPanel from './AuditPanel.jsx';
 import CashierStockPanel from './CashierStockPanel.jsx';
 import {ConfirmProvider,useConfirm} from './ConfirmProvider.jsx';
+import {createBackupHealthMonitor,mergeBackupHealthSnapshot} from './backup-health-monitor.js';
 
 const APP_VERSION = __APP_VERSION__;
 const ACTIVE_COMPANY_KEY = 'facturacr_active_company_id';
@@ -522,7 +523,7 @@ function preventPaymentWheelChange(event){
  if(event.currentTarget===document.activeElement)event.currentTarget.blur();
 }
 
-function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,downloadBackup,createAutoBackup,saveAutoBackup,refreshAutoBackup,refreshBackupHealth,refreshBackupStatus,restoreInput,restoreBackup,restoreStage,setMessage,sizeLabel}){
+function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,downloadBackup,createAutoBackup,saveAutoBackup,refreshAutoBackup,refreshBackupHealth,refreshBackupStatus,restoreInput,restoreBackup,restoreStage,setMessage,sizeLabel,backupHealthCheckedAt,backupHealthMonitorError}){
  const files=Array.isArray(autoBackup?.files)?autoBackup.files:[];
  const [backupSearch,setBackupSearch]=useState('');
  const [showAllBackups,setShowAllBackups]=useState(false);
@@ -592,6 +593,8 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
    <div className="backupHealthContent"><strong>{backupHealth?.title||'Consultando protección de los respaldos...'}</strong><p>{backupHealth?.detail||'Actualiza para consultar el estado de la carpeta y la programación.'}</p>
     <div className="backupHealthFacts"><span>Destino: {autoBackup?.config?.directoryMode==='custom'?'Carpeta personalizada':'Carpeta predeterminada'}</span><span>{backupHealth?.directoryAvailable===false?'Unidad o carpeta no disponible':'Ubicación accesible'}</span>{healthNext&&<span>{backupHealth?.state==='pending'?'Respaldo previsto':'Próxima copia'}: {healthNext}</span>}{backupHealth?.freeBytes!=null&&<span>Espacio libre: {sizeLabel(backupHealth.freeBytes)}</span>}</div>
     <small className="backupHealthScope">Estado de programación y almacenamiento; usa «Verificar integridad» para comprobar el contenido de cada copia.</small>
+    <small className="backupHealthMonitorInfo">Actualización automática cada 60 segundos mientras Respaldos está abierto{backupHealthCheckedAt?' · Última comprobación: '+backupHealthCheckedAt.toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}.</small>
+    {backupHealthMonitorError&&<small className="backupHealthMonitorWarning" role="alert">No se pudo completar la última consulta: {backupHealthMonitorError}. Puedes usar «Actualizar estado» para reintentar.</small>}
    </div>
    <button type="button" className="secondary backupHealthRefresh" disabled={busy} onClick={refreshBackupHealth} aria-label="Actualizar diagnóstico de respaldos"><UiIcon name="refresh" size={15}/><span>Actualizar estado</span></button>
   </section>
@@ -643,6 +646,11 @@ function App({account,securityPanel}){
  const [backupStatus,setBackupStatus]=useState(null),[catalogPreview,setCatalogPreview]=useState(null),[catalogBusy,setCatalogBusy]=useState(false);
  const [bulkPreview,setBulkPreview]=useState(null),[bulkFile,setBulkFile]=useState(null),[bulkPrice,setBulkPrice]=useState(true),[bulkStock,setBulkStock]=useState(false),[bulkCabys,setBulkCabys]=useState(false),[bulkBusy,setBulkBusy]=useState(false);
  const [backupBusy,setBackupBusy]=useState(false);
+ const backupBusyRef=useRef(false);
+ backupBusyRef.current=backupBusy;
+ const backupHealthMonitorRef=useRef(null);
+ const [backupHealthCheckedAt,setBackupHealthCheckedAt]=useState(null);
+ const [backupHealthMonitorError,setBackupHealthMonitorError]=useState('');
  const restoreRunningRef=useRef(false);
  const [restoreStage,setRestoreStage]=useState('');
  const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14,weekday:1,monthDay:1,directoryMode:'default',customDirectory:''});
@@ -721,15 +729,51 @@ function App({account,securityPanel}){
  const refreshBackupStatus=async()=>{try{const status=await api('/api/backups/status');setBackupStatus(status);setMessage('')}catch(e){setBackupStatus(null);setMessage('No se pudo consultar el espacio de respaldos: '+e.message)}};
  const refreshAutoBackup=async()=>{try{const data=await api('/api/backups/automatic');setAutoBackup(data);setAutoConfig(data.config)}catch(e){setMessage('No se pudieron consultar los respaldos automáticos: '+e.message)}};
  const refreshBackupHealth=async()=>{
+  // La comprobación manual comparte la solicitud en curso con el monitor automático.
+  if(backupHealthMonitorRef.current){await backupHealthMonitorRef.current.check({manual:true});return;}
   try{
    const data=await api('/api/backups/automatic');
-   setAutoBackup(data); // No descartar los cambios todavía no guardados del formulario.
+   setAutoBackup(prev=>mergeBackupHealthSnapshot(prev,data));
+   setBackupHealthCheckedAt(new Date());
+   setBackupHealthMonitorError('');
    await refreshBackupStatus();
-  }catch(e){setMessage('No se pudo actualizar el diagnóstico: '+e.message)}
+  }catch(e){setBackupHealthMonitorError(e.message);setMessage('No se pudo actualizar el diagnóstico: '+e.message)}
  };
  const saveAutoBackup=async()=>{setBackupBusy(true);try{await api('/api/backups/automatic',{method:'PUT',body:JSON.stringify(autoConfig)});await refreshAutoBackup();await refreshBackupStatus();setMessage('Programación y carpeta de respaldos guardadas. Se utilizarán en las próximas copias mientras FacturaCR esté abierto.')}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
  const createAutoBackup=async()=>{setBackupBusy(true);try{const data=await api('/api/backups/automatic/run',{method:'POST'});await refreshAutoBackup();setMessage('Respaldo verificado: '+data.file)}catch(e){setMessage(e.message)}finally{setBackupBusy(false)}};
- useEffect(()=>{if(tab==='backups'){refreshBackupStatus();refreshAutoBackup()}},[tab]);
+ // Una sola suscripción al abrir Respaldos: 60 segundos entre comprobaciones,
+ // ninguna consulta periódica al salir y sin pisar cambios del formulario.
+ useEffect(()=>{
+  if(tab!=='backups'||!account?.isOwner)return;
+  let initialConfigurationPending=true; // Cargar formulario solo al entrar, jamás en un refresco periódico.
+  const monitor=createBackupHealthMonitor({
+   fetchSnapshot:async()=>{
+    const [backup,storage]=await Promise.all([
+     api('/api/backups/automatic'),
+     api('/api/backups/status').then(data=>({data}),error=>({error}))
+    ]);
+    return {backup,storage};
+   },
+   onSnapshot:({backup,storage})=>{
+    setAutoBackup(prev=>mergeBackupHealthSnapshot(prev,backup));
+    if(initialConfigurationPending){setAutoConfig(backup.config);initialConfigurationPending=false;}
+    setBackupStatus(storage.data||null);
+    setBackupHealthCheckedAt(new Date());
+    setBackupHealthMonitorError(storage.error?'No se pudo consultar el espacio de almacenamiento: '+storage.error.message:'');
+   },
+   onFailure:(error,{manual})=>{
+    setBackupHealthMonitorError(error.message);
+    if(manual)setMessage('No se pudo actualizar el diagnóstico: '+error.message);
+   },
+   isBusy:()=>backupBusyRef.current,
+   isVisible:()=>document.visibilityState!=='hidden'
+  });
+  backupHealthMonitorRef.current=monitor;
+  monitor.start({immediate:true});
+  const onVisible=()=>{if(document.visibilityState==='visible')void monitor.check();};
+  document.addEventListener('visibilitychange',onVisible);
+  return ()=>{document.removeEventListener('visibilitychange',onVisible);monitor.stop();if(backupHealthMonitorRef.current===monitor)backupHealthMonitorRef.current=null;};
+ },[tab,account?.isOwner]);
  const sizeLabel=bytes=>bytes==null||!Number.isFinite(Number(bytes))?'—':(Number(bytes)/1048576).toLocaleString('es-CR',{maximumFractionDigits:1})+' MB';
  const exportPdfFromRoute=async(path,name)=>{
   try{if(!window.facturacrReports?.savePdf)throw Error('El PDF requiere la aplicación de escritorio.');
@@ -955,7 +999,7 @@ function App({account,securityPanel}){
  {tab==='users'&&<UsersPanel account={account}/>}
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}
  {tab==='cashier-kardex'&&!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<CashierStockPanel companyId={selected}/>}
- {tab==='backups'&&<BackupWorkspace autoBackup={autoBackup} autoConfig={autoConfig} setAutoConfig={setAutoConfig} backupStatus={backupStatus} busy={backupBusy} downloadBackup={downloadBackup} createAutoBackup={createAutoBackup} saveAutoBackup={saveAutoBackup} refreshAutoBackup={refreshAutoBackup} refreshBackupHealth={refreshBackupHealth} refreshBackupStatus={refreshBackupStatus} restoreInput={restoreInput} restoreBackup={restoreBackup} restoreStage={restoreStage} setMessage={setMessage} sizeLabel={sizeLabel}/>}
+ {tab==='backups'&&<BackupWorkspace autoBackup={autoBackup} autoConfig={autoConfig} setAutoConfig={setAutoConfig} backupStatus={backupStatus} busy={backupBusy} downloadBackup={downloadBackup} createAutoBackup={createAutoBackup} saveAutoBackup={saveAutoBackup} refreshAutoBackup={refreshAutoBackup} refreshBackupHealth={refreshBackupHealth} refreshBackupStatus={refreshBackupStatus} restoreInput={restoreInput} restoreBackup={restoreBackup} restoreStage={restoreStage} setMessage={setMessage} sizeLabel={sizeLabel} backupHealthCheckedAt={backupHealthCheckedAt} backupHealthMonitorError={backupHealthMonitorError}/>}
  {['users','audit','cashier-kardex'].includes(tab)?null:tab==='companies'?<section className="companiesWorkspace"><div className="companiesHero"><div><p className="companiesOverline">Gestión de comprobantes · Costa Rica</p><h3>Perfiles de empresas</h3><p className="hint">Administra los documentos de cada empresa por separado y cambia rápidamente entre ellas.</p></div>{account?.isOwner&&<button type="button" onClick={createCompanyProfile}><UiIcon name="plus" size={15}/> Nueva empresa</button>}</div><div className="companiesInlineNotice">Las empresas comparten una base local, pero sus clientes, inventario, ventas y respaldos se manejan por separado.</div><div className="companyProfilesGrid">{companies.map(c=>{const title=c.trade_name||c.legal_name;const subtitle=c.identification||'Sin cédula configurada';const initial=(title||'E').charAt(0).toUpperCase();return <article key={c.id} className={'companyProfileCard '+(selected===c.id?'isSelected':'')}><div className="companyProfileHeader"><div className="companyProfileAvatar" style={{background:`linear-gradient(180deg, ${colorForCompany(c)}, ${colorForCompany(c)})`}}>{initial}</div>{selected===c.id&&<span className="companyProfileBadge">Activa</span>}</div><div className="companyProfileBody"><strong title={title}>{title}</strong><small title={subtitle}>{subtitle}</small></div><div className="companyProfileFooter"><button type="button" className="secondary" onClick={()=>openCompanyProfile(c)}><UiIcon name="store" size={15}/> Abrir perfil</button><div className="actions"><button type="button" className="secondary" disabled title="La eliminación de empresas no está habilitada"><UiIcon name="trash" size={14}/> Eliminar</button></div></div></article>})}{account?.isOwner&&<button type="button" className="companyProfileCard companyAddCard" onClick={createCompanyProfile}><span>＋</span><strong>Agregar empresa</strong><small>Crea un nuevo perfil para tus comprobantes.</small></button>}</div></section>:
  tab==='backups'?null:
  tab==='dashboard'?<DashboardPanel companyId={selected} company={current}/>: 

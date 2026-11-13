@@ -1,3 +1,28 @@
+# FacturaCR v0.6.68 — Monitoreo automático del diagnóstico de respaldos
+
+**Versión vigente: 0.6.68 (13 de noviembre de 2026).** Conserva íntegra la v0.6.67 con historial, integridad, ensayo de recuperación, carpetas personalizadas y programación de día y hora.
+
+## Monitoreo de Respaldos
+
+1. Entra en **Respaldos** desde la cuenta propietaria. FacturaCR comprueba automáticamente la salud de la programación y la unidad de almacenamiento al abrir el módulo.
+2. Mientras permanezcas en el módulo, el estado se consulta nuevamente **cada 60 segundos**, siempre que no esté trabajando en otra operación de respaldo y la ventana esté visible. Los intervalos no se ejecutan al navegar a otro módulo. Al volver a la ventana activa se puede efectuar una comprobación inmediata.
+3. La pantalla muestra la última hora de consulta. Si falla, conserva el diagnóstico anterior y muestra un aviso, sin declarar falsamente que se actualizó. El botón **Actualizar estado** permite consultar inmediatamente.
+4. Si editas el día, la hora o la carpeta y todavía no has pulsado **Guardar configuración**, las consultas automáticas **no borran esos cambios**. La pantalla de diagnóstico refleja siempre la configuración realmente guardada en el servidor.
+5. Si acabas de verificar un archivo o ensayar su recuperación, el resultado permanece visible en el historial mientras la lista y la carpeta guardada no hayan cambiado. Los procesos de verificación de integridad, ensayo y restauración no se ejecutan automáticamente.
+
+### Verificación y compilación
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+El monitor se implementa en `src/backup-health-monitor.js`, con pruebas en `tests/qa-068-backup-monitor.cjs` y `tests/qa-068-backup-monitor-ui.cjs`. No se modificaron datos SQLite, roles, recuperación SMTP ni cálculos de ventas.
+
+---
+
 # FacturaCR v0.6.67 — Diagnóstico de salud de los respaldos
 
 **Versión vigente: 0.6.67 (13 de noviembre de 2026).** Continúa desde v0.6.66 con el historial de copias simétrico, la verificación de integridad y el ensayo de recuperación. Se conserva SQLite, la configuración por empresa, los permisos y el mecanismo de restauración anterior.

@@ -77,7 +77,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'better-sqlite3 sigue siendo incompatible con Node.js 22' }
       - name: Instalar, reinstalar y desinstalar sin perder datos SQLite
         run: npm run qa:install-upgrade
-      - name: Actualización REAL 0.6.34 a 0.6.67 con datos comerciales persistentes
+      - name: Actualización REAL 0.6.34 a 0.6.68 con datos comerciales persistentes
         shell: pwsh
         run: |
           $current = @(Get-ChildItem 'release' -Filter '*.exe' -File)

@@ -1332,3 +1332,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @media(max-width:760px){.backupHealthPanel{flex-wrap:wrap}.backupHealthPanel .backupHealthRefresh{width:100%;margin-left:0}}
 
 .backupHealthPanel .backupHealthScope{display:block;margin-top:7px;font-size:10px;font-weight:500;line-height:1.5;opacity:.77}
+
+/* v0.6.68: indicador discreto para el monitoreo de respaldos */
+.backupHealthPanel .backupHealthMonitorInfo{display:block;margin-top:5px;font-size:10px;line-height:1.5;opacity:.82}
+.backupHealthPanel .backupHealthMonitorWarning{display:block;margin-top:6px;font-size:11px;line-height:1.5;font-weight:650;color:#9a3412;overflow-wrap:anywhere}

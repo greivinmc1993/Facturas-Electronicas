@@ -25,7 +25,7 @@ check('El diagnóstico muestra estado, ubicación, próximo respaldo y espacio',
 });
 check('Actualizar estado refresca los datos reales y no ejecuta restauración',()=>{
  assert.match(block,/onClick=\{refreshBackupHealth\}/);
- assert.match(main,/setAutoBackup\(data\); \/\/ No descartar los cambios/);
+ assert.match(main,/setAutoBackup\(prev=>mergeBackupHealthSnapshot\(prev,data\)\)/); // Mantiene el formulario y los resultados de verificación
  assert.doesNotMatch(block.split('backupHealthRefresh')[1].split('</button>')[0],/restoreBackup|performRestore/);
 });
 check('Panel accesible y mensajes fáciles de leer',()=>{

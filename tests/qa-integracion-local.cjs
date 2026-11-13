@@ -64,7 +64,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.67')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.68')});
   await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
    const before=fs.statSync(dbPath).size;
    const r=await call('GET','/api/backups/automatic');
