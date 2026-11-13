@@ -1270,11 +1270,38 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @media(max-width:540px){.backupFileRow .backupVerifyButton{width:100%;margin-left:0}.backupFileRow .backupFileDetails{flex-basis:calc(100% - 45px)}}
 
 
-/* FacturaCR v0.6.66 · Ensayo aislado de recuperación de respaldos */
-.backupFileRow .backupFileActions{display:flex;flex:0 1 auto;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:7px;margin-left:auto;min-width:0}
-.backupFileRow .backupFileActions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;margin:0;white-space:normal;flex:1 1 135px;max-width:205px}
+/* FacturaCR v0.6.66 · Ensayo aislado de recuperación de respaldos
+   Ajuste de simetría: los dos botones usan el mismo ancho/alto y una sola línea.
+   La distribución responde al ancho REAL de la fila y no solo al viewport. */
+.backupFileRow{container-name:backup-history-row;container-type:inline-size}
+.backupFileRow .backupFileActions{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ align-items:stretch;gap:8px;flex:0 1 444px;
+ width:100%;max-width:444px;min-width:0;margin-left:auto;
+}
+.backupFileRow .backupFileActions button{
+ box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+ width:100%;max-width:none;min-width:0;min-height:46px;margin:0;
+ padding:10px 9px;gap:7px;line-height:1.25;
+ font-size:12px;font-weight:650;text-align:center;white-space:nowrap;
+}
+.backupFileRow .backupFileActions button svg{
+ flex:0 0 16px;width:16px;height:16px;align-self:center;
+}
+.backupFileRow .backupFileActions .backupActionLabel{
+ display:inline-block;min-width:0;white-space:nowrap;text-align:center;
+}
 .backupFileDetails .backupRehearsalSuccess{display:grid;gap:4px;padding:9px 11px;margin-top:6px;border:1px solid #a8d9cf;border-radius:9px;background:#ecf8f5;overflow-wrap:anywhere}
 .backupFileDetails .backupRehearsalSuccess>strong{font-size:11px;color:#0d685d}
 .backupFileDetails .backupRehearsalSuccess>small{font-size:11px;color:#28645f;line-height:1.5}
-@media(max-width:760px){.backupFileRow .backupFileActions{width:100%;flex:1 1 100%;justify-content:stretch;margin-left:0}.backupFileRow .backupFileActions button{max-width:none}}
-@media(max-width:460px){.backupFileRow .backupFileActions{flex-direction:column}.backupFileRow .backupFileActions button{width:100%;flex-basis:auto}}
+/* En tarjetas medianas, los botones ocupan una fila completa del historial. */
+@container backup-history-row (max-width:840px){
+ .backupFileRow .backupFileActions{flex:1 1 100%;max-width:none;margin-left:0}
+}
+/* Cuando el área disponible es muy estrecha, se apilan AMBOS por igual. */
+@container backup-history-row (max-width:390px){
+ .backupFileRow .backupFileActions{grid-template-columns:minmax(0,1fr)}
+}
+/* Respaldo de compatibilidad para navegadores sin container queries. */
+@media(max-width:760px){.backupFileRow .backupFileActions{width:100%;flex:1 1 100%;max-width:none;margin-left:0}}
+@media(max-width:460px){.backupFileRow .backupFileActions button{width:100%}}

@@ -2,6 +2,10 @@
 
 **Versión vigente: 0.6.66 (12 de noviembre de 2026).** Continúa desde v0.6.65, sin cambiar las tablas SQLite ni los permisos existentes. Los respaldos automáticos, la selección de carpeta, la verificación de integridad y la restauración con confirmación permanecen disponibles.
 
+### Ajuste de simetría en los botones del historial (v0.6.66)
+
+Los botones **Verificar integridad** y **Ensayar recuperación** comparten ahora el mismo ancho, alto mínimo de 46 px, iconos de 16 px y texto centrado. En filas con espacio suficiente aparecen juntos en una sola línea por botón; cuando la tarjeta es estrecha, ambos se apilan con idénticas dimensiones. Los cambios son exclusivamente visuales y conservan las confirmaciones, permisos, accesibilidad, estado de carga, funciones SQLite y rutas de respaldo. Se incluyeron comprobaciones adicionales en `tests/qa-066-backup-rehearsal-ui.cjs` y pruebas visuales con Chromium en diferentes resoluciones. Es necesario validar finalmente el instalador en Windows.
+
 ## Novedades v0.6.66 — Ensayar recuperación sin afectar el negocio
 
 En **Respaldos → Historial de respaldos**, cada copia incluye un nuevo botón **Ensayar recuperación** junto a **Verificar integridad**. Es una comprobación voluntaria reservada al propietario, especialmente útil para copias alojadas en unidades externas o carpetas personalizadas.

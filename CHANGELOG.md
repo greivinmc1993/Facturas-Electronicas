@@ -1,3 +1,8 @@
+### Ajuste visual de los botones del historial (v0.6.66)
+- Los botones «Verificar integridad» y «Ensayar recuperación» ahora tienen ancho equivalente, altura de 46 px, iconos centrados de 16 px y etiquetas sin saltos de línea cuando caben en la misma fila.
+- Adaptación al ancho efectivo de cada tarjeta: ambos se redistribuyen y se apilan conjuntamente en espacios estrechos, con foco y estados de carga intactos. No se modifican APIs, roles, SQLite ni lógica de respaldo.
+- Cinco comprobaciones nuevas dentro de `tests/qa-066-backup-rehearsal-ui.cjs` y validación visual en Chromium a diferentes resoluciones.
+
 ## FacturaCR v0.6.66 — Ensayo seguro de recuperación (12 de noviembre de 2026)
 
 - Nuevo botón «Ensayar recuperación» junto a «Verificar integridad» en el historial de respaldos: crea un clon SQLite temporal, comprueba integridad, esquema, WAL, apertura de transacción y consultas de empresas, clientes, productos, ventas y proformas sin afectar el archivo original ni la base activa.
