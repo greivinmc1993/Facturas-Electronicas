@@ -13,6 +13,7 @@ import AuditPanel from './AuditPanel.jsx';
 import CashierStockPanel from './CashierStockPanel.jsx';
 import {ConfirmProvider,useConfirm} from './ConfirmProvider.jsx';
 import {createBackupHealthMonitor,mergeBackupHealthSnapshot} from './backup-health-monitor.js';
+import {getOwnerBackupNotice,getOwnerBackupCheckFailure} from './backup-owner-notice.js';
 
 const APP_VERSION = __APP_VERSION__;
 const ACTIVE_COMPANY_KEY = 'facturacr_active_company_id';
@@ -654,6 +655,7 @@ function App({account,securityPanel}){
  const restoreRunningRef=useRef(false);
  const [restoreStage,setRestoreStage]=useState('');
  const [autoBackup,setAutoBackup]=useState(null),[autoConfig,setAutoConfig]=useState({enabled:false,frequency:'daily',time:'20:00',keep:14,weekday:1,monthDay:1,directoryMode:'default',customDirectory:''});
+ const [ownerBackupNotice,setOwnerBackupNotice]=useState(null);
  const [dialog,setDialog]=useState(null);
  const askConfirm=(title,description,action,danger=false,confirmLabel)=>setDialog({title,description,action,danger,confirmLabel});
  const closeDialog=()=>setDialog(null);
@@ -773,6 +775,20 @@ function App({account,securityPanel}){
   const onVisible=()=>{if(document.visibilityState==='visible')void monitor.check();};
   document.addEventListener('visibilitychange',onVisible);
   return ()=>{document.removeEventListener('visibilitychange',onVisible);monitor.stop();if(backupHealthMonitorRef.current===monitor)backupHealthMonitorRef.current=null;};
+ },[tab,account?.isOwner]);
+ // Aviso para el propietario al entrar a Empresas o Dashboard.
+ // Una consulta por entrada a esas pantallas, sin temporizadores fuera de Respaldos.
+ // El servidor mantiene su propia autorización; no se consultan datos para otros roles.
+ useEffect(()=>{
+  if(!account?.isOwner || !['companies','dashboard'].includes(tab))return;
+  setOwnerBackupNotice(null); // Evitar mostrar un diagnóstico anterior mientras se consulta el destino actual.
+  let active=true;
+  api('/api/backups/automatic').then(data=>{
+   if(active)setOwnerBackupNotice(getOwnerBackupNotice(data?.health));
+  }).catch(()=>{
+   if(active)setOwnerBackupNotice(getOwnerBackupCheckFailure());
+  });
+  return ()=>{active=false;}; // No publicar resultados de consultas anteriores.
  },[tab,account?.isOwner]);
  const sizeLabel=bytes=>bytes==null||!Number.isFinite(Number(bytes))?'—':(Number(bytes)/1048576).toLocaleString('es-CR',{maximumFractionDigits:1})+' MB';
  const exportPdfFromRoute=async(path,name)=>{
@@ -995,6 +1011,11 @@ function App({account,securityPanel}){
   <button className={tab==='cash'?'navactive':''} onClick={()=>setTab('cash')}><span className="navIcon"><UiIcon name="receipt" size={18}/></span><span>Caja y gastos</span></button>
   {account?.isOwner&&<button className={tab==='backups'?'navactive':''} onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldos</span></button>}<span>Facturas electrónicas · Próximamente</span>{account?.isOwner&&<button className={tab==='audit'?'navactive':''} onClick={()=>setTab('audit')}><span className="navIcon"><UiIcon name="shield" size={18}/></span><span>Auditoría del propietario</span></button>}{(account?.isOwner||account?.companies?.some(c=>c.role==='company_admin')||account?.delegatedCashierCompanies?.length>0)&&<button className={tab==='users'?'navactive':''} onClick={()=>setTab('users')}><span className="navIcon"><UiIcon name="users" size={18}/></span><span>Usuarios y permisos</span></button>}
  </nav><div className="sidebarBottom"><div className="sidebarProtection"><span className="sidebarProtectionIcon" aria-hidden="true"><UiIcon name="shield" size={18}/></span><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div>{account?.isOwner&&<button type="button" className="sidebarBackupButton" onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldar base SQLite</span></button>}<small>FacturaCR · v{APP_VERSION}</small></div></aside><main>{securityPanel}{tab!=='backups'&&<header><h2>{tab==='dashboard'?'Dashboard comercial':tab==='companies'?'Empresas':tab==='clients'?'Clientes':tab==='sales'?'Punto de venta':tab==='quotes'?'Cotizaciones y proformas':tab==='valuation'?'Valoración de inventario':tab==='cash'?'Caja y gastos':tab==='kardex'?'Kardex de inventario':tab==='users'?'Usuarios y permisos':tab==='audit'?'Auditoría del propietario':tab==='cashier-kardex'?'Kardex · Movimientos':'Inventario y servicios'}</h2><p>Información guardada localmente y separada por empresa</p></header>}
+ {account?.isOwner&&['companies','dashboard'].includes(tab)&&ownerBackupNotice&&<section className={'ownerBackupNotice ownerBackupNotice-'+ownerBackupNotice.severity} role={ownerBackupNotice.severity==='warning'?'alert':'status'} aria-label="Aviso de protección de respaldos">
+  <span className="ownerBackupNoticeIcon"><UiIcon name="backup" size={19}/></span>
+  <div className="ownerBackupNoticeBody"><strong>{ownerBackupNotice.title}</strong><p>{ownerBackupNotice.detail}</p></div>
+  <button type="button" className="secondary ownerBackupNoticeAction" onClick={()=>setTab('backups')}><UiIcon name="folder-open" size={16}/><span>Revisar respaldos</span></button>
+ </section>}
  {message&&<p className="notice" role="status">{message}</p>}
  {tab==='users'&&<UsersPanel account={account}/>}
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}

@@ -1,3 +1,25 @@
+# FacturaCR v0.6.69 — Alertas preventivas de respaldos para el propietario
+
+**Versión vigente: 0.6.69 (13 de noviembre de 2026).** Conserva las funciones de v0.6.68, incluido el monitoreo cada 60 segundos **solo dentro de Respaldos**.
+
+## Avisos preventivos en Empresas y Dashboard
+
+- Cuando el propietario entra a **Empresas** o **Dashboard**, FacturaCR consulta **una vez** el diagnóstico ya existente (`GET /api/backups/automatic`) y muestra un aviso discreto únicamente si se detecta una situación que requiere revisión.
+- Se avisa cuando la carpeta o unidad no está disponible, el espacio es insuficiente, hubo un error de respaldo, hay una copia programada pendiente o todavía no se creó ninguna copia en el destino activo. Las copias al día y la creación en curso no generan falsas alertas; la desactivación voluntaria de la programación no se trata como error.
+- **Revisar respaldos** abre el módulo correspondiente, con acceso al diagnóstico, el historial, «Verificar integridad» y «Ensayar recuperación».
+- La consulta **solo ocurre al entrar a Empresas o Dashboard**, sin nuevos intervalos de vigilancia en esos módulos. Al salir, una respuesta tardía no puede actualizar el aviso. Los avisos no incluyen nombres de archivos, ubicaciones privadas ni datos empresariales; el servidor exige sesión propietaria.
+- Si falla la consulta, se indica que **no se pudo comprobar** el estado en lugar de mostrar una falsa confirmación de protección. No se modifican SQLite, permisos ni configuraciones de respaldo.
+
+### Validación rápida
+
+1. Inicia sesión como propietario y abre Empresas o Dashboard. Si el destino está en buen estado, no se añade un aviso innecesario.
+2. Utiliza una carpeta personalizada en una unidad de pruebas, deja la unidad fuera de línea con FacturaCR en reposo y entra a Empresas: debe aparecer **La carpeta de respaldos no está disponible**. No desconectes nunca unidades durante escritura.
+3. Pulsa **Revisar respaldos**, comprueba el diagnóstico y reconecta la unidad. Al regresar a Empresas se consultará de nuevo el estado.
+4. Comprueba que supervisores, administradores y cajeros **no ven el aviso** ni realizan consultas al endpoint exclusivo del propietario.
+5. Ejecuta `npm ci`, `npm test`, `npm run qa:real-server` y `npm run dist:win` en Windows. GitHub Actions debe validar además NSIS y actualización desde v0.6.34.
+
+---
+
 # FacturaCR v0.6.68 — Monitoreo automático del diagnóstico de respaldos
 
 **Versión vigente: 0.6.68 (13 de noviembre de 2026).** Conserva íntegra la v0.6.67 con historial, integridad, ensayo de recuperación, carpetas personalizadas y programación de día y hora.

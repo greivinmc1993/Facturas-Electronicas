@@ -1336,3 +1336,18 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 /* v0.6.68: indicador discreto para el monitoreo de respaldos */
 .backupHealthPanel .backupHealthMonitorInfo{display:block;margin-top:5px;font-size:10px;line-height:1.5;opacity:.82}
 .backupHealthPanel .backupHealthMonitorWarning{display:block;margin-top:6px;font-size:11px;line-height:1.5;font-weight:650;color:#9a3412;overflow-wrap:anywhere}
+
+/* v0.6.69 · Avisos preventivos discretos solo para el propietario. */
+.ownerBackupNotice{display:flex;align-items:center;gap:12px;width:100%;max-width:100%;min-width:0;margin:16px 0;padding:13px 16px;border-radius:13px;border:1px solid #f1d8a6;background:#fffbf2;color:#564016;box-shadow:0 5px 16px rgba(63,57,31,.045)}
+.ownerBackupNotice-info{background:#eef8fa;border-color:#c7e4e5;color:#174b58}
+.ownerBackupNoticeIcon{flex:0 0 34px;width:34px;height:34px;border-radius:10px;background:rgba(184,116,14,.09);display:flex;align-items:center;justify-content:center}
+.ownerBackupNotice-info .ownerBackupNoticeIcon{background:rgba(18,124,132,.10)}
+.ownerBackupNoticeBody{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.ownerBackupNoticeBody strong{display:block;font-size:14px;line-height:1.35;font-weight:750}
+.ownerBackupNoticeBody p{margin:4px 0 0;font-size:12.5px;line-height:1.5;color:inherit;opacity:.88}
+.ownerBackupNotice .ownerBackupNoticeAction{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;width:auto;min-height:39px;padding:9px 12px;border:1px solid #cadadf;background:#fff;color:#174c57;font-size:12.5px;font-weight:650;white-space:nowrap}
+.ownerBackupNotice .ownerBackupNoticeAction:hover{background:#edf6f6;border-color:#8fbac0;transform:translateY(-1px)}
+.ownerBackupNotice .ownerBackupNoticeAction:focus-visible{outline:3px solid #25a6a3;outline-offset:2px}
+@container facturacr-workspace (max-width: 660px){.ownerBackupNotice{flex-wrap:wrap}.ownerBackupNoticeAction{flex:1 1 100%!important;justify-content:center}}
+@media(max-width:690px){.ownerBackupNotice{flex-wrap:wrap}.ownerBackupNotice .ownerBackupNoticeAction{flex:1 1 100%;width:100%;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.ownerBackupNotice .ownerBackupNoticeAction:hover{transform:none}}

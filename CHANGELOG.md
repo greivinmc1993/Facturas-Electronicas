@@ -1,3 +1,11 @@
+# 0.6.69 — Avisos preventivos de protección de datos (13-11-2026)
+
+- Nuevo aviso compacto en **Empresas** y **Dashboard** para el propietario cuando el diagnóstico ya existente de Respaldos detecta falta de carpeta, poco espacio, error reciente, copia pendiente o ausencia de la primera copia. Acceso directo a Respaldos sin mostrar rutas privadas.
+- Una consulta al entrar a cada pantalla; sin intervalos adicionales fuera de Respaldos; se ignoran respuestas atrasadas cuando se abandona la pantalla. Los demás roles nunca consultan ese estado.
+- Clasificador puro `src/backup-owner-notice.js` y pruebas regresivas del formato, autorizaciones de UI, estados y responsive. No hay migraciones ni cambios en operaciones comerciales, permisos o SMTP. La compilación y pruebas NSIS de Windows corresponden a GitHub Actions.
+
+---
+
 ## FacturaCR v0.6.68 — Diagnóstico automático de respaldos (13 de noviembre de 2026)
 
 - El diagnóstico se actualiza al entrar en Respaldos y cada **60 segundos** mientras el módulo esté abierto. Al salir se desactiva el temporizador; también se evita consultar si la ventana está oculta o durante otra operación de respaldo.

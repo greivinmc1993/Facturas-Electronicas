@@ -27,7 +27,7 @@ const checks=[
   assert.match(httpQA,/fetch\(base\+'\/api\/backups\/download',\{headers:authorizedHeaders\(\)\}\)/);
   assert.match(httpQA,/fetch\(`\$\{base\}\$\{endpoint\}export\.csv\?\$\{query\}`,\{headers:authorizedHeaders\(\)\}\)/);
  }],
- ['Versión 0.6.68 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.68');assert.equal(l.version,'0.6.68');assert.equal(l.packages[''].version,'0.6.68')}],
+ ['Versión 0.6.69 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.69');assert.equal(l.version,'0.6.69');assert.equal(l.packages[''].version,'0.6.69')}],
 ];
 let pass=0;for(const [label,check]of checks){try{check();pass++;console.log('PASS',label)}catch(err){console.error('FAIL',label,err.message);process.exitCode=1}}
 console.log(`Resultado: ${pass}/${checks.length} pruebas estáticas`);
