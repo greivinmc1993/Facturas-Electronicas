@@ -1,3 +1,11 @@
+## Corrección v0.6.70 · Errores detallados y formulario fiscal simplificado (13-11-2026)
+
+- En **Empresas → Nueva empresa / Abrir perfil**, las validaciones ahora presentan una lista de **campos concretos con errores**: el texto explica qué corregir, el campo se resalta, y pulsar la indicación lleva el foco directamente a ese campo aun si la ventana requiere desplazarse.
+- Los campos de **Sucursal** y **Terminal** se retiran del formulario y de las comprobaciones visibles de preparación. **No se eliminan las columnas SQLite ni se sobrescriben los códigos existentes**: la numeración/sucursal/terminal se abordarán al implementar el generador de comprobantes XML 4.4. La ficha de preparación no significa autorización de Hacienda.
+- Se valida tipo de cédula, número, correo, actividad económica RUT (incluye `4019.0`), dirección exacta y consistencia del código postal antes de la confirmación. El servidor devuelve errores específicos y la clave `field` cuando corresponde, incluidos identificaciones duplicadas y fallos de validación.
+- El servidor distingue identificación repetida, base ocupada, disco sin espacio y problemas de acceso a SQLite; otros errores técnicos se registran localmente sin revelar SQL al usuario. Guardados transaccionales mantienen datos anteriores en fallos.
+- Compatibilidad: no hay cambios de versión ni nuevas migraciones. Se incorporan QA de validación de campos, formulario y pruebas de integración de errores con ambas API de SQLite.
+
 # FacturaCR v0.6.70 — Preparación de Facturación Electrónica 4.4
 
 **Versión vigente: 0.6.70 (13 de noviembre de 2026).** Conserva todas las funciones de 0.6.69 (avisos preventivos de respaldos, monitoreo, restauración segura y operaciones comerciales).

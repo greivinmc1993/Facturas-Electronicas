@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..'),load=p=>fs.readFileSync(path.join(root,p),'utf8');
+const main=load('src/main.jsx'),fields=load('src/CompanyFiscalFields.jsx'),server=load('server/index.js'),css=load('src/style.css'),fe=load('server/fe-preparation.js');
+let n=0;const check=(title,fn)=>{fn();n++;console.log('OK Empresa formulario:',title)};
+check('Guardar valida antes de confirmar y envía solo si es válido',()=>{assert.match(main,/validateCompanyForm\(companyForm\)/);assert.match(main,/if\(Object.keys\(errors\).length\)/);assert.match(main,/askConfirm\('Guardar empresa'/)});
+check('Formulario tiene resumen de errores con links por campo',()=>{assert.match(main,/companyErrorLinks/);assert.match(main,/Object.entries\(companyFieldErrors\)/);assert.match(main,/focusCompanyError\(key\)/)});
+check('Enfoque automático localiza el campo fallido y desplaza el formulario',()=>{assert.match(main,/COMPANY_FIELD_DOM_IDS/);assert.match(main,/scrollIntoView/);assert.match(main,/\.focus\(/)});
+check('Nueva empresa y Editar comparten el mismo diagnóstico',()=>{assert.match(main,/catch\(err\)\{reportCompanySaveError\(err\)\}/);assert.match(main,/catch\(e\)\{reportCompanySaveError\(e\)\}/)});
+check('Todos los errores llevan borde y explicación',()=>{assert.match(css,/companyFieldHasError/);assert.match(css,/companyFieldError/);assert.match(css,/companyErrorLink/)});
+check('Se preserva el formulario sin validación nativa opaca',()=>assert.match(main,/className="companyModalForm" onSubmit=\{saveCompany\} noValidate/));
+check('Sucursal y terminal NO figuran en formulario fiscal',()=>{assert.doesNotMatch(fields,/Sucursal \(3 dígitos\)|Terminal \(5 dígitos\)/);assert.doesNotMatch(fields,/idPrefix\+'-branch'|idPrefix\+'-terminal'/)});
+check('Sucursal y terminal NO figuran en el diagnóstico de preparación',()=>{assert.doesNotMatch(fe,/title:'Código de sucursal/);assert.doesNotMatch(fe,/title:'Código de terminal/)});
+check('El servidor conserva los datos existentes en almacenamiento',()=>{assert.match(server,/company_fe_preparation/);assert.match(fe,/branch:'',terminal:''/)});
+check('API informa campo y motivo, sin filtrar SQL',()=>{assert.match(server,/companyValidationField/);assert.match(server,/field:'legal_name'/);assert.match(server,/DATABASE_FULL/);assert.match(server,/console.error\('FacturaCR: error al/)});
+console.log(`QA interfaz errores de empresas: ${n}/${n} aprobadas`);

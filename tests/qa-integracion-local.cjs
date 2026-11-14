@@ -574,7 +574,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   await check('Preparación FE 4.4: ficha nueva por empresa sin alterar ventas',async()=>{
    const r=await call('GET',`/api/companies/${a}/fe/preparation`);
    assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.report.canEmit,false);
-   assert.equal(r.body.report.version,'4.4');assert.equal(r.body.report.total,10);
+   assert.equal(r.body.report.version,'4.4');assert.equal(r.body.report.total,8);
    assert.equal(r.body.settings.activity_code,'');
    const wrong=await call('GET','/api/companies/999999/fe/preparation');assert.equal(wrong.status,404);
   });
@@ -654,6 +654,34 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(r.status,400,JSON.stringify(r.body));
    const original=await call('GET',`/api/companies/${a}/fe/preparation`);
    assert.equal(original.body.settings.activity_code,'4019.0');
+  });
+  await check('Editar empresa informa el correo inválido y no modifica datos previos',async()=>{
+   const before=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   const r=await call('PUT',`/api/companies/${a}`,{...before,email:'correo-sin-arroba',fe_preparation:before.fe_preparation});
+   assert.equal(r.status,400,JSON.stringify(r.body));assert.equal(r.body.field,'email');
+   const after=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   assert.equal(after.email,before.email);
+  });
+  await check('Empresa señala campo Actividad económica en error fiscal',async()=>{
+   const old=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   const r=await call('PUT',`/api/companies/${a}`,{...old,fe_preparation:{...old.fe_preparation,activity_code:'4019.'}});
+   assert.equal(r.status,400,JSON.stringify(r.body));assert.equal(r.body.field,'activity_code');
+   const after=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   assert.equal(after.fe_preparation.activity_code,old.fe_preparation.activity_code);
+  });
+  await check('Duplicar identificación al registrar empresa señala el campo concreto',async()=>{
+   const old=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   const r=await call('POST','/api/companies',{legal_name:'Duplicada de prueba',identification:old.identification,fe_preparation:{identification_type:old.fe_preparation.identification_type}});
+   assert.equal(r.status,409,JSON.stringify(r.body));assert.equal(r.body.field,'identification');
+   const list=(await call('GET','/api/companies')).body;
+   assert.equal(list.some(x=>x.legal_name==='Duplicada de prueba'),false);
+  });
+  await check('Editar empresa conserva sucursal y terminal históricos sin mostrarlos',async()=>{
+   const old=(await call('GET','/api/companies')).body.find(c=>c.id===a);
+   const r=await call('PUT',`/api/companies/${a}`,{...old,fe_preparation:old.fe_preparation});
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   assert.equal(r.body.fe_preparation.branch,old.fe_preparation.branch);
+   assert.equal(r.body.fe_preparation.terminal,old.fe_preparation.terminal);
   });
  } finally{await started.close()}
  console.log(`QA integración local: ${passed} superadas / ${passed+failed}, ${failed} errores`);

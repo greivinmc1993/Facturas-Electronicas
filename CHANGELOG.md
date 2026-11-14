@@ -1,3 +1,10 @@
+### Corrección de v0.6.70 · 2026-11-13 — Errores de Empresas precisos y ficha fiscal simplificada
+
+- Error genérico «No se pudo actualizar la empresa» reemplazado por respuesta útil: validación por campo en cliente, enlace a cada campo erróneo, borde visible, descripción y enfoque/scroll automático.
+- API de empresas con errores estructurados (`error` + `field`), gestión de identificación duplicada compatible con SQLite y adaptadores de QA; mensajes específicos para errores de almacenamiento sin exponer SQL.
+- Se retiran **Sucursal** y **Terminal** de ambos formularios fiscales y del diagnóstico de preparación. Se conservan todos los valores de la base para futura numeración de Hacienda; no se alteran esquemas ni permisos.
+- Pruebas nuevas de campos, UI e integración. Se mantiene la versión 0.6.70 y no se generan comprobantes XML todavía.
+
 ### Corrección de v0.6.70 · 2026-11-13 — Ficha fiscal dentro de Nueva empresa y Editar perfil
 
 - Unificado el registro/edición de empresa con los datos fiscales en el modal existente; creación y actualización atómicas mediante transacciones SQLite, sin crear empresas parciales si falla una validación.

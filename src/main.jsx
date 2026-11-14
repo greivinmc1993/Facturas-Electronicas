@@ -13,6 +13,7 @@ import AuditPanel from './AuditPanel.jsx';
 import FePreparationPanel from './FePreparationPanel.jsx';
 import CompanyFiscalFields,{EMPTY_COMPANY_FISCAL,postalFromLocation} from './CompanyFiscalFields.jsx';
 import {COMPANY_ID_RULES} from '../server/company-identity.js';
+import {validateCompanyForm,COMPANY_FIELD_TITLES,COMPANY_FIELD_DOM_IDS,companyServerErrorField} from './company-form-validation.js';
 import CashierStockPanel from './CashierStockPanel.jsx';
 import {ConfirmProvider,useConfirm} from './ConfirmProvider.jsx';
 import {createBackupHealthMonitor,mergeBackupHealthSnapshot} from './backup-health-monitor.js';
@@ -98,10 +99,10 @@ async function api(url,options={}){
  const contentType=response.headers.get('content-type')||'';
  if(!contentType.includes('application/json'))throw Error(`El servidor devolvió una respuesta inesperada (${response.status}). Comprueba que FacturaCR esté iniciado correctamente y reinicia la aplicación.`);
  const data=await response.json();
- if(!response.ok)throw Error(data.error||'Error en la solicitud');
+ if(!response.ok){const err=Error(data.error||'Error en la solicitud');err.field=data.field||null;err.status=response.status;throw err;}
  return data;
 }
-function Field({title,children}){return <label className="field">{title}{children}</label>}
+function Field({title,children,error}){return <label className={'field'+(error?' companyFieldHasError':'')}>{title}{children}{error&&<small className="companyFieldError">{error}</small>}</label>}
 class ScreenErrorBoundary extends React.Component {
  constructor(props){super(props);this.state={error:null}}
  static getDerivedStateFromError(error){return {error}}
@@ -923,18 +924,38 @@ function App({account,securityPanel}){
  const change=(key,value)=>setForm(prev=>({...prev,[key]:value,...(key==='tax_code'?{tax_rate:rates[value]}:{})}));
  const resetCompanyForm=()=>setCompanyForm({legal_name:'',identification:'',trade_name:'',phone:'',email:'',address:'',website:'',social:'',avatar_color:COMPANY_COLORS[0],fe_preparation:{...EMPTY_COMPANY_FISCAL}});
  const [companyFiscalRevision,setCompanyFiscalRevision]=useState(0);
- const setCompanyFiscal=changes=>setCompanyForm(prev=>{const next={...prev.fe_preparation,...changes};return {...prev,fe_preparation:{...next,postal_code:postalFromLocation(next)}}});
+ const setCompanyFiscal=changes=>{setCompanyForm(prev=>{const next={...prev.fe_preparation,...changes};return {...prev,fe_preparation:{...next,postal_code:postalFromLocation(next)}}});setCompanyFieldErrors(prev=>{const next={...prev};Object.keys(changes).forEach(key=>delete next[key]);delete next.postal_code;return next});setCompanyModalError('')};
  const [companyModalOpen,setCompanyModalOpen]=useState(false);
  const [companySaving,setCompanySaving]=useState(false);
  const [companyModalError,setCompanyModalError]=useState('');
- const closeCompanyModal=()=>{if(!companySaving){setCompanyModalOpen(false);setEditingCompany(null)}};
+ const [companyFieldErrors,setCompanyFieldErrors]=useState({});
+ const clearCompanyFieldError=field=>setCompanyFieldErrors(prev=>{if(!prev[field])return prev;const next={...prev};delete next[field];return next});
+ const editCompanyField=(field,value)=>{setCompanyForm(prev=>({...prev,[field]:value}));clearCompanyFieldError(field);if(Object.keys(companyFieldErrors).every(key=>key===field))setCompanyModalError('')};
+ const focusCompanyError=field=>{
+  const inputId=COMPANY_FIELD_DOM_IDS[field];if(!inputId)return;
+  // Se consulta el DOM después de React renderizar los errores del formulario.
+  requestAnimationFrame(()=>{const input=document.getElementById(inputId);if(!input)return;input.scrollIntoView({block:'center',behavior:'smooth'});input.focus({preventScroll:true})});
+ };
+ const showCompanyError=(message,fields={})=>{setCompanyModalError(message);setCompanyFieldErrors(fields);const first=Object.keys(fields)[0];if(first)focusCompanyError(first)};
+ const closeCompanyModal=()=>{if(!companySaving){setCompanyModalOpen(false);setEditingCompany(null);setCompanyFieldErrors({});setCompanyModalError('')}};
  const companyIdRule=COMPANY_ID_RULES[companyForm.fe_preparation.identification_type];
- const saveCompany=e=>{e.preventDefault();askConfirm('Guardar empresa',`¿${editingCompany?'Actualizar':'Registrar'} la empresa «${companyForm.legal_name}»?`,editingCompany?updateCompany:persistCompany)};
- const persistCompany=async()=>{setCompanySaving(true);try{const created=await api('/api/companies',{method:'POST',body:JSON.stringify(companyForm)});resetCompanyForm();await refreshCompanies();setCompanyFiscalRevision(v=>v+1);setSelected(created.id);setCompanyModalOpen(false);setMessage('Empresa registrada.')}catch(err){setCompanyModalError(err.message)}finally{setCompanySaving(false)}};
+ const saveCompany=e=>{
+  e.preventDefault();
+  const errors=validateCompanyForm(companyForm);
+  if(Object.keys(errors).length){showCompanyError(Object.keys(errors).length===1?'Revisa el campo señalado antes de guardar.':`Revisa los ${Object.keys(errors).length} campos señalados antes de guardar.`,errors);return}
+  setCompanyModalError('');setCompanyFieldErrors({});
+  askConfirm('Guardar empresa',`¿${editingCompany?'Actualizar':'Registrar'} la empresa «${companyForm.legal_name}»?`,editingCompany?updateCompany:persistCompany);
+ };
+ const reportCompanySaveError=e=>{
+  const field=companyServerErrorField(e.message,e.field);
+  const message=e.message||'No se pudo guardar la empresa. Revisa los datos y vuelve a intentar.';
+  showCompanyError(field?`No se pudo guardar. Revisa el campo ${COMPANY_FIELD_TITLES[field]}.`:message,field?{[field]:message}:{});
+ };
+ const persistCompany=async()=>{setCompanySaving(true);try{const created=await api('/api/companies',{method:'POST',body:JSON.stringify(companyForm)});resetCompanyForm();await refreshCompanies();setCompanyFiscalRevision(v=>v+1);setSelected(created.id);setCompanyModalOpen(false);setCompanyFieldErrors({});setMessage('Empresa registrada.')}catch(err){reportCompanySaveError(err)}finally{setCompanySaving(false)}};
  const [editingCompany,setEditingCompany]=useState(null);
- const createCompanyProfile=()=>{setEditingCompany(null);resetCompanyForm();setCompanyModalError('');setCompanyModalOpen(true)};
- const openCompanyProfile=c=>{setSelected(c.id);setTab('companies');if(!account?.isOwner){setCompanyModalOpen(false);return}setEditingCompany(c.id);setCompanyForm({legal_name:c.legal_name,identification:c.identification,trade_name:c.trade_name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',website:c.website||'',social:c.social||'',avatar_color:COMPANY_COLORS.includes(c.avatar_color)?c.avatar_color:COMPANY_COLORS[0],fe_preparation:{...EMPTY_COMPANY_FISCAL,...c.fe_preparation}});setCompanyModalError('');setCompanyModalOpen(true)};
- const updateCompany=async()=>{setCompanySaving(true);try{await api(`/api/companies/${editingCompany}`,{method:'PUT',body:JSON.stringify(companyForm)});await refreshCompanies();setCompanyFiscalRevision(v=>v+1);setEditingCompany(null);resetCompanyForm();setCompanyModalOpen(false);setMessage('Perfil y datos fiscales actualizados.')}catch(e){setCompanyModalError(e.message)}finally{setCompanySaving(false)}};
+ const createCompanyProfile=()=>{setEditingCompany(null);resetCompanyForm();setCompanyModalError('');setCompanyFieldErrors({});setCompanyModalOpen(true)};
+ const openCompanyProfile=c=>{setSelected(c.id);setTab('companies');if(!account?.isOwner){setCompanyModalOpen(false);return}setEditingCompany(c.id);setCompanyForm({legal_name:c.legal_name,identification:c.identification,trade_name:c.trade_name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',website:c.website||'',social:c.social||'',avatar_color:COMPANY_COLORS.includes(c.avatar_color)?c.avatar_color:COMPANY_COLORS[0],fe_preparation:{...EMPTY_COMPANY_FISCAL,...c.fe_preparation}});setCompanyModalError('');setCompanyFieldErrors({});setCompanyModalOpen(true)};
+ const updateCompany=async()=>{setCompanySaving(true);try{await api(`/api/companies/${editingCompany}`,{method:'PUT',body:JSON.stringify(companyForm)});await refreshCompanies();setCompanyFiscalRevision(v=>v+1);setEditingCompany(null);resetCompanyForm();setCompanyModalOpen(false);setCompanyFieldErrors({});setMessage('Perfil y datos fiscales actualizados.')}catch(e){reportCompanySaveError(e)}finally{setCompanySaving(false)}};
  const persistItem=async()=>{try{
    await api(endpoint+(editing?`/${editing}`:''),{method:editing?'PUT':'POST',body:JSON.stringify(tab==='products'?{...form,price_includes_tax:'1'}:form)});
    setForm(tab==='products'?blankProduct:blankClient);setEditing(null);await refreshItems();setMessage('Registro guardado correctamente.');
@@ -1119,19 +1140,19 @@ function App({account,securityPanel}){
  <p className="warning">Versión de desarrollo: la eliminación de empresas está bloqueada hasta implementar autenticación. El catálogo territorial se carga desde una fuente pública y debe revisarse antes de emitir comprobantes; CABYS requiere verificación oficial. El inventario registra movimientos manuales y automáticos por ventas internas. No emite XML ni factura electrónica de Hacienda.</p>
  </main>{companyModalOpen&&<div className="companyModalOverlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closeCompanyModal()}}><section className="companyModal" role="dialog" aria-modal="true" aria-labelledby="company-modal-title" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();closeCompanyModal()}}}>
   <div className="companyModalHeader"><div><p className="companiesOverline">Perfiles independientes</p><h2 id="company-modal-title">{editingCompany?'Editar empresa':'Registrar nueva empresa'}</h2><p>Configura los datos generales y fiscales de esta empresa en un solo lugar.</p></div><button type="button" className="companyModalClose" aria-label="Cerrar ventana" onClick={closeCompanyModal} disabled={companySaving}><UiIcon name="close" size={19}/></button></div>
-  <form className="companyModalForm" onSubmit={saveCompany}>
-   {companyModalError&&<p className="companyModalError" role="alert">{companyModalError}</p>}
-   <div className="companyModalFields"><Field title="Razón social o nombre de la empresa *"><input autoFocus required maxLength="160" placeholder="Ej. Comercial La Esperanza S.A." value={companyForm.legal_name} onChange={e=>setCompanyForm({...companyForm,legal_name:e.target.value})}/></Field>
+  <form className="companyModalForm" onSubmit={saveCompany} noValidate>
+   {companyModalError&&<div className="companyModalError" role="alert"><strong>{companyModalError}</strong>{Object.keys(companyFieldErrors).length>0&&<div className="companyErrorLinks">{Object.entries(companyFieldErrors).map(([key,detail])=><button key={key} type="button" className="companyErrorLink" onClick={()=>focusCompanyError(key)}><UiIcon name="close" size={14}/><span><b>{COMPANY_FIELD_TITLES[key]||key}</b>: {detail}</span></button>)}</div>}</div>}
+   <div className="companyModalFields"><Field title="Razón social o nombre de la empresa *" error={companyFieldErrors.legal_name}><input id="company-legal-name" aria-invalid={!!companyFieldErrors.legal_name} autoFocus required maxLength="160" placeholder="Ej. Comercial La Esperanza S.A." value={companyForm.legal_name} onChange={e=>editCompanyField('legal_name',e.target.value)}/></Field>
    <div className="companyIdentitySection"><div className="companyIdentityRow">
-     <Field title="Tipo de identificación *"><select required value={companyForm.fe_preparation.identification_type} onChange={e=>setCompanyFiscal({identification_type:e.target.value})}><option value="">Seleccionar tipo</option>{Object.entries(COMPANY_ID_RULES).map(([code,rule])=><option key={code} value={code}>{rule.label}</option>)}</select></Field>
-     <Field title="Número de identificación *"><input required type="text" inputMode={companyForm.fe_preparation.identification_type==='05'?'text':'numeric'} pattern={companyIdRule?.pattern.source||'[0-9A-Za-z]{1,20}'} maxLength={companyIdRule?.maxLength||20} placeholder={companyIdRule?.placeholder||'Seleccione primero el tipo'} value={companyForm.identification} onChange={e=>setCompanyForm(prev=>({...prev,identification:e.target.value.replace(/[\s-]/g,'')}))}/></Field>
+     <Field title="Tipo de identificación *" error={companyFieldErrors.identification_type}><select id="company-identity-type" aria-invalid={!!companyFieldErrors.identification_type} required value={companyForm.fe_preparation.identification_type} onChange={e=>setCompanyFiscal({identification_type:e.target.value})}><option value="">Seleccionar tipo</option>{Object.entries(COMPANY_ID_RULES).map(([code,rule])=><option key={code} value={code}>{rule.label}</option>)}</select></Field>
+     <Field title="Número de identificación *" error={companyFieldErrors.identification}><input id="company-identity-number" aria-invalid={!!companyFieldErrors.identification} required type="text" inputMode={companyForm.fe_preparation.identification_type==='05'?'text':'numeric'} pattern={companyIdRule?.pattern.source||'[0-9A-Za-z]{1,20}'} maxLength={companyIdRule?.maxLength||20} placeholder={companyIdRule?.placeholder||'Seleccione primero el tipo'} value={companyForm.identification} onChange={e=>editCompanyField('identification',e.target.value.replace(/[\s-]/g,''))}/></Field>
     </div><p className="companyIdentityHint" role="status">{companyIdRule?.hint||'Seleccione el tipo de identificación y escriba el número correspondiente. Ambos campos son obligatorios.'} La identificación debe corresponder a la empresa inscrita en Hacienda.</p></div>
-   <Field title="Teléfono"><input maxLength="160" placeholder="8888-8888" value={companyForm.phone} onChange={e=>setCompanyForm({...companyForm,phone:e.target.value})}/></Field>
-   <Field title="Nombre comercial"><input maxLength="160" placeholder="Nombre que verá en el punto de venta" value={companyForm.trade_name} onChange={e=>setCompanyForm({...companyForm,trade_name:e.target.value})}/></Field>
-   <Field title="Correo electrónico"><input type="email" maxLength="300" placeholder="contabilidad@empresa.com" value={companyForm.email} onChange={e=>setCompanyForm({...companyForm,email:e.target.value})}/></Field>
-   <Field title="Dirección exacta (otras señas)"><textarea rows="3" maxLength="160" placeholder="Ej. 150 metros norte del parque, local 2" value={companyForm.address} onChange={e=>setCompanyForm({...companyForm,address:e.target.value})}/></Field>
-   <CompanyFiscalFields value={companyForm.fe_preparation} onChange={setCompanyFiscal} idPrefix="company-modal-fiscal" showIdentificationType={false}/>
-   <div className="companyModalTwo"><Field title="Sitio web"><input maxLength="300" placeholder="https://..." value={companyForm.website} onChange={e=>setCompanyForm({...companyForm,website:e.target.value})}/></Field><Field title="Redes sociales"><input maxLength="300" placeholder="Cuenta o enlace" value={companyForm.social} onChange={e=>setCompanyForm({...companyForm,social:e.target.value})}/></Field></div>
+   <Field title="Teléfono" error={companyFieldErrors.phone}><input id="company-phone" aria-invalid={!!companyFieldErrors.phone} maxLength="160" placeholder="8888-8888" value={companyForm.phone} onChange={e=>editCompanyField('phone',e.target.value)}/></Field>
+   <Field title="Nombre comercial" error={companyFieldErrors.trade_name}><input id="company-trade-name" aria-invalid={!!companyFieldErrors.trade_name} maxLength="160" placeholder="Nombre que verá en el punto de venta" value={companyForm.trade_name} onChange={e=>editCompanyField('trade_name',e.target.value)}/></Field>
+   <Field title="Correo electrónico" error={companyFieldErrors.email}><input id="company-email" aria-invalid={!!companyFieldErrors.email} type="email" maxLength="300" placeholder="contabilidad@empresa.com" value={companyForm.email} onChange={e=>editCompanyField('email',e.target.value)}/></Field>
+   <Field title="Dirección exacta (otras señas)" error={companyFieldErrors.address}><textarea id="company-address" aria-invalid={!!companyFieldErrors.address} rows="3" maxLength="160" placeholder="Ej. 150 metros norte del parque, local 2" value={companyForm.address} onChange={e=>editCompanyField('address',e.target.value)}/></Field>
+   <CompanyFiscalFields value={companyForm.fe_preparation} onChange={setCompanyFiscal} idPrefix="company-modal-fiscal" showIdentificationType={false} errors={companyFieldErrors}/>
+   <div className="companyModalTwo"><Field title="Sitio web" error={companyFieldErrors.website}><input id="company-website" aria-invalid={!!companyFieldErrors.website} maxLength="300" placeholder="https://..." value={companyForm.website} onChange={e=>editCompanyField('website',e.target.value)}/></Field><Field title="Redes sociales" error={companyFieldErrors.social}><input id="company-social" aria-invalid={!!companyFieldErrors.social} maxLength="300" placeholder="Cuenta o enlace" value={companyForm.social} onChange={e=>editCompanyField('social',e.target.value)}/></Field></div>
    <div className="companyColorArea"><div><strong className="companyColorHeading">Color de identificación</strong><p className="hint">Identifica visualmente tu empresa en las tarjetas y el menú lateral.</p><div className="companyColorChoices" role="group" aria-label="Color de identificación">{COMPANY_COLORS.map(color=><button key={color} type="button" aria-label={`Elegir color ${color}`} aria-pressed={companyForm.avatar_color===color} className={'companyColorOption '+(companyForm.avatar_color===color?'isActive':'')} style={{backgroundColor:color}} onClick={()=>setCompanyForm(prev=>({...prev,avatar_color:color}))}>{companyForm.avatar_color===color&&<UiIcon name="check" size={19}/>}</button>)}</div></div><div className="companyColorPreview"><small>Vista previa</small><div className="companyColorPreviewRow"><span className="companyColorPreviewAvatar" style={{background:`linear-gradient(180deg, ${companyForm.avatar_color||COMPANY_COLORS[0]}, ${companyForm.avatar_color||COMPANY_COLORS[0]})`}}>{(companyForm.trade_name||companyForm.legal_name||'E').charAt(0).toUpperCase()}</span><span><strong>{companyForm.trade_name||companyForm.legal_name||'Nombre de empresa'}</strong><small>{companyForm.identification||'Identificación'}</small></span></div></div></div><p className="companyModalInfo"><UiIcon name="shield" size={16}/> La información permanece en tu equipo. La identificación es obligatoria. La ficha fiscal prepara los datos de la futura emisión XML 4.4.</p></div>
    <div className="companyModalFooter"><button type="button" className="secondary" onClick={closeCompanyModal} disabled={companySaving}>Cancelar</button><button type="submit" disabled={companySaving}>{companySaving?'Guardando…':editingCompany?'Guardar cambios':'✓ Crear empresa'}</button></div>
   </form>

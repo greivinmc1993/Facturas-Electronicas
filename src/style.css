@@ -1405,3 +1405,16 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .companyIdentityRow :is(input,select){width:100%;max-width:100%;box-sizing:border-box;min-width:0}
 .companyIdentityHint{font-size:12px;line-height:1.45;margin:10px 0 0;color:#557386;overflow-wrap:anywhere}
 @media(max-width:570px){.companyIdentityRow{grid-template-columns:minmax(0,1fr);gap:10px}.companyIdentitySection{padding:12px}}
+
+/* v0.6.70 · Avisos específicos en Nueva empresa / Editar empresa. */
+.companyModalError{flex:0 0 auto;max-height:min(31vh,245px);overflow-y:auto;line-height:1.45;margin:12px 22px 0;padding:13px 15px}
+.companyModalError>strong{display:block;font-size:13px;line-height:1.5}
+.companyErrorLinks{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin-top:10px}
+.companyModalError .companyErrorLink{display:flex;gap:9px;align-items:flex-start;text-align:left;width:100%;min-width:0;border:1px solid #edc3bb;border-radius:9px;background:#fffaf8;color:#8b3027;padding:9px 11px;line-height:1.5;font-size:12px;font-weight:450;cursor:pointer;white-space:normal;box-shadow:none}
+.companyModalError .companyErrorLink:hover,.companyModalError .companyErrorLink:focus-visible{background:#fff1ec;border-color:#de8271;outline:2px solid #edb8a9;outline-offset:1px;transform:none}
+.companyModalError .companyErrorLink svg{flex:0 0 14px;margin-top:2px}
+.companyModalError .companyErrorLink span{min-width:0;overflow-wrap:anywhere}
+.companyModalFields .companyFieldHasError :is(input,textarea,select),.companyModalFields :is(input,textarea,select)[aria-invalid="true"]{border:1.5px solid #d45445!important;background:#fff8f6!important;box-shadow:0 0 0 2px rgba(212,84,69,.08)}
+.companyModalFields .companyFieldHasError :is(input,textarea,select):focus-visible{outline:2px solid #e39485;outline-offset:1px}
+.companyModalFields .companyFieldHasError .companyFieldError{font-size:11.5px;line-height:1.5;font-weight:650;color:#a42e23;overflow-wrap:anywhere}
+@media(max-width:560px){.companyModalError{margin:10px 14px 0;padding:11px 12px;max-height:30vh}}

@@ -36,9 +36,9 @@ const {pathToFileURL}=require('node:url');
   const result=describeFePreparation(company,{}, {total:4,missingCabys:2});
   assert.equal(result.canEmit,false);assert.ok(result.missing.some(x=>x.includes('CAByS')));assert.ok(result.missing.some(x=>x.includes('Actividad')));
  });
- check('Ficha completa registra 10 comprobaciones locales sin autorizar emisión',()=>{
+ check('Ficha completa registra 8 comprobaciones visibles sin autorizar emisión',()=>{
   const result=describeFePreparation(company,valid,{total:4,missingCabys:0});
-  assert.equal(result.completed,10);assert.equal(result.total,10);assert.equal(result.canEmit,false);assert.equal(result.scope,'preparation-only');
+  assert.equal(result.completed,8);assert.equal(result.total,8);assert.equal(result.canEmit,false);assert.equal(result.scope,'preparation-only');
  });
  check('Catálogo vacío no se declara listo para emisión',()=>{
   const result=describeFePreparation(company,valid,{total:0,missingCabys:0});assert.equal(result.checks.at(-1).ok,false);

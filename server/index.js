@@ -519,6 +519,38 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       .run(companyId,...fiscalKeys.map(k=>settings[k]));
   };
   const fiscalFromBody=body=>body?.fe_preparation===undefined?null:parseFePreparation(body.fe_preparation);
+  // Errores de empresa concretos, sin exponer SQL ni datos privados a la interfaz.
+  const companyValidationField=message=>{
+    const text=String(message||'');
+    if(/seleccione el tipo|tipo de identificaci[oó]n/i.test(text))return 'identification_type';
+    if(/número de identificación|c[eé]dula|DIMEX|NITE|identificaci[oó]n ya/i.test(text))return 'identification';
+    if(/actividad econ[oó]mica/i.test(text))return 'activity_code';
+    if(/c[oó]digo postal/i.test(text))return 'postal_code';
+    if(/provincia/i.test(text))return 'province';
+    if(/cant[oó]n/i.test(text))return 'canton';
+    if(/distrito/i.test(text))return 'district';
+    if(/sucursal/i.test(text))return 'branch';
+    if(/terminal/i.test(text))return 'terminal';
+    return null;
+  };
+  const companyValidationFailure=(res,error)=>{
+    const message=String(error?.message||'Revisa los datos fiscales de la empresa.');
+    return res.status(400).json({error:message,field:companyValidationField(message)});
+  };
+  const companyDatabaseFailure=(res,error,action)=>{
+    const code=String(error?.code||'');
+    if(code.startsWith('SQLITE_CONSTRAINT_UNIQUE')||code.startsWith('SQLITE_CONSTRAINT_PRIMARYKEY')||(code==='SQLITE_CONSTRAINT'&&/companies\.identification/i.test(String(error?.message||'')))||(code==='ERR_SQLITE_ERROR'&&Number(error?.errcode)===2067&&/companies\.identification/i.test(String(error?.message||''))))
+      return res.status(409).json({error:'Ya existe una empresa con ese número de identificación.',field:'identification'});
+    if(code==='SQLITE_BUSY'||code==='SQLITE_LOCKED')
+      return res.status(503).json({error:'La base de datos está ocupada. Cierra otras operaciones e inténtalo de nuevo.',code:'DATABASE_BUSY'});
+    if(code==='SQLITE_FULL')
+      return res.status(507).json({error:'No queda espacio suficiente para guardar los cambios. Comprueba el espacio del disco.',code:'DATABASE_FULL'});
+    if(code==='SQLITE_READONLY'||code==='SQLITE_CANTOPEN')
+      return res.status(500).json({error:'No es posible escribir en la base de datos. Revisa el acceso a la carpeta de datos.',code:'DATABASE_ACCESS'});
+    console.error('FacturaCR: error al '+action+' empresa (consulta el registro local del servidor):',error);
+    return res.status(500).json({error:'No se pudieron guardar los cambios por un error interno de la base de datos. Revisa el registro local de FacturaCR; los datos anteriores se conservaron.',code:'COMPANY_SAVE_FAILED'});
+  };
+
   const companyView=id=>{
     const record=db.prepare('SELECT id,legal_name,identification,trade_name,phone,email,address,website,social,avatar_color FROM companies WHERE id=?').get(id);
     if(!record)return null;
@@ -535,12 +567,13 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     const identification=String(req.body?.identification??'').trim();
     const extra=Object.fromEntries(['trade_name','phone','email','address','website','social'].map(k=>[k,String(req.body?.[k]??'').trim()]));
     const avatar_color=companyColors.includes(req.body?.avatar_color)?req.body.avatar_color:companyColors[0];
-    if(Object.values(extra).some(v=>v.length>300))return res.status(400).json({error:'Los datos adicionales no pueden superar 300 caracteres.'});
+    for(const [field,value] of Object.entries(extra))if(value.length>(field==='address'?160:300))return res.status(400).json({error:`${{address:'Dirección exacta',phone:'Teléfono',trade_name:'Nombre comercial',email:'Correo electrónico',website:'Sitio web',social:'Redes sociales'}[field]}: demasiado largo.`,field});
     if(!legal_name||legal_name.length>160)
-      return res.status(400).json({error:'Ingrese una razón social de máximo 160 caracteres.'});
+      return res.status(400).json({error:'Ingrese una razón social de máximo 160 caracteres.',field:'legal_name'});
+    if(extra.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(extra.email))return res.status(400).json({error:'Correo electrónico: escribe una dirección válida, por ejemplo empresa@dominio.com.',field:'email'});
     let fiscal;
     try{fiscal=fiscalFromBody(req.body);validateCompanyIdentification(fiscal?.identification_type,identification,{allowUntyped:!fiscal})}
-    catch(err){return res.status(400).json({error:err.message})}
+    catch(err){return companyValidationFailure(res,err)}
     try{
       const createdId=db.transaction(()=>{
         const row=db.prepare('INSERT INTO companies(legal_name,identification,trade_name,phone,email,address,website,social,avatar_color) VALUES (?,?,?,?,?,?,?,?,?)').run(legal_name,identification,...Object.values(extra),avatar_color);
@@ -550,8 +583,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       })();
       return res.status(201).json(companyView(createdId));
     }catch(err){
-      if(err.code?.startsWith('SQLITE_CONSTRAINT'))return res.status(409).json({error:'La identificación ya está registrada.'});
-      console.error(err);return res.status(500).json({error:'No se pudo guardar la empresa.'});
+      return companyDatabaseFailure(res,err,'crear');
     }
   });
   app.put('/api/companies/:id',(req,res)=>{
@@ -561,22 +593,25 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     if(!previous)return res.status(404).json({error:'Empresa no encontrada.'});
     const fields=['legal_name','identification','trade_name','phone','email','address','website','social','avatar_color'];
     const values=Object.fromEntries(fields.map(k=>[k,String(req.body?.[k]??previous[k]??'').trim()]));
-    if(!companyColors.includes(values.avatar_color))return res.status(400).json({error:'El color seleccionado no es válido.'});
-    if(!values.legal_name||values.legal_name.length>160||fields.slice(2,8).some(k=>values[k].length>300))
-      return res.status(400).json({error:'Revise los datos de la empresa.'});
+    if(!companyColors.includes(values.avatar_color))return res.status(400).json({error:'El color seleccionado no es válido.',field:'avatar_color'});
+    if(!values.legal_name||values.legal_name.length>160)return res.status(400).json({error:'Razón social: escribe un nombre de máximo 160 caracteres.',field:'legal_name'});
+    for(const field of fields.slice(2,8)){
+      if(values[field].length>(field==='address'?160:300))return res.status(400).json({error:`${{trade_name:'Nombre comercial',phone:'Teléfono',email:'Correo electrónico',address:'Dirección exacta',website:'Sitio web',social:'Redes sociales'}[field]}: supera el máximo de caracteres permitido.`,field});
+    }
+    if(values.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email))return res.status(400).json({error:'Correo electrónico: escribe una dirección válida, por ejemplo empresa@dominio.com.',field:'email'});
     let fiscal;
     try{
       fiscal=fiscalFromBody(req.body);
       const originalType=db.prepare('SELECT identification_type FROM company_fe_preparation WHERE company_id=?').get(id)?.identification_type||'';
       validateCompanyIdentification(fiscal?.identification_type??originalType,values.identification,{allowUntyped:!fiscal&&!originalType});
-    }catch(err){return res.status(400).json({error:err.message})}
+    }catch(err){return companyValidationFailure(res,err)}
     try{
       db.transaction(()=>{
         db.prepare(`UPDATE companies SET ${fields.map(k=>k+'=?').join(',')} WHERE id=?`).run(...fields.map(k=>values[k]),id);
         if(fiscal)upsertFiscal(id,fiscal);
       })();
       res.json(companyView(id));
-    }catch(err){res.status(err.code?.startsWith('SQLITE_CONSTRAINT')?409:500).json({error:'No se pudo actualizar la empresa.'})}
+    }catch(err){return companyDatabaseFailure(res,err,'actualizar')}
   });
   // FacturaCR v0.6.70: ficha fiscal y diagnóstico LOCAL. No genera ni envía XML.
   const feReadinessFor=companyId=>{

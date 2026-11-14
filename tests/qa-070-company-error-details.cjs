@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const {validateCompanyForm,companyServerErrorField,COMPANY_FIELD_DOM_IDS}=await import(pathToFileURL(path.resolve(__dirname,'../src/company-form-validation.js')));
+ let n=0;const check=(name,fn)=>{fn();n++;console.log('OK Empresa diagnósticos:',name)};
+ const good={legal_name:'Empresa de prueba',identification:'115460323',email:'contacto@example.com',address:'Costado este del parque',fe_preparation:{identification_type:'01',activity_code:'4019.0',province:'1',canton:'10',district:'05',postal_code:'11005'}};
+ check('Empresa válida permite guardar sin exigir sucursal y terminal',()=>assert.deepEqual(validateCompanyForm(good),{}));
+ check('Cédula y tipo obligatorios se notifican por separado',()=>{const result=validateCompanyForm({...good,identification:'',fe_preparation:{...good.fe_preparation,identification_type:''}});assert.ok(result.identification);assert.ok(result.identification_type)});
+ check('Cédula invalida identifica el campo exacto',()=>assert.match(validateCompanyForm({...good,identification:'11546032'}).identification,/9 dígitos/));
+ check('Correo inválido se señala en su propio campo',()=>assert.match(validateCompanyForm({...good,email:'correo-incompleto'}).email,/correo válido/));
+ check('Actividad RUT de ejemplo 4019.0 se acepta',()=>assert.ok(!validateCompanyForm(good).activity_code));
+ check('Actividad RUT con formato incorrecto se señala',()=>assert.match(validateCompanyForm({...good,fe_preparation:{...good.fe_preparation,activity_code:'4019.'}}).activity_code,/4019.0/));
+ check('Código postal contradictorio se señala',()=>assert.match(validateCompanyForm({...good,fe_preparation:{...good.fe_preparation,postal_code:'11001'}}).postal_code,/código postal/));
+ check('Cantón sin provincia se señala en Provincia',()=>assert.ok(validateCompanyForm({...good,fe_preparation:{...good.fe_preparation,province:''}}).province));
+ check('Nombre largo y otras señas largas se señalan',()=>{const x=validateCompanyForm({...good,legal_name:'a'.repeat(161),address:'x'.repeat(161)});assert.ok(x.legal_name);assert.ok(x.address)});
+ check('Mapeo de error del servidor reconoce duplicados',()=>assert.equal(companyServerErrorField('Ya existe una empresa con ese número de identificación.'),'identification'));
+ check('Mapeo reconoce errores de actividad',()=>assert.equal(companyServerErrorField('Actividad económica (RUT): formato inválido.'),'activity_code'));
+ check('Prioridad del campo explícito del servidor',()=>assert.equal(companyServerErrorField('Error desconocido','email'),'email'));
+ check('Todos los campos inválidos tienen destino para enfocar',()=>{for(const field of Object.keys(validateCompanyForm({...good,identification:'',email:'mal',address:'x'.repeat(161)})))assert.ok(COMPANY_FIELD_DOM_IDS[field],field)});
+ console.log(`QA validación y errores de empresas: ${n}/${n} aprobadas`);
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1});

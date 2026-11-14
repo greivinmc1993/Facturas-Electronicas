@@ -19,8 +19,8 @@ check('Administrador conserva su ruta de configuración fiscal, sin editar empre
 check('Modal grande tiene contenido desplazable y distribución responsive',()=>{assert.match(css,/\.companyModal\{width:min\(100%,820px\)/);assert.match(css,/\.companyFiscalGrid\{display:grid/);assert.match(css,/@media\(max-width:650px\)/)});
 check('Tipo y número de identificación están en la misma sección y son obligatorios',()=>{
  assert.match(main,/className="companyIdentitySection"/);assert.match(main,/className="companyIdentityRow"/);
- assert.match(main,/<Field title="Tipo de identificación \*"><select required/);
- assert.match(main,/<Field title="Número de identificación \*"><input required/);
+ assert.match(main,/<Field title="Tipo de identificación \*" error=\{companyFieldErrors.identification_type\}><select/);
+ assert.match(main,/<Field title="Número de identificación \*" error=\{companyFieldErrors.identification\}><input/);
 });
 check('El formulario sólo muestra un selector de tipo y mantiene la ficha fiscal',()=>{
  assert.match(main,/showIdentificationType=\{false\}/);
