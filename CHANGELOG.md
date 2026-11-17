@@ -1,3 +1,10 @@
+### Ajuste puntual v0.6.72 — Consistencia fiscal XML en una línea y GitHub Actions Windows (17/11/2026)
+
+- Se conserva un único `LineaDetalle` por artículo, incluso con 15 unidades a ₡700 finales. Se preserva la fotografía fiscal con IVA incluido y total ₡10.500,00; se explica el residuo de ₡0,00005 debido al máximo de cinco decimales en precio unitario.
+- Nueva comprobación de redondeo unitario en el borrador XML: rechaza precios unitarios incoherentes con la base/cantidad o alteraciones del total final cuando no hay descuentos, sin modificar IVA, cobros o SQLite. Se emite advertencia informativa solo cuando existe un residuo legítimo.
+- Se corrige la prueba `qa-072-impresion-tras-vuelto.cjs` para aceptar finales de línea CRLF de Windows / GitHub Actions. No se cambia el código funcional de impresión.
+- Nueva prueba `qa-072-precision-xml-unitario.cjs` integrada en suite y syntax. Sigue pendiente prueba oficial XSD y sandbox de Hacienda; no habilita emisión real.
+
 ### Ajuste puntual v0.6.72 — Orden de precios y catálogo en Clientes (17/11/2026)
 
 - Se adelanta **Cómo se ingresa el precio** antes de Precio, Costo y Moneda en **Inventario y servicios**, sin alterar valor predeterminado, persistencia, vista previa, tarifas ni motor fiscal.

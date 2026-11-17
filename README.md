@@ -1,5 +1,13 @@
 # FacturaCR v0.6.72 — Precisión fiscal de Ventas, vuelto visible y enlaces oficiales
 
+## Ajuste puntual v0.6.72 · Redondeo unitario de XML y estabilidad en GitHub Actions
+
+- **Sin dividir productos en varias líneas:** una venta de 15 Pepsi a ₡700 finales se expresa en un único `LineaDetalle`, `Cantidad=15.000`, `PrecioUnitario=619.46903`, `MontoTotal=9292.03540`, `Impuesto=1207.96460` y `TotalComprobante=10500.00000`.
+- **Residuo decimal explícito:** al multiplicar el unitario publicado por 15 aparece ₡0,00005 de diferencia. Este residuo es matemáticamente inevitable cuando la base neta requiere más de cinco decimales por unidad; el XML preserva la base e IVA calculados desde el **total final real**. Un validador nuevo detecta el precio unitario que no corresponde al redondeo exacto y bloquea alteraciones artificiales; una advertencia informa el residuo, sin afirmar aprobación de Hacienda.
+- **Sin cambios de dinero ni SQLite:** no se modifican ventas, facturas históricas, inventario, cobros, impuestos ni el motor `BigInt` de precios. No se crean descuentos ni líneas ficticias. **Pendiente:** validación XSD 4.4 y prueba real en ambiente de Hacienda antes de emitir comprobantes.
+- **GitHub Actions Windows:** `qa-072-impresion-tras-vuelto.cjs` normaliza `CRLF` y `LF` al leer `src/main.jsx`. Evita un error de coincidencia de texto exclusivo de Windows; no cambia la impresión real.
+- **QA nuevo:** `tests/qa-072-precision-xml-unitario.cjs` se ejecuta con `npm test`, y pruebas de sintaxis y regresión de impresión permanecen activas.
+
 ## Ajuste puntual de interfaz v0.6.72 · Orden de precios y catálogo de actividades de clientes
 
 - En **Inventario y servicios → Productos y servicios**, **Cómo se ingresa el precio** aparece ahora **antes** de los campos Precio / Costo / Moneda. Continúa seleccionada por defecto la opción **Precio final con IVA incluido**; la etiqueta dinámica, tarifas y la vista previa fiscal conservan su lógica.

@@ -3,7 +3,10 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
-const ui=fs.readFileSync(path.resolve(__dirname,'../src/main.jsx'),'utf8');
+// Windows Git puede convertir archivos de trabajo a CRLF; los cortes de prueba usan LF.
+const normalizeLines=text=>text.replace(/\r\n?/g,'\n');
+const ui=normalizeLines(fs.readFileSync(path.resolve(__dirname,'../src/main.jsx'),'utf8'));
+assert.equal(normalizeLines(ui.replace(/\n/g,'\r\n')),ui,'El parser de pruebas funciona con archivos CRLF de Windows');
 
 const section=(start,end)=>{
   const from=ui.indexOf(start);

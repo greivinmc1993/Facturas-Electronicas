@@ -100,6 +100,25 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
       const keys=['unit_price','subtotal','discount','base','tax','total','input_price'];
       try{
         fiscal=Object.fromEntries(keys.map(k=>[k,parseFive(line['fiscal_'+k+'_5'])]));
+        // Un único renglón comercial: la base IVA incluido se calcula sobre el total
+        // real, y el unitario XML se redondea a cinco decimales. La diferencia entre
+        // ambos solo puede ser el residuo matemático de ese redondeo (0.00001 CRC/tick).
+        // Nunca se corrige mediante una segunda línea, descuento ficticio o IVA alterado.
+        if(Number.isSafeInteger(line.quantity)&&line.quantity>0){
+          const qty=BigInt(line.quantity),expectedUnit=roundRatio(fiscal.subtotal,qty);
+          const residual=fiscal.unit_price*qty-fiscal.subtotal;
+          const absoluteResidual=residual<0n?-residual:residual;
+          if(fiscal.unit_price!==expectedUnit||absoluteResidual*2n>qty){
+            issues.push(`${suffix}: precio unitario y monto total no corresponden a un redondeo unitario de cinco decimales. No se altera la venta.`);
+          }else if(residual!==0n){
+            warnings.push(`${suffix}: residuo de redondeo unitario de ₡${five(absoluteResidual)} (cinco decimales, una sola línea). Pendiente de validar la aceptación en Hacienda.`);
+          }
+          // Sin descuentos, el total que el comercio cobró con IVA incluido
+          // debe ser exactamente el precio de entrada por la cantidad.
+          if(Number(line.fiscal_includes_tax)===1&&fiscal.discount===0n&&fiscal.input_price*qty!==fiscal.total){
+            issues.push(`${suffix}: el total fiscal no conserva el precio final con IVA incluido registrado.`);
+          }
+        }
         const expectedTax=roundRatio(fiscal.base*BigInt(Math.round(rate*100)),10000n);
         if(fiscal.subtotal-fiscal.discount!==fiscal.base||fiscal.base+fiscal.tax!==fiscal.total)
           issues.push(`${suffix}: la fotografía fiscal almacenada no concilia (base, descuento, impuesto y total).`);
