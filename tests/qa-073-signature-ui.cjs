@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
+const ui=read('src/FeSignatureReadiness.jsx'),panel=read('src/FePreparationPanel.jsx'),main=read('electron/main.cjs'),preload=read('electron/preload.cjs'),css=read('src/style.css');
+let n=0;const t=(name,fn)=>{fn();n++;console.log('OK interfaz firma v0.6.73:',name)};
+t('Disponible desde el panel FE por empresa, no desde caja',()=>{assert.match(panel,/<FeSignatureReadiness companyId=\{companyId\}/);assert.match(read('src/main.jsx'),/account\?\.isOwner\|\|account\?\.companies/)});
+t('No agrega rutas HTTP de certificados ni archivos de datos',()=>{assert.doesNotMatch(read('server/index.js'),/inspect-p12|upload-p12|sign-xml|fe\/sign/)});
+t('Electron usa selector nativo y lista de extensiones reducida',()=>{assert.match(main,/facturacr:inspect-p12/);assert.match(main,/dialog\.showOpenDialog/);assert.match(main,/extensions:\['p12','pfx'\]/);assert.match(main,/lstat\(filename\)/)});
+t('IPC solo acepta la ventana autorizada',()=>assert.match(main,/event\.sender!==mainWindow\?\.webContents/));
+t('No acepta rutas arbitrarias enviadas desde React',()=>{assert.match(preload,/inspectP12:\(passphrase\)=>ipcRenderer\.invoke\('facturacr:inspect-p12',passphrase\)/);assert.doesNotMatch(preload,/filePath|path,passphrase/)});
+t('Password temporal se borra en el cliente antes de inspeccionar',()=>{assert.match(ui,/type="password"/);assert.match(ui,/setSecret\(''\);setResult\(null\)/);assert.match(ui,/const ephemeralSecret=secret/)});
+t('Cambio de empresa limpia resultado y evita respuestas anteriores',()=>{assert.match(ui,/generation\.current\+\+/);assert.match(ui,/\[companyId\]/);assert.match(ui,/id!==generation\.current/)});
+t('No muestra un botón de emisión ni permite firmar',()=>{assert.match(ui,/no firma archivos XML/);assert.doesNotMatch(ui,/onClick=.*[Ee]mitir|onClick=.*[Ff]irmar/)});
+t('El navegador web no solicita contraseñas',()=>assert.match(ui,/No se solicitan contraseñas desde el navegador web/));
+t('Estilo adaptable y sin pérdida de ancho',()=>{assert.match(css,/\.feSignatureControls\{display:flex/);assert.match(css,/@media\(max-width:610px\)/)});
+console.log(`QA interfaz firma v0.6.73: ${n}/${n} aprobadas`);

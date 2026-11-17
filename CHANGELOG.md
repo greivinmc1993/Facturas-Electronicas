@@ -1,3 +1,20 @@
+## v0.6.73 — Inspección efímera de PKCS#12 y preparación segura para firma (17/11/2026)
+
+- Nuevo panel **Revisión local de certificado digital** en la preparación FE 4.4 por empresa (propietario y administrador con acceso), sin ofrecer firma ni emisión.
+- El proceso principal de Electron permite elegir **.p12/.pfx** mediante diálogo nativo; limita tamaño a 4 MB y rechaza rutas arbitrarias desde el renderer. La contraseña no se persiste ni se exporta y se limpia del estado del formulario tras solicitar el diagnóstico.
+- Se utiliza TLS/cripto del propio Node para leer un PKCS#12 que incluya certificado y clave privada; se exponen únicamente sujeto, emisor, vigencia, huella SHA-256 y tipo de clave pública; se informa si está fuera de fecha o si no usa RSA de al menos 2048 bits.
+- No se almacena ningún certificado en SQLite y no se introducen dependencias adicionales. Los datos fiscales, ventas, usuarios, respaldos y catálogos no se modifican.
+- Se añade QA criptográfica con archivos temporales de **ensayo** (OpenSSL cuando está disponible) y QA estática de integración de Electron/UI, incorporada a `npm test` y Actions. Se actualizaron los metadatos de versión a 0.6.73.
+- **Límite explícito:** aún no se ha implementado la firma XAdES-EPES, validación XSD 4.4, comprobación de revocación/cadena, clave fiscal real, ni el envío a Hacienda. No se debe usar el borrador XML como factura válida. Las pruebas de instalador NSIS y certificados reales en Windows siguen pendientes.
+
+## v0.6.72 — Ajuste visual de Usuarios y enlaces CABYS (17/11/2026)
+
+- Se agrupan y alinean los botones «Quitar acceso» y «Permitir/Revocar administración de cajeros» por empresa. El selector de rol y las acciones «Suspender/Reactivar» y «Eliminar perfil» forman una barra coherente que se adapta al ancho del panel.
+- La lista de URLs oficiales permitidas en Electron incorpora los destinos de Hacienda y del archivo BCCR para que se abran en el navegador externo sin permitir páginas arbitrarias.
+- Los enlaces CABYS ahora llevan a la consulta oficial en Hacienda y directamente al archivo Excel publicado por BCCR, en lugar de a un comunicado de prensa. El acceso al archivo externo puede depender de disponibilidad del sitio.
+- Se conservan permisos, confirmaciones, estados, registro histórico, catálogos y motor fiscal; no se modifica SQLite.
+- Se añadió una prueba estática de 11 verificaciones para UI y vínculos. Pendiente: revisión visual real en Windows y descarga del XLSX desde la red del usuario.
+
 ### Ajuste puntual v0.6.72 — Visibilidad de perfiles eliminados y error de usuario duplicado (17/11/2026)
 
 - El panel **Usuarios y permisos** muestra una sección desplegable **Perfiles eliminados**, en solo lectura, filtrada por los mismos permisos que el listado habitual. Deja de parecer que un nombre reservado no existe.

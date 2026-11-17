@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import './style.css';
 import CompanyFiscalFields,{EMPTY_COMPANY_FISCAL} from './CompanyFiscalFields.jsx';
+import FeSignatureReadiness from './FeSignatureReadiness.jsx';
 
 const EMPTY=EMPTY_COMPANY_FISCAL;
 export default function FePreparationPanel({company,onEditCompany,canEditProfile=false,refreshToken=0}){
@@ -40,6 +41,7 @@ export default function FePreparationPanel({company,onEditCompany,canEditProfile
     </form>}
    {saved&&<p className="fePreparationSuccess" role="status">{saved}</p>}
    {error&&<p className="fePreparationError" role="alert">{error}</p>}
+   <FeSignatureReadiness companyId={companyId}/>
    <p className="fePreparationDisclaimer">Pendientes para emisión real: validación contra XSD y catálogos vigentes, numeración y clave, firma XAdES-EPES, credenciales y API de Hacienda, recepción y estados. Ningún dato se envía desde esta pantalla.</p>
   </>}
  </section>;

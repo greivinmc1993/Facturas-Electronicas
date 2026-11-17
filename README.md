@@ -4,7 +4,39 @@
 - Si Hacienda no devuelve el código `2449001000000`, muestra una **referencia publicada**, claramente no verificada en línea, con indicación para confirmarlo en el catálogo actual del BCCR. No se modifica el IVA ni se afirma aceptación fiscal.
 - Se agregan pruebas de regresión CIIU4/CABYS y se conservan datos de clientes, productos y ventas sin migraciones.
 
-# FacturaCR v0.6.72 — Precisión fiscal de Ventas, vuelto visible y enlaces oficiales
+# FacturaCR v0.6.73 — Revisión segura de certificado para futura firma XAdES-EPES
+
+## Nueva etapa v0.6.73 · Inspección segura de certificados digitales
+
+En **Empresas → Preparación para factura electrónica 4.4 → Revisión local de certificado digital**, el propietario y los administradores autorizados pueden revisar un archivo **PKCS#12 (.p12 / .pfx)** usando el selector nativo de Windows. La contraseña se introduce en la interfaz, se usa una sola vez en el proceso principal de Electron y se elimina del estado del formulario; **no se almacena en SQLite, ni en archivos de configuración, auditoría o reportes**. El archivo se lee en memoria con un límite de 4 MB y su búfer se borra después de procesarlo; nunca se copia al proyecto.
+
+Se muestra el **sujeto**, emisor, vigencia, huella SHA-256 y tipo/longitud de clave pública. La inspección requiere un PKCS#12 legible que contenga clave privada y certificado. Identifica un certificado caducado o aún no vigente y una clave que no sea RSA de al menos 2048 bits. La información es **un diagnóstico técnico, no un veredicto de aceptación fiscal**. Aún falta validar cadena de confianza, revocación, correspondencia con el contribuyente/RUT, política de firma, XSD y pruebas oficiales. La firma XAdES-EPES real permanece DESHABILITADA.
+
+Si abres FacturaCR desde un navegador (Vite) y no desde Electron, el diagnóstico no solicita contraseñas. Tampoco se añade un endpoint HTTP para subir certificados. No se necesita modificar la base SQLite ni recalcular ventas antiguas.
+
+**Pruebas:** `node tests/qa-073-cert-check.cjs` verifica lectura de PKCS#12 de ensayo (si OpenSSL está disponible), error por contraseña incorrecta, fecha fuera de vigencia, contenedor sin clave, límites de tamaño y no divulgación. `node tests/qa-073-signature-ui.cjs` comprueba aislamiento de rutas, Electron y permisos de presentación. Ambas están integradas en `npm test` y GitHub Actions.
+
+**Para actualizar:** primero crea y verifica una copia independiente de la base SQLite y ejecuta en PowerShell:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+**Para GitHub (después de QA local):**
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.73 - revision segura de certificados FE 4.4"
+git push origin main
+```
+
+Conserva `.gitignore`, `README.md`, `CHANGELOG.md` y los workflows en `.github/workflows/`.
+
+---
+
 
 ## Ajuste puntual v0.6.72 · Redondeo unitario de XML y estabilidad en GitHub Actions
 
@@ -1227,3 +1259,10 @@ En **Nueva empresa** y **Abrir perfil / Editar empresa**, el campo **Dirección 
 Al registrar una venta con vuelto, se muestra primero **ENTREGAR VUELTO**. Si la empresa tiene activada **Imprimir automáticamente**, la impresión se inicia únicamente después de pulsar **Vuelto entregado · Cerrar** y de que React retire la ventana. El cierre consume la solicitud pendiente una sola vez. Si no hay vuelto y la impresión automática está activa, el tiquete se imprime al registrar la venta como antes. Si la impresión automática está desactivada, cerrar la ventana no imprime.
 
 La venta y el inventario quedan guardados antes de esta acción; un error o cancelación de impresión no anula la venta. Se mantiene la vista previa, la reimpresión del historial, la configuración de impresoras y las opciones de impresión. Prueba QA: `node tests/qa-072-impresion-tras-vuelto.cjs` (incluida en `npm run qa:static`).
+
+
+### Ajuste visual v0.6.72 — Usuarios y fuentes CABYS
+
+Los accesos de empresa se muestran como un grupo de botones alineados; el cambio de rol y las acciones de cuenta se presentan en una barra adaptable para pantallas pequeñas. En el buscador CABYS, **Buscar en Hacienda** abre el buscador oficial y **Catálogo BCCR (Excel)** abre/descarga el archivo publicado por el Banco Central. Si la descarga externa no se encuentra disponible, se puede consultar CABYS directamente desde Hacienda. Ninguno de estos vínculos valida por sí mismo la tarifa fiscal. No hay migración SQLite.
+
+La aplicación Electron abre únicamente las direcciones oficiales de CABYS permitidas explícitamente en el navegador externo, sin habilitar otras ventanas o enlaces arbitrarios.

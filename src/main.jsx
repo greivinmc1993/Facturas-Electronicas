@@ -562,7 +562,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
   </section>}
   {xmlDraft&&details&&<div className="ticketOverlay" role="dialog" aria-modal="true" aria-label="Borrador de factura electrónica XML 4.4">
     <div className="ticketModal feDraftModal">
-     <div className="feDraftHeader"><div><p className="companiesOverline">Prueba local · FacturaCR v0.6.71</p><h3>Borrador de factura electrónica 4.4</h3></div><span className="fePreparationStage">Sin validez fiscal</span></div>
+     <div className="feDraftHeader"><div><p className="companiesOverline">Prueba local · XML 4.4</p><h3>Borrador de factura electrónica 4.4</h3></div><span className="fePreparationStage">Sin validez fiscal</span></div>
      <p className="feDraftDisclaimer">Este XML NO está firmado, no tiene clave ni consecutivo auténticos, no ha sido validado contra el XSD oficial y NO se envía a Hacienda. No entregarlo como factura electrónica.</p>
      {!xmlDraft.ready?<div role="alert" className="feDraftIssues"><strong>Revisa las comprobaciones antes de descargar el borrador:</strong><ul>{(xmlDraft.issues||[]).map((issue,i)=><li key={i}>{issue}</li>)}</ul></div>:<><div className="feDraftTotals">Venta #{details.id} · Total ₡{saleMoney(details.total_cents)} · CRC · {xmlDraft.version}</div><textarea className="feDraftXml" readOnly spellCheck={false} aria-label="Código XML de prueba" value={xmlDraft.xml||''}/></>}
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>

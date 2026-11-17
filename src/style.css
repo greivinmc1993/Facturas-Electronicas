@@ -1504,3 +1504,58 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .usersWorkspace .userArchivedCard{background:#fafcfd;border-style:dashed;box-shadow:none}
 .usersWorkspace .userArchivedBadge{font-size:11px;font-weight:750;border-radius:99px;padding:5px 10px;background:#eef1f4;color:#677581}
 @media(max-width:520px){.usersWorkspace .userArchivedToggle{flex-wrap:wrap}}
+
+
+/* v0.6.72 · Cuentas: botonera en grupos, alineada y responsiva. */
+.usersWorkspace .userCard{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:14px;row-gap:12px}
+.usersWorkspace .userCard>.userAssignedCompanies,
+.usersWorkspace .userCard>.userCardActions{grid-column:1/-1;min-width:0;width:100%}
+.usersWorkspace .userAssignedCompanies{display:grid;gap:10px;padding-top:12px}
+.usersWorkspace .userCompanyRow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-width:0}
+.usersWorkspace .userCompanyLabel{flex:1 1 200px;min-width:0;color:#47616b;line-height:1.45;overflow-wrap:anywhere}
+.usersWorkspace .userCompanyActions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex:0 1 auto;flex-wrap:wrap;margin-left:auto}
+.usersWorkspace .userCardActions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0;padding:12px 14px;background:#f7fafb;border:1px solid #e2ecee;border-radius:10px}
+.usersWorkspace .userCardRoleControl{flex:1 1 240px;min-width:0;max-width:470px}
+.usersWorkspace .userCardRoleControl select{box-sizing:border-box;width:100%;min-height:40px;margin:0}
+.usersWorkspace .userCardManageActions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-left:auto}
+.usersWorkspace .userCompanyActions button,.usersWorkspace .userCardManageActions button{display:inline-flex;align-items:center;justify-content:center;min-height:39px;min-width:118px;margin:0;padding:9px 13px;border-radius:9px;font-size:12px;font-weight:650;line-height:1.35;white-space:normal;text-align:center;transition:background-color .16s ease,transform .16s ease,box-shadow .16s ease}
+.usersWorkspace .userCompanyActions button:hover:not(:disabled),.usersWorkspace .userCardManageActions button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 3px 8px #12384018}
+.usersWorkspace .userCompanyActions button:active:not(:disabled),.usersWorkspace .userCardManageActions button:active:not(:disabled){transform:translateY(0)}
+.usersWorkspace .userCompanyActions button:focus-visible,.usersWorkspace .userCardManageActions button:focus-visible{outline:2px solid #168578;outline-offset:3px}
+.usersWorkspace .userCardManageActions .danger{min-width:132px}
+@container facturacr-workspace (max-width:700px){
+ .usersWorkspace .userCompanyActions{width:100%;justify-content:flex-start;margin-left:0}
+ .usersWorkspace .userCardRoleControl{flex-basis:100%;max-width:none}
+ .usersWorkspace .userCardManageActions{width:100%;justify-content:flex-start;margin-left:0}
+}
+@media(max-width:480px){
+ .usersWorkspace .userCardActions{padding:10px}
+ .usersWorkspace .userCompanyActions button,.usersWorkspace .userCardManageActions button{flex:1 1 135px}
+}
+
+/* Enlaces a fuentes CABYS: se identifican como accesos externos, no como texto suelto. */
+.haciendaCabysFooter{align-items:center;gap:11px 16px}
+.haciendaCabysFooter>small{flex:1 1 250px;min-width:0}
+.haciendaCabysLinks{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;flex:0 1 auto;min-width:0}
+.haciendaCabysFooter .haciendaCabysLinks a{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;min-height:37px;box-sizing:border-box;border-radius:9px;border:1px solid #b8d5d6;background:#fff;color:#116b63;font-size:11.5px;font-weight:750;text-decoration:none;text-align:center;line-height:1.35;white-space:normal;transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease}
+.haciendaCabysFooter .haciendaCabysLinks a:hover{background:#eaf7f3;border-color:#168779;box-shadow:0 2px 8px #153c4814}
+.haciendaCabysFooter .haciendaCabysLinks a:focus-visible{outline:2px solid #168578;outline-offset:2px}
+.haciendaCabysLinks a span{font-size:14px;line-height:1}
+@media(max-width:560px){.haciendaCabysLinks{width:100%;justify-content:stretch}.haciendaCabysLinks a{flex:1 1 170px}}
+
+/* v0.6.73: diagnóstico de certificado sin almacenamiento */
+.feSignatureReadiness{border:1px solid #d4e5ed;background:#fafcfe;border-radius:14px;padding:clamp(14px,2vw,22px);margin-top:20px;min-width:0}
+.feSignatureIntro{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.feSignatureIntro h4{color:#173951;margin:3px 0 6px;font-size:16px}
+.feSignatureControls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-top:14px}
+.feSignatureControls label{flex:1 1 235px;min-width:0;margin:0}
+.feSignatureControls button{flex:0 1 auto;min-height:42px;white-space:normal}
+.feSignatureResult{background:white;border:1px solid #d6e7e2;border-radius:12px;padding:15px;margin-top:14px;min-width:0}
+.feSignatureResult dl{display:grid;gap:7px;margin:12px 0}
+.feSignatureResult dl>div{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,2fr);gap:12px;border-bottom:1px solid #edf1f3;padding:7px 0}
+.feSignatureResult dt{font-size:12px;color:#526b7b;font-weight:700}
+.feSignatureResult dd{margin:0;overflow-wrap:anywhere;font-size:13px}
+.feSignatureFingerprint{font-family:ui-monospace,monospace}
+.feSignatureCheckOk{color:#176c47;font-size:13px}
+.feSignatureCheckWarn{color:#996019;font-size:13px}
+@media(max-width:610px){.feSignatureControls{align-items:stretch}.feSignatureControls button{width:100%}.feSignatureResult dl>div{grid-template-columns:minmax(0,1fr);gap:3px}}

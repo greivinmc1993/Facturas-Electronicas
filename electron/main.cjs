@@ -1,5 +1,6 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require('electron');
 const {createMailSettingsStore}=require('./mail-settings.cjs');
+const {inspectP12,MAX_P12_BYTES}=require('./fe-certificate-check.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -44,6 +45,7 @@ async function runPackagedSmoke(){
      preloadPrinter:typeof window.facturacrPrinter?.list==='function',
      preloadReports:typeof window.facturacrReports?.savePdf==='function',
      preloadBackups:typeof window.facturacrBackups?.openFolder==='function',
+     preloadSignature:typeof window.facturacrSignature?.inspectP12==='function',
      preloadBackupPicker:typeof window.facturacrBackups?.chooseFolder==='function'
    };
  })()`;
@@ -110,7 +112,7 @@ async function runPackagedSmoke(){
  await mainWindow.loadURL(`http://127.0.0.1:${server.port}/`);
  const dom=await waitFor(d=>d.rootPresent&&d.visibleCharacters>100&&d.navButtons>=4&&d.hasCompanyNavigation,
    'El menú comercial no apareció después de autenticarse');
- if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups||!dom.preloadBackupPicker)
+ if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups||!dom.preloadBackupPicker||!dom.preloadSignature)
    throw Error('La interfaz autenticada perdió las APIs preload: '+JSON.stringify(dom));
  const status=await request('GET','/api/auth/status');
  if(status.status!==200||status.body.authenticated!==true||status.body.user?.isOwner!==true)
@@ -132,6 +134,30 @@ async function runPackagedSmoke(){
      authenticatedOwner:true,commercialScreenAfterLogin:true},screenshot:shot||null};
 }
 
+// Inspección efímera: el certificado se selecciona por diálogo nativo, nunca por ruta
+// escrita en el renderer. No se almacena el archivo ni la contraseña, ni se firma XML.
+ipcMain.handle('facturacr:inspect-p12',async(event,passphrase)=>{
+ if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
+ if(typeof passphrase!=='string'||passphrase.length>512)return {success:false,error:'Contraseña inválida.'};
+ let bytes;
+ try{
+  const chosen=await dialog.showOpenDialog(mainWindow,{
+   title:'Revisar certificado digital de Hacienda (solo lectura)',
+   properties:['openFile'],filters:[{name:'Certificado PKCS#12',extensions:['p12','pfx']}]
+  });
+  if(chosen.canceled||!chosen.filePaths?.[0])return {success:false,cancelled:true};
+  const filename=chosen.filePaths[0];
+  if(!/\.(p12|pfx)$/i.test(filename))return {success:false,error:'Selecciona un archivo .p12 o .pfx.'};
+  const meta=await fs.lstat(filename);
+  if(!meta.isFile()||meta.isSymbolicLink()||meta.size<32||meta.size>MAX_P12_BYTES)
+   return {success:false,error:'El archivo no es válido o supera el límite de 4 MB.'};
+  bytes=await fs.readFile(filename);
+  const report=inspectP12(bytes,passphrase);
+  return {success:true,report};
+ }catch{
+  return {success:false,error:'No se pudo leer el certificado. Comprueba la contraseña, el formato y el estado del archivo.'};
+ }finally{if(bytes)bytes.fill(0);}
+});
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
  if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
@@ -221,7 +247,9 @@ app.whenReady().then(async () => {
     // dentro de Electron. No permitir URLs arbitrarias ni javascript:/file:.
     const officialPages=new Set([
       'https://www.hacienda.go.cr/ClasificacionActividadesEconomicas.html',
-      'https://api.hacienda.go.cr/docs/'
+      'https://api.hacienda.go.cr/docs/',
+      'https://api.hacienda.go.cr/fe/cabys/test',
+      'https://www.bccr.fi.cr/content/dam/bccr/bccr-espanol/noticias/2025/2025-04-01-catalogo-de-bienes-servicios-1.xlsx'
     ]);
     mainWindow.webContents.setWindowOpenHandler(({url})=>{
       if(officialPages.has(url))shell.openExternal(url).catch(error=>console.error('No se pudo abrir enlace oficial:',error.message));

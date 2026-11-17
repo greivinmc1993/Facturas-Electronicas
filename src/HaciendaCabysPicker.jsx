@@ -41,6 +41,10 @@ export default function HaciendaCabysPicker({code='',onSelect=()=>{},companyId=n
   {searched&&!items.length&&!busy&&<p className="haciendaCabysInfo" role="status">No se encontraron coincidencias para esta búsqueda. Prueba otra descripción o verifica el código.</p>}
   {error&&<p className="haciendaCabysWarning" role="alert">{error} El campo CABYS se puede completar manualmente.</p>}
   <div className="haciendaCabysFooter"><small>CABYS seleccionado: <b>{code||'Sin asignar'}</b>. La selección no modifica el IVA ni el precio; revisa la tarifa aplicable.</small>
-   <a href="https://api.hacienda.go.cr/docs/" target="_blank" rel="noopener noreferrer">API Hacienda</a> <a href="https://www.bccr.fi.cr/cr/es/noticias/listado-de-noticias/2025/actualizacion-del-catalogo-de-bienes-y-servicios-cabys-2025.html" target="_blank" rel="noopener noreferrer">Catálogo CABYS BCCR</a></div>
+   <div className="haciendaCabysLinks" aria-label="Fuentes oficiales de CABYS">
+    <a href="https://api.hacienda.go.cr/fe/cabys/test" target="_blank" rel="noopener noreferrer" title="Abrir el buscador CABYS del Ministerio de Hacienda">Buscar en Hacienda <span aria-hidden="true">↗</span></a>
+    <a href="https://www.bccr.fi.cr/content/dam/bccr/bccr-espanol/noticias/2025/2025-04-01-catalogo-de-bienes-servicios-1.xlsx" target="_blank" rel="noopener noreferrer" title="Abrir o descargar el archivo Excel oficial CABYS 2025 del BCCR">Catálogo BCCR (Excel) <span aria-hidden="true">↗</span></a>
+    <a href="https://api.hacienda.go.cr/docs/" target="_blank" rel="noopener noreferrer" title="Documentación de la API oficial de Hacienda">API Hacienda <span aria-hidden="true">↗</span></a>
+   </div></div>
  </div>;
 }
