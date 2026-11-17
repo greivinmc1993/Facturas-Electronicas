@@ -1437,3 +1437,57 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feDraftWarnings{border:1px solid #cedce3;background:#f3f8fa;border-radius:12px;padding:12px 15px;font-size:13px;color:#3c5a68}
 .feDraftModal .actions{justify-content:flex-end;flex-wrap:wrap}
 @media(max-width:600px){.feDraftModal{max-height:95vh}.feDraftModal .actions{display:grid;grid-template-columns:1fr}.feDraftModal .actions button{width:100%}}
+
+/* v0.6.71 · Buscador de actividades CIIU4 y consulta RUT por empresa */
+.companyFiscalActivityFinder{grid-column:1/-1;display:flex;flex-direction:column;gap:9px;min-width:0;border:1px solid #cddfe5;border-radius:12px;background:#fff;padding:12px 14px;margin-top:-1px}
+.companyFiscalActivityFinderTop{display:flex;justify-content:space-between;align-items:baseline;gap:7px 14px;flex-wrap:wrap;color:#34566a}
+.companyFiscalActivityFinderTop label{font-size:12px;font-weight:750;color:#254f62}
+.companyFiscalActivityFinderTop span{font-size:10.5px;color:#627c8b}
+.companyFiscalActivityFinder input[type=search]{width:100%;min-width:0;min-height:40px;font-size:13px;border-radius:8px}
+.companyFiscalActivitySuggestions{display:flex;flex-direction:column;gap:6px;border:1px solid #d6e6eb;border-radius:9px;background:#f8fbfc;max-height:238px;overflow-y:auto;overscroll-behavior:contain;padding:6px}
+.companyFiscalActivityGroup{display:flex;flex-direction:column;min-width:0;gap:3px}
+.companyFiscalActivityGroup>strong{font-size:10.5px;letter-spacing:.03em;color:#557285;padding:6px 7px 2px}
+.companyFiscalActivityOption{display:grid;grid-template-columns:minmax(65px,78px) minmax(0,1fr) auto;align-items:center;gap:7px;width:100%;min-width:0;text-align:left;padding:9px 10px!important;min-height:38px;background:white!important;border:1px solid transparent!important;border-radius:7px!important;font-size:12px!important;font-weight:550!important;color:#274a5d!important;box-shadow:none!important;white-space:normal!important;line-height:1.35!important;transform:none!important}
+.companyFiscalActivityOption:hover,.companyFiscalActivityOption:focus-visible{background:#eaf7f4!important;border-color:#75c8bb!important;outline:none!important}
+.companyFiscalActivityOption.isRegistered{background:#edf8f6!important}
+.companyFiscalActivityCode{font-weight:800;color:#007c6b;font-variant-numeric:tabular-nums}
+.companyFiscalActivityOption small{font-size:10px;color:#197e72;font-weight:700}
+.companyFiscalActivityTools{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.companyFiscalActivityTools button{min-height:36px!important;padding:8px 11px!important;font-size:11.5px!important;width:auto!important;max-width:100%}
+.companyFiscalActivityTools a{font-size:11px;line-height:1.4;color:#087767;font-weight:700;text-underline-offset:3px}
+.companyFiscalActivityInfo,.companyFiscalActivityEmpty{font-size:11px;color:#617789;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.companyFiscalActivityWarning{border:1px solid #eacb8c;background:#fff8e7;color:#76521d;font-size:11.5px;line-height:1.5;padding:9px 10px;border-radius:8px;margin:0}
+@media(max-width:570px){.companyFiscalActivityFinder{padding:10px}.companyFiscalActivityOption{grid-template-columns:64px minmax(0,1fr)}.companyFiscalActivityOption small{display:none}.companyFiscalActivityTools{align-items:stretch}.companyFiscalActivityTools button{width:100%!important}}
+
+/* v0.6.71 · CABYS oficial: sugerencias y selección dentro de Productos */
+.haciendaCabysPicker{display:flex;flex-direction:column;gap:9px;min-width:0;border:1px solid #cddfe5;background:#f9fbfc;padding:12px 14px;border-radius:12px;margin-top:-4px;margin-bottom:8px}
+.haciendaCabysHeader{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;color:#254f62}
+.haciendaCabysHeader label{font-size:12px;font-weight:750;color:#254f62}
+.haciendaCabysHeader span{font-size:10.5px;color:#60798b}
+.haciendaCabysPicker input[type=search]{width:100%;min-width:0;min-height:42px;border-radius:8px;font-size:13px}
+.haciendaCabysResults{display:flex;flex-direction:column;max-height:256px;overflow-y:auto;overscroll-behavior:contain;gap:5px;padding:6px;border:1px solid #d5e6e9;border-radius:10px;background:#fff}
+.haciendaCabysResult{display:grid!important;grid-template-columns:minmax(100px,136px) minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0!important;width:100%!important;min-height:44px!important;padding:9px 10px!important;background:#fff!important;border:1px solid transparent!important;border-radius:8px!important;color:#254b5e!important;box-shadow:none!important;white-space:normal!important;text-align:left!important;line-height:1.35!important;transform:none!important;font-size:12px!important}
+.haciendaCabysResult:hover,.haciendaCabysResult:focus-visible{background:#eaf7f3!important;border-color:#70bfb2!important;outline:none!important}
+.haciendaCabysResult strong{font-weight:800;color:#087868;font-size:12px;font-variant-numeric:tabular-nums}
+.haciendaCabysResult span{min-width:0;overflow-wrap:anywhere}
+.haciendaCabysResult small{font-size:10px;color:#547487}
+.haciendaCabysInfo{font-size:11px;line-height:1.5;color:#61788a;margin:0}
+.haciendaCabysWarning{font-size:11.5px;line-height:1.5;color:#785119;background:#fff6e6;border:1px solid #f0d29a;border-radius:8px;padding:9px 10px;margin:0}
+.haciendaCabysFooter{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px}
+.haciendaCabysFooter small{font-size:11px;color:#61788a;line-height:1.45}
+.haciendaCabysFooter a{font-size:11px;font-weight:700;color:#087868;text-underline-offset:3px}
+@media(max-width:620px){.haciendaCabysPicker{padding:10px}.haciendaCabysResult{grid-template-columns:1fr!important;gap:3px}.haciendaCabysResult small{grid-column:1}}
+
+/* 0.6.72 · Vuelto visible tras una venta confirmada, sin confundirlo con mensajes informativos */
+.posChangeOverlay{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,29,47,.77);backdrop-filter:blur(6px)}
+.posChangeDialog{width:min(100%,500px);padding:32px 30px;border-radius:24px;background:#fff;border:2px solid #0e8376;box-shadow:0 28px 90px rgba(0,0,0,.4);text-align:center;color:#173350;display:grid;justify-items:center;gap:14px}
+.posChangeEmblem{background:#e0f5ed;color:#087766;width:76px;height:76px;display:grid;place-items:center;border-radius:50%}
+.posChangeEyebrow{color:#146358;font-size:.76rem;font-weight:900;letter-spacing:.11em;margin:0}
+.posChangeDialog h2{font-size:clamp(1.5rem,4vw,2rem);line-height:1.15;margin:0;color:#123650}
+.posChangeAmount{font-size:clamp(3.3rem,11vw,5.5rem);color:#087766;font-variant-numeric:tabular-nums;letter-spacing:-.045em;line-height:1.05;overflow-wrap:anywhere;max-width:100%}
+.posChangeDialog p{margin:0}
+.posChangeNumbers{width:100%;border-top:1px solid #d4e7e4;border-bottom:1px solid #d4e7e4;padding:13px 0;display:grid;gap:9px}
+.posChangeNumbers span{display:flex;justify-content:space-between;gap:10px;text-align:left;font-size:.9rem}
+.posChangeDialog>button{width:100%;min-height:54px;border-radius:12px;background:#087766;color:#fff;font-size:1rem;font-weight:800}
+@media(max-width:520px){.posChangeDialog{padding:24px 18px}.posChangeOverlay{padding:12px}}
+@media(prefers-reduced-motion:reduce){.posChangeOverlay{backdrop-filter:none}}

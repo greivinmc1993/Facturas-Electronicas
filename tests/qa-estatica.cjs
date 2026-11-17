@@ -18,7 +18,7 @@ const checks=[
  ['Recursos visuales de instalador',()=>{for(const f of ['build/installerHeader.bmp','build/installerSidebar.bmp','build/uninstallerSidebar.bmp','build/icon.ico'])assert.ok(fs.existsSync(path.join(root,f)),f)}],
  ['Validación de descuento alto en interfaz',()=>assert.ok(ui.includes('discountInvalid&&<p className="posDiscountError"'))],
  ['Validación de descuento negativo en API',()=>assert.ok(server.includes('requestedDiscount<0'))],
- ['Precio de carrito con IVA',()=>assert.ok(ui.includes('priceWithTaxCents(l)')&&ui.includes('Con IVA · antes de descuentos'))],
+ ['Precio de carrito con IVA',()=>assert.ok(ui.includes('priceWithTaxCents(l)')&&ui.includes('Precio final con IVA · antes de descuentos'))],
  ['Servidor real de QA configura propietario y usa cookie para rutas protegidas',()=>{
   assert.ok(httpQA.includes("request('POST','/api/auth/setup'"));
   assert.ok(httpQA.includes("request('POST','/api/auth/login'"));
@@ -27,7 +27,7 @@ const checks=[
   assert.match(httpQA,/fetch\(base\+'\/api\/backups\/download',\{headers:authorizedHeaders\(\)\}\)/);
   assert.match(httpQA,/fetch\(`\$\{base\}\$\{endpoint\}export\.csv\?\$\{query\}`,\{headers:authorizedHeaders\(\)\}\)/);
  }],
- ['Versión 0.6.71 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.71');assert.equal(l.version,'0.6.71');assert.equal(l.packages[''].version,'0.6.71')}],
+ ['Versión 0.6.72 alineada en todos los metadatos',()=>{const p=require(path.join(root,'package.json')),l=require(path.join(root,'package-lock.json'));assert.equal(p.version,'0.6.72');assert.equal(l.version,'0.6.72');assert.equal(l.packages[''].version,'0.6.72')}],
 ];
 let pass=0;for(const [label,check]of checks){try{check();pass++;console.log('PASS',label)}catch(err){console.error('FAIL',label,err.message);process.exitCode=1}}
 console.log(`Resultado: ${pass}/${checks.length} pruebas estáticas`);

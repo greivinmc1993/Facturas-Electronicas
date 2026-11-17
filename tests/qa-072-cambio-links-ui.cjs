@@ -1,0 +1,15 @@
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');const ui=fs.readFileSync(path.join(root,'src/main.jsx'),'utf8');const css=fs.readFileSync(path.join(root,'src/style.css'),'utf8');const electron=fs.readFileSync(path.join(root,'electron/main.cjs'),'utf8');const activity=fs.readFileSync(path.join(root,'src/HaciendaActivityPicker.jsx'),'utf8');const cabys=fs.readFileSync(path.join(root,'src/HaciendaCabysPicker.jsx'),'utf8');const backend=fs.readFileSync(path.join(root,'server/index.js'),'utf8');
+let n=0;const t=(name,f)=>{f();n++;console.log('OK v0.6.72 UI:',name)};
+t('Dos links oficiales presentes',()=>{assert.match(activity,/ClasificacionActividadesEconomicas|HACIENDA_ACTIVITY_SOURCE/);assert.match(cabys,/https:\/\/api.hacienda.go.cr\/docs\//);});
+t('Electron permite exclusivamente dos páginas y abre navegador externo',()=>{assert.match(electron,/officialPages=new Set/);assert.match(electron,/shell.openExternal\(url\)/);assert.match(electron,/officialPages.has\(url\)/);});
+t('No habilita navegación arbitraria en ventanas externas',()=>{assert.match(electron,/return \{action:'deny'\}/);assert.match(electron,/will-navigate/);});
+t('Vuelto se muestra después de éxito del servidor',()=>{assert.ok(ui.indexOf('setChangeReceipt({saleId:result.id')>ui.indexOf('const result=await api(`/api/companies/${companyId}/sales`'));});
+t('No se muestra popup si no existe vuelto',()=>assert.match(ui,/if\(changeToReturn>0\)setChangeReceipt/));
+t('Popup incluye cantidad y confirmación independiente',()=>{for(const x of ['role="alertdialog"','posChangeAmount','ENTREGAR VUELTO','Vuelto entregado · Cerrar'])assert.ok(ui.includes(x),x);});
+t('CSS del popup centrado, destacado y responsive',()=>{for(const x of ['.posChangeOverlay','.posChangeDialog','.posChangeAmount','@media(max-width:520px)'])assert.ok(css.includes(x),x);});
+t('Modo precio con IVA/sin IVA seleccionable por producto',()=>{assert.match(ui,/Cómo se ingresa el precio/);assert.match(ui,/Precio base sin IVA · agregar impuesto/);});
+t('No se fuerza la modalidad de precio al guardar o editar',()=>{assert.doesNotMatch(ui,/price_includes_tax:'1'\}\:form/);assert.doesNotMatch(ui,/k==='price_includes_tax'\?'1'/);});
+t('Frontend y backend comparten motor de precisión',()=>{assert.match(ui,/fiscalSale\(cart.map/);assert.match(backend,/const calculated=fiscalSale\(/);});
+t('Migración fiscal por líneas es aditiva',()=>{assert.match(backend,/addColumn\('sale_lines',column,definition\)/);assert.match(backend,/fiscal_calculation_version/);});
+console.log(`QA v0.6.72 UI: ${n}/${n}`);

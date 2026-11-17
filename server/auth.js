@@ -100,6 +100,8 @@ export function registerAuth(app,getDb,options={}){
     const reqMovementPermission=body?.movement_type==='entrada'?'inventory.receive':body?.movement_type==='ajuste'?'inventory.count':'inventory.adjust';
     if(method==='GET'&&p==='/companies')return 'companies.list';
     if(method==='GET'&&p==='/geography')return 'companies.list';
+    if(method==='GET'&&/^\/companies\/\d+\/fe\/registered-activities$/.test(p))return 'tax.configure';
+    if(method==='GET'&&/^\/companies\/\d+\/products\/cabys-search$/.test(p))return 'inventory.manage';
     if(/^\/companies\/\d+\/fe\/preparation$/.test(p))return ['GET','PUT'].includes(method)?'tax.configure':null;
     if(/^\/companies\/\d+\/sales\/draft(?:\/beacon)?$/.test(p))return ['GET','PUT','DELETE','POST'].includes(method)?'sales.create':null;
     if(/^\/companies\/\d+\/sales$/.test(p))return method==='POST'?'sales.create':method==='GET'?'sales.read_all':null;

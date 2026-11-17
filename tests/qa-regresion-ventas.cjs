@@ -95,8 +95,8 @@ test('Se rechaza el descuento mayor al subtotal',()=>{
 test('Código contiene los arreglos del QA en frontend y backend',()=>{
   const ui=fs.readFileSync(path.join(root,'src/main.jsx'),'utf8');
   const server=fs.readFileSync(path.join(root,'server/index.js'),'utf8');
-  assert.ok(ui.includes('const adjustment=remainingBase>0&&base>0'));
-  assert.ok(server.includes('const adjustedRounding=remainingBase>0&&line.lineSubtotal>0'));
+  assert.ok(ui.includes('fiscalSale(cart.map('),'El carrito comparte el motor fiscal con el servidor');
+  assert.ok(server.includes('const calculated=fiscalSale('),'El servidor usa aritmética decimal fiscal');
   assert.ok(ui.includes('priceWithTaxCents(l)'));
   assert.ok(ui.includes('discountInvalid'));
   assert.ok(server.includes('requestedDiscount<0'));
@@ -104,6 +104,6 @@ test('Código contiene los arreglos del QA en frontend y backend',()=>{
 test('La versión coincide con los metadatos',()=>{
   const pkg=require(path.join(root,'package.json'));
   const lock=require(path.join(root,'package-lock.json'));
-  assert.equal(pkg.version,'0.6.71');assert.equal(lock.version,'0.6.71');assert.equal(lock.packages[''].version,'0.6.71');
+  assert.equal(pkg.version,'0.6.72');assert.equal(lock.version,'0.6.72');assert.equal(lock.packages[''].version,'0.6.72');
 });
 console.log(`${passed} comprobaciones completadas. ${process.exitCode?'Fallaron pruebas.':'Sin fallos.'}`);

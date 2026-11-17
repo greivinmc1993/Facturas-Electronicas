@@ -1,10 +1,101 @@
+# FacturaCR v0.6.72 — Precisión fiscal de Ventas, vuelto visible y enlaces oficiales
+
+> **ETAPA DE PREPARACIÓN:** FacturaCR sigue generando **borradores XML 4.4 sin validez tributaria**. No firma, asigna clave real, valida formalmente XSD ni envía documentos a Hacienda. Esta versión reestructura el cálculo de las **ventas NUEVAS**; nunca modifica importes históricos.
+
+## 1. Artículos: dos modalidades de precio
+
+En **Productos y servicios → Crear / Editar**, el campo **Cómo se ingresa el precio** permite:
+
+- **Precio final con IVA incluido (predeterminado)**: introduce el monto que paga el cliente; por ejemplo ₡2.000,00. El motor deriva la base fiscal ₡1.769,91150 y el IVA ₡230,08850 al 13 %.
+- **Precio base sin IVA**: introduce ₡1.770,00, se calcula IVA ₡230,10000 y total ₡2.000,10.
+
+Los productos nuevos guardan la modalidad elegida y el **precio original exacto como texto de cinco decimales (`products.price_decimal_5`)** además del campo `price` antiguo para compatibilidad con reportes, catálogos y migraciones. Al editar, el selector se conserva; ya no se fuerza a «IVA incluido». Importaciones históricas sin la columna decimal continúan funcionando mediante el precio numérico anterior. Las actualizaciones masivas mantienen el dato exacto para el nuevo precio.
+
+## 2. Motor fiscal compartido en Ventas, SQLite y XML
+
+- `server/fiscal-precision.js` realiza cálculos monetarios con **BigInt en unidades de 0,00001**, sin `Number` para dividir impuestos o distribuir descuentos. El carrito React y el servidor Express utilizan el mismo motor.
+- Los descuentos introducidos como **base imponible sin IVA** se distribuyen mediante restos mayores, de modo que ninguna línea queda negativa ni se asigna de más.
+- En `sale_lines` se registra una **fotografía fiscal inmutable** por línea: precio original, modalidad de entrada, unitario neto, subtotal, descuento, base, IVA, total y versión del algoritmo. Todos los importes fiscales se guardan como texto decimal de cinco posiciones; las columnas anteriores de centavos se conservan para caja, reportes y compatibilidad.
+- La caja cobra en **centavos de CRC**. En casos de redondeo de cinco decimales a dos, el desglose contable en centavos puede diferir hasta ₡0,01 del redondeo independiente del IVA; el campo fiscal `fiscal_tax_5` **nunca se altera para cuadrarlo**. Las cifras de cinco decimales permanecen exactas en la fotografía y en el borrador XML nuevo.
+- El XML de las ventas nuevas utiliza las fotografías fiscales directamente (`BaseImponible`, `Impuesto`, `TotalDesgloseImpuesto`, `TotalComprobante`). Las ventas históricas conservan sus importes originales; si no concilian, el borrador seguirá mostrando el error anterior y no se corregirán silenciosamente.
+
+## 3. Vuelto: confirmación visual después de registrar
+
+En Ventas, cuando se introduce efectivo recibido mayor al importe aplicado, **después de que el servidor confirma la venta** aparece una ventana central destacada **ENTREGAR VUELTO** con el monto en grande, efectivo recibido, importe aplicado y botón **Vuelto entregado · Cerrar**. Si no hay vuelto o la venta no se guarda, no se muestra. El carrito se limpia únicamente tras éxito, como antes. El popup es `alertdialog` y no imprime ni emite un comprobante tributario.
+
+## 4. Enlaces oficiales: funcionan desde Electron
+
+- **Abrir listado de Hacienda** → `https://www.hacienda.go.cr/ClasificacionActividadesEconomicas.html`.
+- **Documentación oficial** del buscador CABYS → `https://api.hacienda.go.cr/docs/`.
+
+La ventana Electron sigue impidiendo la navegación externa dentro del proceso protegido. Ahora permite **abrir exclusivamente estos dos destinos HTTPS conocidos en el navegador predeterminado de Windows**, usando `shell.openExternal`. No se habilitan URL arbitrarias ni acceso a archivos locales por vínculos.
+
+## 5. Pruebas y compatibilidad
+
+- Nuevas pruebas: **22 verificaciones de cálculo fiscal**, **11 de interfaz/enlaces** y pruebas reales del flujo API→SQLite→XML para una venta con IVA incluido y otra con precio base.
+- La suite `npm test` continúa cubriendo seguridad, compras, inventarios, permisos, históricos, respaldos y comprobantes. No hay migraciones destructivas, solo columnas `NULL` en los históricos.
+- **Pendiente de comprobar en Windows:** compilación Vite, instalación NSIS, comportamiento visual final del diálogo y apertura de enlaces en el navegador nativo. Aquí no se dispone del Chromium necesario para ejecutar la comprobación visual.
+- **Siguiente etapa:** validación formal contra el XSD oficial de Hacienda, verificación de CABYS y RUT, reglas particulares de exoneraciones, descuentos y otros impuestos; posteriormente firma XAdES-EPES y transmisión. No interpretar esta mejora como precisión tributaria absoluta en todos los escenarios posibles.
+
+**Instalación / QA:** realizar antes un respaldo verificado de SQLite; ejecutar `npm ci`, `npm test`, `npm run qa:real-server` y `npm run dist:win` en Windows. Mantener datos en directorio de usuario, fuera del código del proyecto.
+
+---
+
+## Borrador XML 4.4: estructura corregida, cálculo exacto y avisos fiscales (v0.6.71)
+
+Las versiones anteriores creaban un XML de ensayo a partir de los centavos históricos de Ventas. Ahora la plantilla del borrador incluye encabezado en el orden de los anexos, `BaseImponible`, `ImpuestoAsumidoEmisorFabrica`, `TotalDesgloseImpuesto` y `MedioPago` (de `sale_payments`). Las mercancías y servicios se distinguen por el tipo real del artículo, no por el prefijo de un CAByS de prueba. Se conserva el nombre comercial y la dirección de receptor cuando están disponibles.
+
+**Importante sobre los importes históricos:** Ventas puede haber almacenado redondeos al colón para sostener el precio comercial final con IVA incluido. Esos redondeos no siempre coinciden con `Base imponible × tarifa IVA` a cinco decimales. Por ejemplo, ₡1.770,00 × 13 % = ₡230,10, no ₡230,00. Si una línea presenta esa diferencia, el borrador indica el IVA guardado y el fiscal esperado, y **no permite descargar el XML inconsistente**; no modifica el total del cliente ni los datos históricos. Una etapa posterior deberá almacenar/recuperar también la precisión tributaria del precio bruto y su base, sin estimar arbitrariamente las ventas pasadas.
+
+**Prueba de cuatro mercancías:** bases 1770 + 1770 + 1770 + 3095 = ₡8.405; IVA exacto 230,10 + 230,10 + 230,10 + 402,35 = ₡1.092,65; total de ensayo ₡9.497,65. Si el histórico cobra ₡9.500 con IVA redondeado, la descarga se bloquea y se explica la diferencia. Se debe revisar el precio original y la política IVA incluido/IVA excluido antes de construir una FE real.
+
+**Límites conscientes:** siguen pendientes la validación completa contra el XSD oficial vigente, verificación de la existencia y correspondencia de cada CABYS, numeración real de 20/50 dígitos, firma XAdES-EPES, datos registrales y transmisión a Hacienda. Los ceros fiscales son solamente marcadores de prueba; nadie debe interpretar un XML de esta etapa como comprobante válido. Los códigos de actividad se guardan tal como se ingresaron (`XXXX.X` o seis dígitos) sin inferir inscripción en el RUT. Para obtener documentos oficiales hace falta un proceso nuevo de emisión; no basta con quitar estos avisos.
+
+La operación de borrador es GET y de solo lectura. Los pagos salen de la misma venta/empresa que se está consultando. Ejecutar `npm test` para validar unidad, acceso multiempresa y operación con SQLite.
+
+---
+
 # FacturaCR v0.6.71 — Primer borrador XML de Factura Electrónica 4.4
 
 > **SOLO PRUEBA LOCAL: SIN VALIDEZ FISCAL.** Este generador no asigna claves o consecutivos reales, no consulta el RUT, no valida contra XSD, no firma XML ni envía datos a Hacienda. **Nunca entregar el archivo como factura válida.**
 
+## Seleccionar CABYS desde el catálogo oficial — v0.6.71
+
+En **Productos y servicios → Registrar producto/servicio o Editar**, junto al campo **CABYS (13 dígitos)** encontrarás **Buscar CABYS oficial por descripción o código**.
+
+1. Escribe al menos **3 caracteres** del nombre del bien o servicio (por ejemplo `jugo de tomate`) o introduce **exactamente 13 dígitos** para consultar un código concreto.
+2. Tras una pausa de 650 milisegundos, FacturaCR consulta desde el servidor local la API oficial `https://api.hacienda.go.cr/fe/cabys`. La lista muestra código, descripción y, si Hacienda lo informa, impuesto del catálogo. Selecciona el resultado más apropiado; también puedes usar flecha abajo y Enter.
+3. El código se copia al campo CABYS del producto que estás creando o editando. **Solo se modifica CABYS**: comprueba manualmente la tarifa IVA, el precio, la unidad y la descripción real de tu producto antes de guardarlo.
+4. Si Hacienda no está disponible, aparece un aviso y puedes escribir el CABYS manualmente; la operación no cambia registros de otros productos. Las consultas requieren Internet, pero la información ya guardada funciona sin conexión.
+5. Si la búsqueda devuelve varias coincidencias, revisa la clasificación correcta. Un código de 13 dígitos no garantiza por sí solo que esté vigente o sea adecuado al bien: verifica el catálogo al momento de emitir XML 4.4. **Esta versión sigue sin firmar ni transmitir facturas a Hacienda.**
+
+**Protección y rendimiento:** consultas autorizadas con permiso `inventory.manage` y empresa activa; entrada limitada a 80 caracteres, espera de 650 ms, caché temporal de 10 minutos, deduplicación de llamadas idénticas y mensajes para HTTP 429. No requiere modificar SQLite ni añade dependencias. La API pública oficial documenta búsquedas por `q` (mínimo 3 caracteres) y `codigo` (13 dígitos): https://api.hacienda.go.cr/docs/ .
+
+**QA:** ejecutar `npm test`; archivos `tests/qa-071-cabys-catalog.cjs` y `tests/qa-071-cabys-catalog-ui.cjs`. Las pruebas de red usan respuestas simuladas: la API en producción y el ejecutable Windows se validarán separadamente.
+
+---
+
+## v0.6.71 · Ayuda para seleccionar actividad económica CIIU4 (edición de 17/11/2026)
+
+**Empresas → Nueva empresa / Abrir perfil → Actividad económica (RUT)** y la ficha fiscal administrada muestran un buscador por código o descripción.
+
+1. Empieza a escribir el código en **Actividad económica (RUT)** para ver coincidencias del índice de referencia; opcionalmente busca palabras como **programación** en **Buscar actividad por código o descripción**.
+2. Selecciona un resultado para copiar exclusivamente el código al campo fiscal; el formato CIIU4 con punto se conserva exactamente, por ejemplo `6201.0`.
+3. La búsqueda local es un **EXTRACTO de 221 códigos** de la tabla de correspondencias publicada por el Ministerio de Hacienda, NO el catálogo exhaustivo ni la lista de actividades inscritas del contribuyente. Fuente oficial: https://www.hacienda.go.cr/ClasificacionActividadesEconomicas.html (enlace incluido junto al campo). Un código ausente del extracto no se considera automáticamente inválido.
+4. Si la empresa ya está guardada, **Consultar mis actividades inscritas** consulta la API oficial `https://api.hacienda.go.cr/fe/ae?identificacion=...`, usando en el servidor la identificación almacenada para esa empresa. Solo está disponible para el propietario y el administrador con permiso fiscal sobre ella. **No se consulta Hacienda al escribir cada tecla**. Los resultados se almacenan temporalmente en memoria por 10 minutos para respetar los límites oficiales de uso.
+5. Si la empresa es nueva, primero guárdala para habilitar la consulta de su inscripción real. Si Hacienda no responde, puedes seguir completando el código manualmente y revisar TRIBU-CR → Mis Datos → Actividades Económicas. Nada de esto autoriza, firma o envía comprobantes.
+
+El índice local no depende de Internet; la consulta a la API de Hacienda sí. El campo conserva cualquier código existente hasta que el usuario lo cambie explícitamente, y **no transforma `4019.0` en un supuesto código nuevo**. Mantener el enlace oficial y verificar la actividad vigente inscrita antes de la emisión final.
+
+**QA adicional:** `tests/qa-071-activity-catalog.cjs` (14 pruebas), `tests/qa-071-activity-catalog-ui.cjs` (10 pruebas) y la copia de módulo para el adaptador de integración; ejecutarlas junto al `npm test` general. Sin cambios de esquema SQLite ni credenciales nuevas.
+
+---
+
+---
+
 ## Cómo probar el borrador
 
-1. Configura la ficha fiscal desde **Empresas → Abrir perfil** con tipo y número de identificación, correo, ubicación, dirección exacta y código de actividad RUT actual **de 6 dígitos**.
+1. Configura la ficha fiscal desde **Empresas → Abrir perfil** con tipo y número de identificación, correo, ubicación, dirección exacta y código de actividad RUT exacto **con formato CIIU4 XXXX.X** (por ejemplo `4019.0`; también se conserva formato histórico de seis dígitos).
 2. Prepara productos con CAByS de 13 dígitos en el catálogo y un cliente registrado con identificación. La primera etapa admite únicamente **ventas de contado activas en CRC**, con tarifa 0, 1, 2, 4 o 13 por ciento.
 3. Entra a **Ventas → Historial → Ver** una venta existente. Pulsa **Borrador FE 4.4 (prueba)**.
 4. Si faltan datos, la ventana enumerará por qué no puede crear el XML. No modifica la venta ni inventa los datos fiscales faltantes.
@@ -14,7 +105,7 @@
 
 - Los importes se toman de `sales` y `sale_lines` tal como se guardaron, en centavos CRC. No vuelve a calcular el IVA ni modifica el inventario.
 - Los CAByS se consultan del catálogo actual; las ventas internas antiguas **no guardan copia histórica del CAByS**, por lo que el XML es solo una demostración.
-- El formato histórico `4019.0` se conserva en Empresas, pero no se convierte arbitrariamente al `CodigoActividadEmisor` de seis dígitos que exige el XML; consulta tu código válido en el RUT.
+- La actividad CIIU4 `4019.0` es un código de seis **caracteres** que incluye un punto: se conserva literalmente en `CodigoActividadEmisor`. El programa comprueba el formato, pero todavía **no verifica** que ese código exista o corresponda al emisor en el padrón RUT; no debe utilizarse para emisión real.
 - Ventas anuladas, ventas a crédito sin plazo fiscal, clientes no identificados, productos sin CAByS e importes incongruentes se **bloquean con explicación**.
 - En 0.6.72 trabajaremos en los XSD oficiales, reglas y catálogos vigentes, sin habilitar emisión real hasta completar firma, clave, consecutivos y API.
 - El endpoint `GET /api/companies/:companyId/sales/:saleId/fe/xml-draft` exige el permiso `sales.read_all` de la empresa, utiliza solo consultas de lectura y responde `422` con problemas específicos cuando no puede generar el borrador.
@@ -44,7 +135,7 @@
 
 ## Ficha fiscal integrada en Nueva empresa y Abrir perfil (corrección de v0.6.70)
 
-Para el **propietario**, la ficha fiscal se completa ahora **dentro de las ventanas Empresas → Nueva empresa y Empresas → Abrir perfil**. Una sola confirmación guarda los datos generales (razón social, identificación, dirección exacta, correo, etc.) y los fiscales (tipo de identificación, actividad económica de 6 dígitos, ubicación, sucursal de 3 dígitos y terminal de 5 dígitos). Se emplea una transacción SQLite: si un dato fiscal es inválido, no se crea ni se modifica parcialmente la empresa.
+Para el **propietario**, la ficha fiscal se completa ahora **dentro de las ventanas Empresas → Nueva empresa y Empresas → Abrir perfil**. Una sola confirmación guarda los datos generales (razón social, identificación, dirección exacta, correo, etc.) y los fiscales (tipo de identificación, actividad económica de hasta seis caracteres, ubicación (sucursal y terminal se conservan internamente)). Se emplea una transacción SQLite: si un dato fiscal es inválido, no se crea ni se modifica parcialmente la empresa.
 
 La ubicación se selecciona **por nombre**: primero provincia, luego cantón y luego distrito. Internamente se conservan códigos de 1, 2 y 2 dígitos para la futura facturación electrónica. El **código postal de cinco dígitos** se calcula automáticamente al seleccionar distrito: provincia + cantón + distrito, por ejemplo `1 + 10 + 01 = 11001`. No se permite guardarlo si contradice la ubicación. El campo **Dirección exacta (otras señas)** admite hasta 160 caracteres, pensado para su futura integración en XML 4.4.
 
@@ -60,14 +151,14 @@ La nueva columna `postal_code` se agrega de manera **aditiva** a `company_fe_pre
 2. Completa los datos generales y la **Dirección exacta**.
 3. En **Datos fiscales y ubicación de la empresa**, elige el tipo de identificación y la actividad económica inscrita en el RUT.
 4. Selecciona **Provincia → Cantón → Distrito** por sus nombres. El **Código postal** aparece automáticamente.
-5. Introduce sucursal y terminal si los conoces (la ficha admite información parcial).
+5. Revisa la dirección exacta y el código postal. Sucursal y terminal no se solicitan en esta ventana.
 6. Pulsa **Crear empresa** o **Guardar cambios** y confirma. Revisa el diagnóstico de preparación que aparece debajo de las tarjetas.
 
 **Validación:** ejecutar `npm ci`, `npm test`, `npm run qa:real-server` y `npm run dist:win` en Windows; el último paso debe comprobarse en tu instalación. Las pruebas automatizadas incluyen creación, modificación, rollback de validaciones, aislamiento entre empresas, migración, cálculo del código postal y compatibilidad con roles.
 
 ## Nueva ficha fiscal por empresa
 
-Desde **Empresas**, el propietario o administrador de empresa autorizado puede completar los datos de preparación para factura electrónica 4.4. Cada empresa conserva sus campos: tipo de identificación, código de actividad económica inscrito (6 dígitos), provincia, cantón, distrito, sucursal (3 dígitos) y terminal (5 dígitos). Se guardan en SQLite, en la tabla `company_fe_preparation`, sin cambiar las ventas anteriores. Una ficha puede guardarse parcialmente para completar después; se verifican los formatos.
+Desde **Empresas**, el propietario o administrador de empresa autorizado puede completar los datos de preparación para factura electrónica 4.4. Cada empresa conserva sus campos: tipo de identificación, código de actividad inscrito (XXXX.X o histórico de seis dígitos), provincia, cantón y distrito; sucursal y terminal se conservan internamente. Se guardan en SQLite, en la tabla `company_fe_preparation`, sin cambiar las ventas anteriores. Una ficha puede guardarse parcialmente para completar después; se verifican los formatos.
 
 La nueva pantalla muestra **10 comprobaciones locales** que incluyen razón social, identificación, datos fiscales, correo, dirección y cobertura CAByS de los artículos y servicios activos. Indica los artículos cuyo CAByS no tiene 13 dígitos. El acceso **Editar perfil y ficha fiscal** abre el formulario unificado para el propietario; el administrador autorizado conserva su formulario fiscal específico. Los resultados son orientativos: no consultan RUT ni certifican correspondencia de códigos. Las credenciales de Hacienda y el certificado digital **no se solicitan ni se almacenan en esta versión**.
 
@@ -1069,7 +1160,7 @@ La ventana **Nueva empresa / Abrir perfil** reúne **Tipo de identificación** y
 | 04 · NITE | 10 dígitos, sin guiones |
 | 05 · Extranjero no domiciliado | Hasta 20 caracteres alfanuméricos; aplicabilidad restringida según el comprobante |
 
-**Actividad económica (RUT):** se admite el formato `4019.0` y, por compatibilidad, códigos de seis dígitos. La escritura se almacena tal como la proporciona el RUT. **No se convierte automáticamente** `4019.0` en un supuesto código de emisión de Hacienda: el XML 4.4 utiliza `CodigoActividadEmisor` de seis dígitos y requiere validar el padrón real antes de emitir. La ficha sigue siendo preparatoria y no firma, genera ni envía comprobantes.
+**Actividad económica (RUT):** se admite el formato `4019.0` y, por compatibilidad, códigos de seis dígitos. El generador conserva el texto `4019.0` exactamente, sin quitar el punto ni convertirlo a `401900`. Este formato no certifica que la actividad corresponda a la empresa: el XML 4.4 utiliza `CodigoActividadEmisor` de hasta seis caracteres, incluido el punto de códigos CIIU4, y requiere validar el padrón real antes de emitir. La ficha sigue siendo preparatoria y no firma, genera ni envía comprobantes.
 
 **Compatibilidad:** las empresas históricas conservan sus datos en SQLite; al editar una ficha anterior sin tipo de identificación, se deberá seleccionar uno válido. La API sin ficha fiscal mantiene la compatibilidad de solicitudes comerciales antiguas con identificaciones numéricas de 9 a 12 dígitos. Las solicitudes que incluyen tipo fiscal se validan estrictamente. Las rutas de crear/editar siguen siendo transaccionales y el administrador de empresa no puede asignar un tipo incompatible con el número existente.
 

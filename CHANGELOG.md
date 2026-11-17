@@ -1,3 +1,46 @@
+## v0.6.72 — Motor fiscal decimal, selector de precio, vuelto destacado y enlaces oficiales (17/11/2026)
+
+1. **Precisión monetaria:** módulo `server/fiscal-precision.js` con BigInt en 5 decimales, compartido por interfaz y API. Las ventas nuevas mantienen el precio final cuando incluye IVA y calculan base/tributo sin ajustes artificiales. Las líneas guardan fotografía fiscal de cinco decimales, con importes comerciales en centavos compatibles con reportes previos.
+2. **Catálogo:** selector de precio **IVA incluido / precio base**, predeterminado incluido y persistente en edición. Precio fuente exacto en `products.price_decimal_5` y en la fotografía al vender. Descuentos distribuidos por restos mayores y tarifa aplicada por línea; el XML de ventas nuevas usa esos valores y mantiene las advertencias sobre firma, CABYS y XSD.
+3. **Caja:** `alertdialog` grande y centrado **ENTREGAR VUELTO** tras confirmación real de una venta pagada con efectivo recibido sobrante, con cantidad, efectivo recibido, efectivo aplicado y confirmación de entrega. Nunca antes de guardar ni para pagos sin vuelto.
+4. **Enlaces externos:** Electron abre únicamente el enlace institucional de CIIU4 y la documentación CABYS, mediante `shell.openExternal` y lista blanca. La política de navegación protegida se conserva.
+5. **QA:** tests nuevos para precisión fiscal, fuentes de precio, descuento y compatibilidad; integración API y SQLite con 5 decimales y lectura XML; comprobaciones estáticas de popup/enlaces. `npm test` debe mantenerse verde; compilación instalador, render Chromium y envío/XSD real quedan pendientes de Windows/Hacienda.
+6. **Compatibilidad:** migraciones SQLite aditivas y `NULL` históricos; ventas, precios y comprobantes antiguos nunca se recalculan. No archivos de notas por versión adicionales.
+
+## Corrección v0.6.71 — Auditoría de estructura XML 4.4, impuestos y pagos (17/11/2026)
+
+- Corrección del orden del encabezado: `Clave`, `ProveedorSistemas`, `CodigoActividadEmisor`, receptor cuando esté informado, `NumeroConsecutivo`, `FechaEmision`.
+- Para cada línea gravada se incluye `BaseImponible` antes de `Impuesto`, `ImpuestoAsumidoEmisorFabrica=0.00000` antes de `ImpuestoNeto` y `MontoTotalLinea` calculado con el impuesto exacto. El impuesto asumido siempre es cero **solo dentro del escenario simple admitido por este borrador**.
+- Se incorpora `TotalDesgloseImpuesto`, agrupado por tarifa IVA, y `MedioPago` antes de `TotalComprobante`, utilizando exclusivamente los pagos reales registrados en la venta (efectivo 01, tarjeta 02, cheque 03, transferencia 04, SINPE Móvil 06 y otros 99).
+- Mercancía/servicio se clasifica a partir de `products.kind`, nunca por el prefijo de un CAByS ficticio. Se respeta `NombreComercial`, y domicilio de receptor cuando consta completo.
+- Las bases imponibles y el IVA se calculan con precisión de cinco decimales a partir del precio neto de la venta. **Si el IVA histórico redondeado de una venta POS difiere del IVA tributario exacto, no se cambia la venta ni se exporta un XML inconsistente**; aparece el monto real y el esperado por cada línea. Esta regla es necesaria porque las ventas históricas no preservan suficiente información para reconstruir automáticamente precios con IVA incluido.
+- Clave/consecutivo con ceros, CABYS de prueba y ausencia de firma siguen fuera del alcance por acuerdo: la descarga NO equivale a emisión real, aceptación de Hacienda ni validación XSD. Los códigos CABYS no se consultan aquí; sí se mantiene la validación básica de longitud de 13 dígitos.
+- QA: pruebas unitarias para 4 líneas reales de ejemplo (IVA correcto ₡1.092,65), desajustes históricos, orden XML, pagos mixtos y clasificación; suite `npm test` e integración SQLite. No se modifica la base de datos ni los módulos comerciales.
+
+## Corrección v0.6.71 — Buscador CABYS oficial al registrar o editar productos (17/11/2026)
+
+- Se incorpora `src/HaciendaCabysPicker.jsx` al formulario real de **Productos y servicios**: búsqueda por descripción de al menos 3 caracteres o por código exacto de 13 dígitos, con lista de códigos y descripciones devueltos por Hacienda.
+- La búsqueda utiliza el endpoint oficial `https://api.hacienda.go.cr/fe/cabys` mediante un proxy interno `GET /api/companies/:companyId/products/cabys-search?q=...`, limitado al permiso `inventory.manage` de la empresa. No se envían credenciales de Hacienda ni se aceptan URLs arbitrarias.
+- Espera de 650 ms al teclear, cancelación de consultas previas, caché en memoria de 10 minutos, deduplicación de solicitudes concurrentes y avisos claros ante API caída o HTTP 429. Respuestas limitadas a 12 sugerencias.
+- Seleccionar un CABYS actualiza **solo** el campo de 13 dígitos; no modifica automáticamente precio, IVA, descripción del producto ni inventario. El usuario puede seguir escribiendo manualmente si no hay Internet.
+- Accesibilidad por teclado, tamaños adaptables y compatibilidad con Crear y Editar; las operaciones comerciales y los datos existentes permanecen sin cambios. Sigue siendo necesaria la validación del catálogo vigente para emisión real.
+- QA: 18 pruebas del catálogo y API simulada, 13 de interfaz, 72 de integración y suite completa `npm test`; pendiente comprobar contra la API en línea y en el instalador Windows.
+
+## v0.6.71 — Buscador de actividades económicas con referencias oficiales (17/11/2026)
+
+- Nuevo buscador contextual por código y descripción de actividad en los formularios de alta, edición y administración fiscal de Empresas.
+- Índice de referencia local con 221 códigos CIIU4 tomados de la tabla de correspondencias publicada por Hacienda. Se identifica expresamente como **extracto** y se ofrece el enlace al listado oficial; los valores ausentes no se invalidan por esa ausencia.
+- Consulta bajo demanda de actividades inscritas para empresas ya guardadas a través de `api.hacienda.go.cr/fe/ae`, utilizando el ID guardado en servidor; permisos `tax.configure`, caché de 10 minutos y manejo de indisponibilidad y HTTP 429.
+- Seleccionar un resultado actualiza el campo real sin convertir códigos con punto ni modificar otras empresas. No cambia ventas, numeración fiscal, XML, firma ni SQLite.
+- QA: 14 pruebas nuevas de catálogo y API, 10 de interfaz, 72 de integración previas, revisión visual responsive y suite `npm test` completa.
+
+### Corrección v0.6.71 · 2026-11-17 — Actividad CIIU4 en borrador XML
+
+- `CodigoActividadEmisor` es un campo de texto: admite códigos CIIU4 `XXXX.X` como `4019.0` (seis caracteres contando el punto); la condición previa de seis dígitos bloqueaba indebidamente el borrador.
+- `server/fe-xml-draft.js` reutiliza el validador fiscal ya usado al registrar empresas. El código llega al XML **sin convertirlo a números ni eliminar el punto**.
+- Los valores vacíos o con sintaxis incorrecta siguen bloqueados; el borrador advierte expresamente que la pertenencia de la actividad al RUT **no está verificada**.
+- QA unitario y de integración añadidos para verificar el XML generado, los formatos inválidos, lectura de ventas y permisos por empresa. Se conserva la versión 0.6.71 y el modo exclusivo de pruebas.
+
 ## v0.6.71 · 2026-11-16 — Primer generador XML 4.4 en modo de prueba
 
 - Nuevo botón **Borrador FE 4.4 (prueba)** en detalle de ventas; vista previa y descarga XML informativa con aviso destacado de ausencia de validez fiscal.

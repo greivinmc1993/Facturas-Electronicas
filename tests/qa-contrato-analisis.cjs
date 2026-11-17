@@ -9,7 +9,7 @@ let passed=0;
 function check(name,cb){cb();passed++;console.log('PASS',name)}
 check('Migración aditiva del costo histórico, sin alterar líneas existentes',()=>{
  assert.match(server,/addColumn\('sale_lines','unit_cost_cents','INTEGER'\)/);
- assert.match(server,/unit_cost_cents\) VALUES/);
+ assert.match(server,/unit_cost_cents,fiscal_unit_price_5/);
  assert.match(server,/historicalCost=.*product\.currency==='CRC'/s);
 });
 check('Márgenes consideran solo líneas con costo capturado, excluyen históricos NULL',()=>{

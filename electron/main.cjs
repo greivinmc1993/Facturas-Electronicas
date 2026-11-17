@@ -217,7 +217,16 @@ app.whenReady().then(async () => {
         if(details.level==='error'||details.level===3) qaErrors.push(String(details.message).slice(0,500));
       });
     }
-    mainWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+    // Links oficiales: abrir en navegador del sistema sin habilitar navegación externa
+    // dentro de Electron. No permitir URLs arbitrarias ni javascript:/file:.
+    const officialPages=new Set([
+      'https://www.hacienda.go.cr/ClasificacionActividadesEconomicas.html',
+      'https://api.hacienda.go.cr/docs/'
+    ]);
+    mainWindow.webContents.setWindowOpenHandler(({url})=>{
+      if(officialPages.has(url))shell.openExternal(url).catch(error=>console.error('No se pudo abrir enlace oficial:',error.message));
+      return {action:'deny'};
+    });
     mainWindow.webContents.on('will-navigate',(event,url)=>{
       const allowed = dev ? 'http://127.0.0.1:5173/' : `http://127.0.0.1:${server.port}/`;
       if (!url.startsWith(allowed)) event.preventDefault();

@@ -35,7 +35,7 @@ export default function FePreparationPanel({company,onEditCompany,canEditProfile
    {report&&<div className="fePreparationChecks" aria-label="Comprobaciones locales de preparación">{report.checks.map(check=><div key={check.key} className={'fePreparationCheck '+(check.ok?'isReady':'isPending')}><span aria-hidden="true">{check.ok?'✓':'!'}</span><span>{check.title}</span><small>{check.ok?'Registrado':'Pendiente'}</small></div>)}</div>}
    {canEditProfile?<div className="fePreparationForm fePreparationOwnerAction"><h4>Datos fiscales del emisor</h4><p className="hint">La ficha se completa y modifica desde Nueva empresa o Abrir perfil, junto con la dirección exacta y el código postal. El diagnóstico se actualiza después de guardar.</p><button type="button" className="secondary" onClick={onEditCompany}>Editar perfil y ficha fiscal</button></div>:
     <form className="fePreparationForm" onSubmit={save}><h4>Datos fiscales del emisor</h4><p className="hint">Como administrador puedes actualizar los datos fiscales de tu empresa. La dirección exacta y los datos generales los administra el propietario.</p>
-      <CompanyFiscalFields value={draft} onChange={changes=>{setDraft(prev=>({...prev,...changes}));setSaved('')}} idPrefix="admin-fiscal"/>
+      <CompanyFiscalFields value={draft} onChange={changes=>{setDraft(prev=>({...prev,...changes}));setSaved('')}} idPrefix="admin-fiscal" companyId={companyId}/>
       <div className="fePreparationActions"><button type="submit" disabled={saving}>{saving?'Guardando…':'Guardar ficha fiscal'}</button></div>
     </form>}
    {saved&&<p className="fePreparationSuccess" role="status">{saved}</p>}

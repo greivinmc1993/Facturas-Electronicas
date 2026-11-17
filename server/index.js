@@ -1,5 +1,8 @@
+import {fiscalSale,fiscalSnapshot,fiveString,parseFive,toCents} from './fiscal-precision.js';
 import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {FE_PREPARATION_EMPTY,parseFePreparation,describeFePreparation} from './fe-preparation.js';
+import {createRegisteredActivitiesLookup} from './hacienda-activity-lookup.js';
+import {createCabysLookup} from './hacienda-cabys-lookup.js';
 import {createFeXmlDraft} from './fe-xml-draft.js';
 import {validateCompanyIdentification} from './company-identity.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
@@ -43,7 +46,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     tax_code:"TEXT NOT NULL DEFAULT '08'", unit:"TEXT NOT NULL DEFAULT 'Unid'",
     stock:"REAL NOT NULL DEFAULT 0", min_stock:"REAL NOT NULL DEFAULT 0",
     track_stock:"INTEGER NOT NULL DEFAULT 1", barcode:"TEXT NOT NULL DEFAULT ''",
-    cost:"REAL NOT NULL DEFAULT 0", price_includes_tax:"INTEGER NOT NULL DEFAULT 0", notes:"TEXT NOT NULL DEFAULT ''"
+    cost:"REAL NOT NULL DEFAULT 0", price_includes_tax:"INTEGER NOT NULL DEFAULT 0", price_decimal_5:"TEXT", notes:"TEXT NOT NULL DEFAULT ''"
   };
   function migrateDatabase() {
   db.exec(`CREATE TABLE IF NOT EXISTS companies (
@@ -166,6 +169,13 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   CREATE INDEX IF NOT EXISTS idx_sales_client ON sales(company_id,client_id);`);
   // Costo histórico de la venta: NULL en registros anteriores o sin costo confiable.
   addColumn('sale_lines','unit_cost_cents','INTEGER');
+  // Precisión fiscal v2: columnas aditivas, NULL en históricos. No recalcular ventas pasadas.
+  for(const [column,definition] of Object.entries({
+    fiscal_unit_price_5:'TEXT',fiscal_subtotal_5:'TEXT',fiscal_discount_5:'TEXT',
+    fiscal_base_5:'TEXT',fiscal_tax_5:'TEXT',fiscal_total_5:'TEXT',
+    fiscal_input_price_5:'TEXT',fiscal_includes_tax:'INTEGER',fiscal_calculation_version:'TEXT'
+  })) addColumn('sale_lines',column,definition);
+
   // Campos reservados para comprobantes realmente emitidos por Hacienda.
   addColumn('sales','fe_consecutivo',"TEXT NOT NULL DEFAULT ''");
   addColumn('sales','fe_clave',"TEXT NOT NULL DEFAULT ''");
@@ -615,6 +625,18 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     }catch(err){return companyDatabaseFailure(res,err,'actualizar')}
   });
   // FacturaCR v0.6.70: ficha fiscal y diagnóstico LOCAL. No genera ni envía XML.
+  const lookupHaciendaActivities=createRegisteredActivitiesLookup();
+  // Consulta oficial bajo demanda de las actividades inscritas de la empresa,
+  // nunca al escribir cada letra. Autorización tax.configure por empresa.
+  app.get('/api/companies/:companyId/fe/registered-activities',async(req,res)=>{
+    const id=Number(req.params.companyId);
+    if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Empresa inválida.'});
+    const company=db.prepare('SELECT identification FROM companies WHERE id=?').get(id);
+    if(!company)return res.status(404).json({error:'Empresa no encontrada.'});
+    res.setHeader('Cache-Control','no-store');
+    try{return res.json(await lookupHaciendaActivities(company.identification));}
+    catch(err){return res.status(503).json({error:err.message||'No se pudo consultar Hacienda.'});}
+  });
   const feReadinessFor=companyId=>{
     const company=db.prepare('SELECT id,legal_name,identification,email,address,trade_name FROM companies WHERE id=?').get(companyId);
     if(!company)return null;
@@ -647,6 +669,20 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     upsertFiscal(id,settings);
     res.setHeader('Cache-Control','no-store');
     return res.json({...feReadinessFor(id),ok:true});
+  });
+  // CAByS oficial para la ficha de productos: búsqueda limitada a la empresa
+  // autorizada y al catálogo público, sin guardar ni modificar sus precios/IVA.
+  const lookupCabys=createCabysLookup();
+  app.get('/api/companies/:companyId/products/cabys-search',async(req,res)=>{
+    const companyId=Number(req.params.companyId);
+    if(!Number.isSafeInteger(companyId)||companyId<1)return res.status(400).json({error:'Empresa inválida.'});
+    if(!db.prepare('SELECT id FROM companies WHERE id=?').get(companyId))return res.status(404).json({error:'Empresa no encontrada.'});
+    res.setHeader('Cache-Control','no-store');
+    try{return res.json(await lookupCabys(req.query.q));}
+    catch(err){
+      const invalid=/^(?:CABYS:|Para consultar|Para buscar|La búsqueda)/.test(err.message);
+      return res.status(invalid?400:503).json({error:err.message||'No fue posible consultar CABYS.'});
+    }
   });
   // All records are scoped to an existing company. Parameters are bound in SQL.
   const configs = {
@@ -684,6 +720,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
         if (!(v.tax_code in tariffs)) throw Error('Seleccione una tarifa de IVA válida.');
         v.tax_rate=tariffs[v.tax_code];
         v.price_includes_tax = v.price_includes_tax==='1'?1:0;
+        v.price_decimal_5=fiveString(parseFive(body?.price??'0'));
         for (const k of ['price','stock','min_stock','cost']) {
           const n=Number(v[k]);
           if (!Number.isFinite(n) || n<0 || n>1e12) throw Error('Revise precio, costo y existencias.');
@@ -757,9 +794,10 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       if(code&&product.product_code!==code || barcode&&product.barcode!==barcode)throw Error(`Fila ${i+2}: el identificador no coincide con el artículo.`);
       if(seen.has(product.id))throw Error(`Fila ${i+2}: el artículo aparece más de una vez.`);
       seen.add(product.id);
-      let price=product.price,stock=product.stock,cabys=product.cabys;
+      let price=product.price,price_decimal_5=product.price_decimal_5||fiveString(parseFive(product.price)),stock=product.stock,cabys=product.cabys;
       if(updatePrice){
         if(r.price===undefined||String(r.price).trim()==='')throw Error(`Fila ${i+2}: falta el precio.`);
+        price_decimal_5=fiveString(parseFive(r.price));
         price=Number(r.price);
         if(!Number.isFinite(price)||price<0||price>1e12)throw Error(`Fila ${i+2}: precio inválido.`);
       }
@@ -775,7 +813,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
         if(!/^\d{13}$/.test(cabys))throw Error(`Fila ${i+2}: CABYS debe contener exactamente 13 dígitos. Revisa que Excel no lo haya convertido a número.`);
       }
       prepared.push({id:product.id,description:product.description,product_code:product.product_code,barcode:product.barcode,
-        old_price:product.price,new_price:price,old_stock:product.stock,new_stock:stock,old_cabys:product.cabys,new_cabys:cabys,
+        old_price:product.price,new_price:price,new_price_decimal_5:price_decimal_5,old_stock:product.stock,new_stock:stock,old_cabys:product.cabys,new_cabys:cabys,
         priceChanged:updatePrice&&price!==product.price,stockChanged:updateStock&&stock!==product.stock,cabysChanged:updateCabys&&cabys!==product.cabys,
         // Valores de referencia para confirmar sin pisar cambios concurrentes.
         expected_price:r.expected_price,expected_stock:r.expected_stock,expected_cabys:r.expected_cabys});
@@ -801,13 +839,13 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
              r.expected_cabys===undefined||String(r.expected_cabys)!==r.old_cabys)
             throw Error(`El artículo «${r.description}» cambió desde la vista previa. Revisa el CSV nuevamente.`);
         }
-        const update=db.prepare('UPDATE products SET price=?,stock=?,cabys=? WHERE company_id=? AND id=? AND is_deleted=0');
+        const update=db.prepare('UPDATE products SET price=?,price_decimal_5=?,stock=?,cabys=? WHERE company_id=? AND id=? AND is_deleted=0');
         const logPrice=db.prepare('INSERT INTO product_bulk_price_changes(company_id,product_id,old_price,new_price) VALUES (?,?,?,?)');
         const logMovement=db.prepare('INSERT INTO inventory_movements(company_id,product_id,movement_type,quantity,delta,stock_before,stock_after,reason) VALUES (?,?,?,?,?,?,?,?)');
         let priceChanges=0,stockChanges=0,cabysChanges=0;
         for(const r of rows){
           if(!r.priceChanged&&!r.stockChanged&&!r.cabysChanged)continue;
-          const result=update.run(r.new_price,r.new_stock,r.new_cabys,id,r.id);
+          const result=update.run(r.new_price,r.new_price_decimal_5,r.new_stock,r.new_cabys,id,r.id);
           if(result.changes!==1)throw Error('No se pudo actualizar '+r.description);
           if(r.priceChanged){logPrice.run(id,r.id,r.old_price,r.new_price);priceChanges++}
           if(r.stockChanged){const delta=r.new_stock-r.old_stock;
@@ -1237,7 +1275,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       const lines=db.prepare(`SELECT sl.*,p.cabys,p.unit,p.kind FROM sale_lines sl
         LEFT JOIN products p ON p.id=sl.product_id AND p.company_id=?
         WHERE sl.sale_id=? ORDER BY sl.id`).all(companyId,saleId);
-      const result=createFeXmlDraft({company,fiscal,sale,client,lines});
+      const payments=db.prepare('SELECT method,amount_cents FROM sale_payments WHERE sale_id=? ORDER BY id').all(saleId);
+      const result=createFeXmlDraft({company,fiscal,sale,client,lines,payments});
       return res.status(result.ready?200:422).json(result);
     }catch(err){return res.status(400).json({error:'No se pudo generar el borrador: '+err.message});}
   });
@@ -1253,54 +1292,34 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       if(!Array.isArray(body.payments)||body.payments.length>10)throw Error('Pagos inválidos.');
       const requestedDiscount=Number(body.discount??0);
       if(!Number.isFinite(requestedDiscount)||requestedDiscount<0)throw Error('El descuento debe ser un importe válido y no negativo.');
-      const discount=Math.round(cents(requestedDiscount)/100)*100;
+      const discount=toCents(parseFive(body.discount??'0'));
       const unique=new Set(body.lines.map(l=>String(l.product_id)));
       if(unique.size!==body.lines.length)throw Error('Hay artículos duplicados en el carrito. Agrupa las cantidades.');
       const result=db.transaction(()=>{
-        let subtotal=0,tax=0;
         const lines=body.lines.map(row=>{
           const productId=Number(row.product_id),quantity=Number(row.quantity);
           if(!Number.isSafeInteger(productId)||!Number.isSafeInteger(quantity)||quantity<1||quantity>100000)throw Error('Artículo o cantidad inválidos.');
           const product=db.prepare('SELECT * FROM products WHERE id=? AND company_id=? AND is_deleted=0').get(productId,companyId);
           if(!product)throw Error('Un artículo no existe o fue eliminado.');
           if(product.currency!=='CRC')throw Error(`«${product.description}» está en USD. Configura su precio en CRC antes de venderlo.`);
-          const includesTax=Number(product.price_includes_tax)===1;
-          const rate=Number(product.tax_rate);
-          const rawUnit=includesTax?Math.round(cents(product.price)/(1+rate/100)):cents(product.price);
-          const unit=Math.round(rawUnit/100)*100,lineSubtotal=unit*quantity;
-          if(!Number.isSafeInteger(lineSubtotal)||lineSubtotal>1e12)throw Error('Importe demasiado grande.');
-          // El precio marcado "IVA incluido" es el importe final prometido al cliente.
-          // Al redondear por separado base e IVA pueden perderse ₡1 o más por cantidad.
-          // Conservamos la base en colones enteros y asignamos la diferencia al IVA,
-          // sin cambiar precios de productos ni ventas históricas.
-          const grossLine=includesTax?Math.round(cents(product.price)/100)*100*quantity:null;
-          if(grossLine!==null&&(!Number.isSafeInteger(grossLine)||grossLine>1e12))throw Error('Importe demasiado grande.');
-          const unadjustedTax=Math.round(lineSubtotal*rate/10000)*100;
-          const taxRoundingAdjustment=includesTax?grossLine-lineSubtotal-unadjustedTax:0;
-          subtotal+=lineSubtotal;
-          return {product,quantity,unit,lineSubtotal,taxRoundingAdjustment};
+          return {product,quantity};
         });
-        if(discount>subtotal)throw Error('El descuento supera el subtotal.');
-        // Descuento proporcional por línea, con remanente asignado a la última.
-        let distributed=0;
-        const detailed=lines.map((line,i)=>{
-          const part=i===lines.length-1?discount-distributed:Math.floor(discount*line.lineSubtotal/subtotal/100)*100;
-          distributed+=part;
-          // El ajuste de redondeo corresponde al precio ANTES del descuento.
-          // Se prorratea con la base restante: si se descuenta la totalidad de la
-          // base imponible, el IVA y su ajuste pasan a ₡0 (sin residuos de ₡1).
-          const remainingBase=line.lineSubtotal-part;
-          const roundedTax=Math.round(remainingBase*Number(line.product.tax_rate)/10000)*100;
-          const adjustedRounding=remainingBase>0&&line.lineSubtotal>0
-            ?Math.round(line.taxRoundingAdjustment*remainingBase/line.lineSubtotal/100)*100:0;
-          const lineTax=Math.max(0,roundedTax+adjustedRounding);
-          tax+=lineTax;
-          return {...line,discount:part,lineTax,lineTotal:line.lineSubtotal-part+lineTax};
+        const calculated=fiscalSale(lines.map(l=>({price:String(l.product.price_decimal_5||l.product.price),price_includes_tax:l.product.price_includes_tax,
+          tax_rate:String(l.product.tax_rate),quantity:l.quantity})),String(body.discount??0));
+        const detailed=lines.map((l,i)=>{
+          const fiscal=calculated.lines[i], centsRow=calculated.lineCents[i];
+          return {...l,unit:Math.round(Number(fiscal.unit5)/1000),lineSubtotal:centsRow.subtotal_cents,
+            discount:centsRow.discount_cents,lineTax:centsRow.tax_cents,lineTotal:centsRow.total_cents,fiscal};
         });
-        const total=subtotal-discount+tax;
-        if(!Number.isSafeInteger(total)||total<=0)throw Error('El total debe ser positivo.');
+        // Los totales de caja están expresados en centavos. Los cinco decimales
+        // originales se conservan en cada línea para el XML; nunca se "ajusta" el IVA.
+        const subtotal=detailed.reduce((sum,l)=>sum+l.lineSubtotal,0),
+          discount=detailed.reduce((sum,l)=>sum+l.discount,0),
+          tax=detailed.reduce((sum,l)=>sum+l.lineTax,0),
+          total=detailed.reduce((sum,l)=>sum+l.lineTotal,0);
+        if(!Number.isSafeInteger(total)||total<=0||total>1e12)throw Error('El total debe ser positivo y estar dentro del límite permitido.');
         const payments=body.payments.map(pay=>{
-          const method=String(pay.method||''),amount=Math.round(cents(pay.amount)/100)*100;
+          const method=String(pay.method||''),amount=toCents(parseFive(pay.amount));
           if(!paymentLabels.includes(method)||amount<1)throw Error('Método o importe de pago inválido.');
           return {method,amount};
         });
@@ -1321,13 +1340,16 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
         }
         const id=Number(db.prepare(`INSERT INTO sales(company_id,client_id,sale_type,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents)
           VALUES (?,?,?,?,?,?,?,?,?)`).run(companyId,clientId,saleType,subtotal,discount,tax,total,paid,total-paid).lastInsertRowid);
-        const addLine=db.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents,unit_cost_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+        const addLine=db.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents,unit_cost_cents,fiscal_unit_price_5,fiscal_subtotal_5,fiscal_discount_5,fiscal_base_5,fiscal_tax_5,fiscal_total_5,fiscal_input_price_5,fiscal_includes_tax,fiscal_calculation_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
         // Captura el costo al vender, no el costo actual del catálogo. No estimar históricos.
         for(const l of detailed){
           const cost=Number(l.product.cost);
           const historicalCost=l.product.currency==='CRC'&&Number.isFinite(cost)&&cost>0&&cost<=1e10
             ?Math.round(cost*100):null;
-          addLine.run(id,l.product.id,l.product.description,l.quantity,l.unit,l.product.tax_rate,l.discount,l.lineSubtotal,l.lineTax,l.lineTotal,historicalCost);
+          const snapshot=fiscalSnapshot(l.product,l.fiscal);
+          addLine.run(id,l.product.id,l.product.description,l.quantity,l.unit,l.product.tax_rate,l.discount,l.lineSubtotal,l.lineTax,l.lineTotal,historicalCost,
+            snapshot.fiscal_unit_price_5,snapshot.fiscal_subtotal_5,snapshot.fiscal_discount_5,snapshot.fiscal_base_5,
+            snapshot.fiscal_tax_5,snapshot.fiscal_total_5,snapshot.fiscal_input_price_5,snapshot.fiscal_includes_tax,snapshot.fiscal_calculation_version);
         }
         const addPayment=db.prepare('INSERT INTO sale_payments(sale_id,method,amount_cents) VALUES (?,?,?)');
         for(const pay of payments)addPayment.run(id,pay.method,pay.amount);

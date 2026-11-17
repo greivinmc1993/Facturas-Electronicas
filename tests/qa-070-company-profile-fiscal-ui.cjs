@@ -34,7 +34,7 @@ check('El campo de identificación usa patrón y longitud del tipo seleccionado'
 check('Actividad económica admite el formato 4019.0',()=>{
  assert.match(widget,/Ej\. 4019\.0/);
  assert.match(widget,/inputMode="decimal"/);
- assert.match(widget,/El XML 4\.4 exige validar un código/);
+ assert.match(widget,/El XML 4\.4 conserva el formato CIIU4/);
 });
 check('Grupo de identificación se adapta a pantallas pequeñas',()=>{
  assert.match(css,/\.companyIdentityRow\{display:grid/);

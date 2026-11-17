@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const picker=read('src/HaciendaActivityPicker.jsx'),form=read('src/CompanyFiscalFields.jsx'),main=read('src/main.jsx'),panel=read('src/FePreparationPanel.jsx'),style=read('src/style.css'),auth=read('server/auth.js'),server=read('server/index.js');
+let n=0;const check=(name,fn)=>{fn();n++;console.log('OK Catálogo UI:',name)};
+check('Nueva empresa, edición y administración usan el mismo buscador',()=>{assert.match(form,/<HaciendaActivityPicker/);assert.match(main,/companyId=\{editingCompany\}/);assert.match(panel,/companyId=\{companyId\}/)});
+check('Escribir el código muestra sugerencias del extracto',()=>{assert.match(picker,/String\(code\)/);assert.match(picker,/searchHaciendaActivityExcerpt/);assert.match(picker,/term.length>=2/)});
+check('Búsqueda opcional por nombre',()=>{assert.match(picker,/type="search"/);assert.match(picker,/por código o descripción/)});
+check('Elegir sugerencia pasa el código al campo fiscal real',()=>{assert.match(picker,/onSelect\(item.code\)/);assert.match(form,/onSelect=\{code=>onChange\(\{activity_code:code\}\)\}/)});
+check('La API solo se consulta cuando el usuario pulsa el botón',()=>{assert.match(picker,/onClick=\{consult\}/);assert.doesNotMatch(picker,/useEffect\(\(\)=>\{\s*consult\(/)});
+check('Resultados de empresa inscrita tienen identificador propio',()=>{assert.match(picker,/Inscritas para esta empresa según Hacienda/);assert.match(picker,/isRegistered/)});
+check('No se confunde el extracto con inscripción al RUT',()=>{assert.match(picker,/no el padrón completo/);assert.match(picker,/no confirma inscripción tributaria/)});
+check('Acceso directo a catálogo completo oficial con enlace seguro',()=>{assert.match(picker,/HACIENDA_ACTIVITY_SOURCE/);assert.match(picker,/rel="noopener noreferrer"/)});
+check('Consultas protegidas por permisos de la empresa',()=>{assert.match(auth,/registered-activities\$.*tax.configure/);assert.match(server,/lookupHaciendaActivities\(company.identification\)/);assert.match(server,/SELECT identification FROM companies WHERE id=\?/)});
+check('Diseño de sugerencias y errores responsive',()=>{assert.match(style,/companyFiscalActivityOption/);assert.match(style,/@media\(max-width:570px\)/);assert.match(picker,/role="alert"/)});
+console.log(`QA interfaz catálogo: ${n}/${n} aprobadas`);

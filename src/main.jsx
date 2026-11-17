@@ -1,3 +1,4 @@
+import {fiscalSale,toCents,parseFive,fiveString} from '../server/fiscal-precision.js';
 import {csvExcelBlob,decodeCatalogCsv,csvSafeCell} from './csv-export.js';
 import React,{useEffect,useState,useRef} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -12,6 +13,7 @@ import UsersPanel from './UsersPanel.jsx';
 import AuditPanel from './AuditPanel.jsx';
 import FePreparationPanel from './FePreparationPanel.jsx';
 import CompanyFiscalFields,{EMPTY_COMPANY_FISCAL,postalFromLocation} from './CompanyFiscalFields.jsx';
+import HaciendaCabysPicker from './HaciendaCabysPicker.jsx';
 import {COMPANY_ID_RULES} from '../server/company-identity.js';
 import {validateCompanyForm,COMPANY_FIELD_TITLES,COMPANY_FIELD_DOM_IDS,companyServerErrorField} from './company-form-validation.js';
 import CashierStockPanel from './CashierStockPanel.jsx';
@@ -110,7 +112,7 @@ class ScreenErrorBoundary extends React.Component {
  render(){if(this.state.error)return <div style={{padding:32,fontFamily:'system-ui',color:'#193450',maxWidth:800,margin:'auto'}}><h2>No se pudo mostrar esta pantalla</h2><p>FacturaCR detectó un problema en la interfaz. Tus datos no se han eliminado.</p><pre style={{whiteSpace:'pre-wrap',background:'#eef2f6',padding:16,borderRadius:8}}>{String(this.state.error.message||this.state.error)}</pre><button type="button" onClick={()=>window.location.reload()}>Recargar FacturaCR</button></div>;return this.props.children}
 }
 const basePrice=p=>Number(p.price_includes_tax)===1?Number(p.price)/(1+Number(p.tax_rate||0)/100):Number(p.price);
-const saleMoney=cents=>(Number(cents||0)/100).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:0});
+const saleMoney=cents=>(Number(cents||0)/100).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const ticketDefaults={width:'80',logo:'',thankYou:'¡Gracias por su compra!',social:'',showAddress:true,showPhone:true,showClient:true,showPayments:true,showTax:true,autoPrint:false,printerName:'',silent:false,copies:1,template:'classic'};
 const safeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ivaLabel=rate=>`${Number(rate||0).toLocaleString('es-CR',{maximumFractionDigits:2})}%`;
@@ -149,6 +151,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
  const [draftReadyCompany,setDraftReadyCompany]=useState(null),[pendingDraft,setPendingDraft]=useState(null),[draftNotice,setDraftNotice]=useState('');
  const savedDraftRef=useRef(null),draftEpoch=useRef(0),draftWriteQueue=useRef(Promise.resolve());
  const [cart,setCart]=useState([]),[clientId,setClientId]=useState(''),[clientQuery,setClientQuery]=useState(''),[clientResultIndex,setClientResultIndex]=useState(0),[saleType,setSaleType]=useState('contado');
+ const [changeReceipt,setChangeReceipt]=useState(null);
  const [cashTendered,setCashTendered]=useState(''),[discount,setDiscount]=useState('0'),[payments,setPayments]=useState([{method:'Efectivo',amount:''}]);
  const [query,setQuery]=useState(''),[scanCode,setScanCode]=useState(''),[productPage,setProductPage]=useState(1),[historyQuery,setHistoryQuery]=useState(''),[notice,setNotice]=useState('');
  const [historyPeriod,setHistoryPeriod]=useState('mes'),[historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
@@ -306,7 +309,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
    if(!pendingDraft)return;
    const restored=pendingDraft.lines.map(l=>{
      const product=products.find(p=>p.id===l.id);
-     return product?{id:product.id,description:product.description,price:basePrice(product),listed_price:Number(product.price),includes_tax:Number(product.price_includes_tax)===1,tax_rate:Number(product.tax_rate),quantity:l.quantity}:null;
+     return product?{id:product.id,description:product.description,price:basePrice(product),listed_price:String(product.price_decimal_5||product.price),includes_tax:Number(product.price_includes_tax)===1,tax_rate:Number(product.tax_rate),quantity:l.quantity}:null;
    }).filter(Boolean);
    const missing=pendingDraft.lines.length-restored.length;
    setCart(restored);setClientId(pendingDraft.clientId||'');setSaleType(pendingDraft.saleType||'contado');setDiscount(pendingDraft.discount||'0');setPayments(pendingDraft.payments?.length?pendingDraft.payments:[{method:'Efectivo',amount:''}]);setCashTendered(pendingDraft.cashTendered||'');
@@ -335,7 +338,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
    save.then(()=>{savedDraftRef.current=key}).catch(e=>setDraftNotice('No se pudo guardar el borrador: '+e.message));
  },[companyId,draftReadyCompany,pendingDraft,cart,clientId,saleType,discount,cashTendered,payments]);
 
- const add=product=>{if(draftReadyCompany!==companyId){setNotice('Recupera o descarta el borrador pendiente antes de añadir productos.');return;}setCart(old=>old.some(l=>l.id===product.id)?old.map(l=>l.id===product.id?{...l,quantity:l.quantity+1}:l):[...old,{id:product.id,description:product.description,price:basePrice(product),listed_price:Number(product.price),includes_tax:Number(product.price_includes_tax)===1,tax_rate:Number(product.tax_rate),quantity:1}]);};
+ const add=product=>{if(draftReadyCompany!==companyId){setNotice('Recupera o descarta el borrador pendiente antes de añadir productos.');return;}setCart(old=>old.some(l=>l.id===product.id)?old.map(l=>l.id===product.id?{...l,quantity:l.quantity+1}:l):[...old,{id:product.id,description:product.description,price:basePrice(product),listed_price:String(product.price_decimal_5||product.price),includes_tax:Number(product.price_includes_tax)===1,tax_rate:Number(product.tax_rate),quantity:1}]);};
  // Los lectores USB suelen actuar como teclado y enviar Enter después del código.
  // Buscar coincidencias exactas evita añadir accidentalmente un producto parecido.
  const scanProduct=()=>{
@@ -348,43 +351,39 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
    add(found[0]);setScanCode('');setNotice(`Añadido al carrito: ${found[0].description}`);
  };
  const productSuggestions=normalizedProductQuery?matchingProducts.slice(0,8):[];
- const lineBaseCents=l=>roundCRC(Math.round(l.price*100))*l.quantity;
- const lineTaxAdjustment=l=>{
-   if(!l.includes_tax)return 0;
-   const base=lineBaseCents(l);
-   const gross=roundCRC(Math.round(l.listed_price*100))*l.quantity;
-   const taxBeforeAdjustment=roundCRC(Math.round(base*l.tax_rate/100));
-   return gross-base-taxBeforeAdjustment;
- };
- const subtotal=cart.reduce((sum,l)=>sum+lineBaseCents(l),0);
- const discountCents=roundCRC(Math.round(Math.max(0,Number(discount)||0)*100));
- const effectiveDiscount=Math.min(subtotal,discountCents);
- let allocated=0;
- // Los totales que ve el cajero coinciden con el cálculo del servidor.
- // Los precios con IVA incluido conservan su precio final (p. ej. ₡700).
- const tax=cart.reduce((sum,l,i)=>{const base=lineBaseCents(l);const part=i===cart.length-1?effectiveDiscount-allocated:Math.floor(effectiveDiscount*base/(subtotal||1)/100)*100;allocated+=part;const remainingBase=base-part;const adjustment=remainingBase>0&&base>0?Math.round(lineTaxAdjustment(l)*remainingBase/base/100)*100:0;return sum+Math.max(0,roundCRC(Math.round(remainingBase*l.tax_rate/100))+adjustment)},0);
- const total=subtotal-effectiveDiscount+tax;
- const discountInvalid=discountCents>subtotal;
- const priceWithTaxCents=l=>{
-   const base=lineBaseCents(l);
-   return base+Math.max(0,roundCRC(Math.round(base*l.tax_rate/100))+lineTaxAdjustment(l));
- };
+ // Un solo motor de cálculo para React y Express; los cinco decimales
+ // se conservan para la fotografía fiscal y los pagos se cobran en centavos.
+ const requestedDiscount=String(discount||'0');
+ let fiscalCart=null,fiscalError='';
+ try{if(cart.length)fiscalCart=fiscalSale(cart.map(l=>({price:l.listed_price,price_includes_tax:l.includes_tax,quantity:l.quantity,tax_rate:l.tax_rate})),requestedDiscount)}
+ catch(err){fiscalError=err.message;}
+ const fiscalLines=fiscalCart?.lines||[];
+ const lineBaseCents=l=>{const i=cart.indexOf(l);return fiscalCart?toCents(fiscalLines[i].base5):0};
+ const priceWithTaxCents=l=>{const i=cart.indexOf(l);return fiscalCart?toCents(fiscalLines[i].base5+fiscalLines[i].unadjustedTax5):0};
+ const subtotal=fiscalCart?fiscalCart.lineCents.reduce((sum,l)=>sum+l.subtotal_cents,0):0;
+ const effectiveDiscount=fiscalCart?fiscalCart.lineCents.reduce((sum,l)=>sum+l.discount_cents,0):0;
+ const tax=fiscalCart?fiscalCart.lineCents.reduce((sum,l)=>sum+l.tax_cents,0):0;
+ const total=fiscalCart?fiscalCart.lineCents.reduce((sum,l)=>sum+l.total_cents,0):0;
+ const discountInvalid=!!fiscalError;
+ const centsFromInput=val=>{try{return toCents(parseFive(val))}catch{return 0}};
  const cashSelected=payments.some(p=>p.method==='Efectivo');
- const nonCashPaid=payments.filter(p=>p.method!=='Efectivo').reduce((sum,p)=>sum+roundCRC(Math.round((Number(p.amount)||0)*100)),0);
- const tenderCents=cashSelected&&cashTendered!==''?Math.max(0,roundCRC(Math.round((Number(cashTendered)||0)*100))):0;
+ const nonCashPaid=payments.filter(p=>p.method!=='Efectivo').reduce((sum,p)=>sum+centsFromInput(p.amount||'0'),0);
+ const tenderCents=cashSelected&&cashTendered!==''?centsFromInput(cashTendered):0;
  const cashApplied=cashSelected?Math.min(tenderCents,Math.max(0,total-nonCashPaid)):0;
  const paid=nonCashPaid+cashApplied;
  const changeCents=cashSelected?Math.max(0,tenderCents-cashApplied):0;
- const actualPayments=payments.filter(p=>p.method!=='Efectivo'&&Number(p.amount)>0).map(p=>({method:p.method,amount:roundCRC(Math.round(Number(p.amount)*100))/100}));
+ const actualPayments=payments.filter(p=>p.method!=='Efectivo'&&Number(p.amount)>0).map(p=>({method:p.method,amount:centsFromInput(p.amount)/100}));
  if(cashApplied>0)actualPayments.push({method:'Efectivo',amount:cashApplied/100});
  const submit=()=>runCommercialAction('venta',async()=>{
+  const changeToReturn=changeCents,receivedCash=tenderCents,cashUsed=cashApplied;
   try{
    // Esperar borradores anteriores antes de registrar la venta; el servidor elimina el borrador de forma atómica.
    await draftWriteQueue.current.catch(()=>{});
-   const result=await api(`/api/companies/${companyId}/sales`,{method:'POST',body:JSON.stringify({sale_type:saleType,client_id:clientId||null,discount:discountCents/100,lines:cart.map(l=>({product_id:l.id,quantity:l.quantity})),payments:actualPayments})});
+   const result=await api(`/api/companies/${companyId}/sales`,{method:'POST',body:JSON.stringify({sale_type:saleType,client_id:clientId||null,discount:requestedDiscount,lines:cart.map(l=>({product_id:l.id,quantity:l.quantity})),payments:actualPayments})});
    // Limpiar inmediatamente tras confirmar la escritura, incluso si la impresión o actualización falla.
    await api(`/api/companies/${companyId}/sales/draft`,{method:'DELETE'}).catch(()=>{});
    setCart([]);setPayments([{method:'Efectivo',amount:''}]);setDiscount('0');setCashTendered('');
+   if(changeToReturn>0)setChangeReceipt({saleId:result.id,changeCents:changeToReturn,receivedCents:receivedCash,appliedCents:cashUsed});
    setNotice(`Venta interna #${result.id} registrada. Total ₡${saleMoney(result.total_cents)}. Saldo ₡${saleMoney(result.balance_cents)}. No es comprobante electrónico de Hacienda.`);
    if(ticketSettings.autoPrint)try{await openTicket(result.id,true)}catch(e){setNotice(`Venta #${result.id} guardada; impresión pendiente: ${e.message}`)}
    try{await load();if(canReadHistory)await loadCredits()}catch(e){setNotice(`Venta #${result.id} guardada, pero no se pudo actualizar el historial: ${e.message}`)}
@@ -393,7 +392,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
  const finish=e=>{e.preventDefault();if(operationLock.current||operationBusy)return;
   if(draftReadyCompany!==companyId){setNotice('Resuelve primero el borrador pendiente.');return}
   if(!cart.length){setNotice('Agrega al menos un artículo.');return}
-  if(discountInvalid){setNotice('El descuento supera el subtotal sin IVA. Reduce el descuento antes de confirmar la venta.');return}
+  if(discountInvalid){setNotice(fiscalError||'Revisa el descuento antes de confirmar la venta.');return}
   if(total<=0){setNotice('La venta debe tener un total positivo. Reduce el descuento o revisa los artículos.');return}
   askConfirm('Confirmar venta',`¿Registrar esta venta ${saleType} por ₡${saleMoney(total)}? Se descontará el inventario.`,submit);
  };
@@ -464,6 +463,18 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
 
  if(!companyId)return <div className="card">Selecciona una empresa en Empresas antes de registrar ventas.</div>;
  return <div className="salesModule">
+  {changeReceipt&&<div className="posChangeOverlay" role="presentation">
+    <div className="posChangeDialog" role="alertdialog" aria-modal="true" aria-labelledby="pos-change-title" aria-describedby="pos-change-description">
+      <div className="posChangeEmblem" aria-hidden="true"><UiIcon name="check" size={36}/></div>
+      <p className="posChangeEyebrow">VENTA REGISTRADA CORRECTAMENTE</p>
+      <h2 id="pos-change-title">ENTREGAR VUELTO</h2>
+      <strong className="posChangeAmount" aria-label={`Vuelto: ${saleMoney(changeReceipt.changeCents)} colones`}>₡{saleMoney(changeReceipt.changeCents)}</strong>
+      <p id="pos-change-description">Venta #{changeReceipt.saleId} guardada · El cliente debe recibir este monto.</p>
+      <div className="posChangeNumbers"><span>Efectivo recibido <b>₡{saleMoney(changeReceipt.receivedCents)}</b></span><span>Aplicado a la venta <b>₡{saleMoney(changeReceipt.appliedCents)}</b></span></div>
+      <button type="button" autoFocus onClick={()=>setChangeReceipt(null)}>Vuelto entregado · Cerrar</button>
+    </div>
+  </div>}
+
   <div className="card"><h3>Punto de venta · {company?.trade_name||company?.legal_name}</h3><p className="hint">Registro comercial interno en colones. No emite factura electrónica ni valida comprobantes ante Hacienda.</p>{notice&&<p className="notice" role="status">{notice}</p>}
    <div className="posQuickTools">
     <div className="posQuickSearch"><Field title="Buscar artículo, código o SKU"><input value={query} onChange={e=>{setQuery(e.target.value);setProductPage(1)}} placeholder="Escribe para buscar entre todos los artículos" autoComplete="off"/></Field>
@@ -476,7 +487,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
   </div>
   {draftNotice&&<section className="draftNotice" role="status"><UiIcon name="save" size={19}/><span>{draftNotice}</span>{pendingDraft&&<div className="actions"><button type="button" onClick={recoverDraft} disabled={!products.length}>Recuperar venta</button><button type="button" className="secondary" onClick={discardDraft}>Descartar borrador</button></div>}</section>}
   <form className="card posCartCard" aria-busy={operationBusy} onSubmit={finish} onKeyDown={e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA')e.preventDefault()}}><div className="posCartHeader"><h3 className="posCartTitle"><span className="posCartTitleMain">🛒 Carrito de compras</span><span>{cart.reduce((s,l)=>s+l.quantity,0)} artículos</span></h3>{cart.length>0&&<p className="posCartSubtitle">Los artículos agregados se muestran aquí. Puedes ajustar cantidades antes de confirmar la venta.</p>}</div>
-   {cart.length===0?<div className="posCartEmpty"><strong>No has agregado artículos todavía</strong><p className="hint">Selecciona productos del catálogo para comenzar la venta.</p></div>:<div className="posCartTableWrap"><table className="posCartTable"><thead><tr><th>Artículo</th><th>Cantidad</th><th>Precio</th><th>Acción</th></tr></thead><tbody>{cart.map((l,index)=><tr key={l.id} className="posCartRow"><td className="posCartItemCell"><div className="posCartItemBlock"><span className="posCartItemIndex">{index+1}</span><div><strong className="posCartItemName">{l.description}</strong><small className="posCartItemHint">Artículo agregado al carrito</small></div></div></td><td><input className="posCartQtyInput" type="number" min="1" max="100000" step="1" value={l.quantity} onChange={e=>setCart(old=>old.map(x=>x.id===l.id?{...x,quantity:Number(e.target.value)}:x))}/></td><td className="posCartPriceCell"><strong className="posCartLineTotal">₡{saleMoney(priceWithTaxCents(l))}</strong><small className="posCartItemHint">Con IVA · antes de descuentos</small><small className="posCartItemHint">Base sin IVA: ₡{saleMoney(lineBaseCents(l))}</small></td><td className="posCartActionCell"><button type="button" className="danger" onClick={()=>setCart(old=>old.filter(x=>x.id!==l.id))}>Quitar</button></td></tr>)}</tbody></table></div>}
+   {cart.length===0?<div className="posCartEmpty"><strong>No has agregado artículos todavía</strong><p className="hint">Selecciona productos del catálogo para comenzar la venta.</p></div>:<div className="posCartTableWrap"><table className="posCartTable"><thead><tr><th>Artículo</th><th>Cantidad</th><th>Precio</th><th>Acción</th></tr></thead><tbody>{cart.map((l,index)=><tr key={l.id} className="posCartRow"><td className="posCartItemCell"><div className="posCartItemBlock"><span className="posCartItemIndex">{index+1}</span><div><strong className="posCartItemName">{l.description}</strong><small className="posCartItemHint">Artículo agregado al carrito</small></div></div></td><td><input className="posCartQtyInput" type="number" min="1" max="100000" step="1" value={l.quantity} onChange={e=>setCart(old=>old.map(x=>x.id===l.id?{...x,quantity:Number(e.target.value)}:x))}/></td><td className="posCartPriceCell"><strong className="posCartLineTotal">₡{saleMoney(priceWithTaxCents(l))}</strong><small className="posCartItemHint">Precio final con IVA · antes de descuentos</small><small className="posCartItemHint">Base sin IVA: ₡{saleMoney(lineBaseCents(l))}</small></td><td className="posCartActionCell"><button type="button" className="danger" onClick={()=>setCart(old=>old.filter(x=>x.id!==l.id))}>Quitar</button></td></tr>)}</tbody></table></div>}
    <div className="posClientSaleStack"><div className="posClientPicker"><div className="posClientSearchHeader"><strong>Cliente de la venta</strong>{!selectedClient&&<span>Consumidor final</span>}</div>{selectedClient?<div className="posClientSelectedCard"><div className="posClientSelectedInitial" aria-hidden="true">{String(selectedClient.name||'C').charAt(0).toUpperCase()}</div><div className="posClientSelectedInfo"><strong>{selectedClient.name}</strong><small>{selectedClient.identification||'Sin identificación'}{selectedClient.trade_name?` · ${selectedClient.trade_name}`:''}</small><small>{selectedClient.phone||selectedClient.email||'Cliente registrado'}</small></div><button type="button" className="secondary posClientChangeButton" onClick={resetClient}>Cambiar</button></div>:<><label className="field" htmlFor="posClientSearch">Buscar cliente por nombre o cédula<input id="posClientSearch" type="search" value={clientQuery} onChange={e=>{setClientQuery(e.target.value);setClientResultIndex(0)}} onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();setClientResultIndex(i=>Math.min(i+1,clientSuggestions.length-1))}else if(e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();setClientResultIndex(i=>Math.max(i-1,0))}else if(e.key==='Enter'&&clientQuery.trim()){e.preventDefault();e.stopPropagation();if(clientSuggestions.length)chooseClient(clientSuggestions[Math.min(clientResultIndex,clientSuggestions.length-1)])}else if(e.key==='Escape'){e.stopPropagation();setClientQuery('');setClientResultIndex(0)}}} placeholder="Escribe nombre, cédula, teléfono o correo..." autoComplete="off" aria-label="Buscar cliente para esta venta" aria-controls="posClientResults"/></label>{clientQuery.trim()?<div id="posClientResults" className="posClientResults" role="group" aria-label="Resultados de búsqueda de clientes"><p className="posClientMatches">{visibleClients.length===0?'No se encontraron clientes.':`${visibleClients.length} cliente(s) encontrado(s). Haz clic para seleccionar.`}</p>{clientSuggestions.map((c,i)=><button key={c.id} type="button" className={'posClientResult '+(i===clientResultIndex?'isHighlighted':'')} onClick={()=>chooseClient(c)}><span className="posClientResultAvatar" aria-hidden="true">{String(c.name||'C').charAt(0).toUpperCase()}</span><span className="posClientResultInfo"><strong>{c.name}</strong><small>{c.identification||'Sin identificación'}{c.trade_name?` · ${c.trade_name}`:''}</small><small>{[c.phone,c.email].filter(Boolean).join(' · ')}</small></span><span className="posClientResultAction" aria-hidden="true">Elegir</span></button>)}{visibleClients.length>8&&<p className="posClientResultsMore">Mostrando los primeros 8. Escribe más letras o números para precisar.</p>}</div>:<p className="posClientSearchHint">Escribe para ver clientes coincidentes y selecciona uno. Si no eliges ninguno, la venta será para consumidor final.</p>}</>}</div><div className="posSaleCondition"><Field title="Condición de venta"><select value={saleType} onChange={e=>setSaleType(e.target.value)}><option value="contado">Contado</option><option value="credito">Crédito</option></select></Field></div></div>
    <Field title="Descuento total (₡)"><input type="number" min="0" step="1" max={subtotal/100} value={discount} onChange={e=>setDiscount(e.target.value)} aria-invalid={discountInvalid}/></Field>
    {discountInvalid&&<p className="posDiscountError" role="alert">El descuento ingresado supera el subtotal sin IVA (₡{saleMoney(subtotal)}). Corrige el importe para registrar la venta.</p>}
@@ -536,7 +547,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
     <div className="ticketModal feDraftModal">
      <div className="feDraftHeader"><div><p className="companiesOverline">Prueba local · FacturaCR v0.6.71</p><h3>Borrador de factura electrónica 4.4</h3></div><span className="fePreparationStage">Sin validez fiscal</span></div>
      <p className="feDraftDisclaimer">Este XML NO está firmado, no tiene clave ni consecutivo auténticos, no ha sido validado contra el XSD oficial y NO se envía a Hacienda. No entregarlo como factura electrónica.</p>
-     {!xmlDraft.ready?<div role="alert" className="feDraftIssues"><strong>Corrige estos datos antes de generar un borrador:</strong><ul>{(xmlDraft.issues||[]).map((issue,i)=><li key={i}>{issue}</li>)}</ul></div>:<><div className="feDraftTotals">Venta #{details.id} · Total ₡{saleMoney(details.total_cents)} · CRC · {xmlDraft.version}</div><textarea className="feDraftXml" readOnly spellCheck={false} aria-label="Código XML de prueba" value={xmlDraft.xml||''}/></>}
+     {!xmlDraft.ready?<div role="alert" className="feDraftIssues"><strong>Revisa las comprobaciones antes de descargar el borrador:</strong><ul>{(xmlDraft.issues||[]).map((issue,i)=><li key={i}>{issue}</li>)}</ul></div>:<><div className="feDraftTotals">Venta #{details.id} · Total ₡{saleMoney(details.total_cents)} · CRC · {xmlDraft.version}</div><textarea className="feDraftXml" readOnly spellCheck={false} aria-label="Código XML de prueba" value={xmlDraft.xml||''}/></>}
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>
      <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>setXmlDraft(null)}>Cerrar</button></div>
     </div>
@@ -985,7 +996,7 @@ function App({account,securityPanel}){
  const openCompanyProfile=c=>{setSelected(c.id);setTab('companies');if(!account?.isOwner){setCompanyModalOpen(false);return}setEditingCompany(c.id);setCompanyForm({legal_name:c.legal_name,identification:c.identification,trade_name:c.trade_name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',website:c.website||'',social:c.social||'',avatar_color:COMPANY_COLORS.includes(c.avatar_color)?c.avatar_color:COMPANY_COLORS[0],fe_preparation:{...EMPTY_COMPANY_FISCAL,...c.fe_preparation}});setCompanyModalError('');setCompanyFieldErrors({});setCompanyModalOpen(true)};
  const updateCompany=async()=>{setCompanySaving(true);try{await api(`/api/companies/${editingCompany}`,{method:'PUT',body:JSON.stringify(companyForm)});await refreshCompanies();setCompanyFiscalRevision(v=>v+1);setEditingCompany(null);resetCompanyForm();setCompanyModalOpen(false);setCompanyFieldErrors({});setMessage('Perfil y datos fiscales actualizados.')}catch(e){reportCompanySaveError(e)}finally{setCompanySaving(false)}};
  const persistItem=async()=>{try{
-   await api(endpoint+(editing?`/${editing}`:''),{method:editing?'PUT':'POST',body:JSON.stringify(tab==='products'?{...form,price_includes_tax:'1'}:form)});
+   await api(endpoint+(editing?`/${editing}`:''),{method:editing?'PUT':'POST',body:JSON.stringify(form)});
    setForm(tab==='products'?blankProduct:blankClient);setEditing(null);await refreshItems();setMessage('Registro guardado correctamente.');
   }catch(err){setMessage(err.message)}};
  const saveItem=e=>{e.preventDefault();
@@ -993,7 +1004,7 @@ function App({account,securityPanel}){
  };
  const removeRecord=async item=>{try{await api(endpoint+'/'+item.id,{method:'DELETE'});await refreshItems();setMessage(tab==='products'?'Artículo retirado del catálogo. Su historial de inventario se conserva.':'Registro eliminado.');}catch(e){setMessage(e.message)}};
  const remove=item=>askConfirm(tab==='products'?'Eliminar artículo':'Eliminar registro',tab==='products'?`¿Retirar «${item.description}» del catálogo? Dejará de aparecer en artículos, pero se conservarán sus movimientos para auditoría.`:'¿Eliminar este registro? Esta acción no se puede deshacer.',()=>removeRecord(item),true);
- const edit=item=>{const apply=()=>{const keys=Object.keys(tab==='products'?blankProduct:blankClient);setForm(Object.fromEntries(keys.map(k=>[k,k==='price'&&tab==='products'&&Number(item.price_includes_tax)!==1?String(Math.round(Number(item.price)*(1+Number(item.tax_rate||0)/100)*100)/100):k==='price_includes_tax'?'1':String(item[k]??'')])));setEditing(item.id);window.scrollTo({top:0,behavior:'smooth'})};
+ const edit=item=>{const apply=()=>{const keys=Object.keys(tab==='products'?blankProduct:blankClient);setForm(Object.fromEntries(keys.map(k=>[k,String(item[k]??'')])));setEditing(item.id);window.scrollTo({top:0,behavior:'smooth'})};
   askConfirm(tab==='products'?'Editar artículo':'Editar cliente',`¿Deseas editar «${item.description||item.name}»?`,apply);
  };
  const loadMovements=async(productId)=>{try{setMovements(await api(`/api/companies/${selected}/inventory/movements?productId=${productId}`))}catch(e){setMessage(e.message)}};
@@ -1050,6 +1061,11 @@ function App({account,securityPanel}){
   }
   return result||num(a.id,b.id);
  });
+ const productPricePreview=(()=>{
+  if(tab!=='products')return null;
+  try{return fiscalSale([{price:String(form.price||'0'),price_includes_tax:form.price_includes_tax,tax_rate:form.tax_rate,quantity:1}]).lines[0]}
+  catch{return null}
+ })();
  const activeAccent=colorForCompany(current);
  const activeAccentSoft=withAlpha(activeAccent,.15);
  const activeAccentBorder=withAlpha(activeAccent,.42);
@@ -1085,7 +1101,7 @@ function App({account,securityPanel}){
  tab==='sales'?<SalesPanel companyId={selected} company={current} askConfirm={askConfirm} canReadHistory={!!(account?.isOwner||account?.companies?.some(c=>c.company_id===selected&&c.role!=='cashier'))}/>: 
  tab==='quotes'?<QuotesPanel companyId={selected} company={current}/>: 
  !current?<div className="card">Primero registre una empresa.</div>:
- <section className="grid"><div className="card"><h3>{editing?'Editar':'Registrar'} {tab==='clients'?'cliente':'producto o servicio'}</h3><form onSubmit={saveItem} onKeyDown={e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'){e.preventDefault()}}}>
+ <section className="grid"><div className="card"><h3>{editing?'Editar':'Registrar'} {tab==='clients'?'cliente':'producto o servicio'}</h3><form onSubmit={saveItem} onKeyDown={e=>{if(e.key==='Enter'&&!['TEXTAREA','BUTTON'].includes(e.target.tagName)){e.preventDefault()}}}>
  {tab==='clients'?<>
   <h4>Identificación</h4>
   <Field title="Nombre o razón social *"><input required maxLength="100" value={form.name} onChange={e=>change('name',e.target.value)}/></Field>
@@ -1110,11 +1126,16 @@ function App({account,securityPanel}){
   <Field title="Descripción *"><textarea rows="2" required maxLength="250" value={form.description} onChange={e=>change('description',e.target.value)}/></Field>
   <div className="two"><Field title="CABYS (13 dígitos)"><input maxLength="13" pattern="([0-9]{13})?" value={form.cabys} onChange={e=>change('cabys',e.target.value)} placeholder="Consultar catálogo oficial"/></Field>
   <Field title="Código de barras"><input maxLength="60" value={form.barcode} onChange={e=>change('barcode',e.target.value)}/></Field></div>
+  <HaciendaCabysPicker code={form.cabys} onSelect={code=>change('cabys',code)} companyId={selected}/>
   <h4>Precios e impuestos</h4>
-  <div className="three"><Field title="Precio final con IVA incluido *"><input type="number" min="0" step="0.00001" required value={form.price} onChange={e=>change('price',e.target.value)}/></Field>
+  <div className="three"><Field title={form.price_includes_tax==='1'?'Precio final con IVA incluido *':'Precio base sin IVA *'}><input type="number" min="0" step="0.00001" required value={form.price} onChange={e=>change('price',e.target.value)}/></Field>
   <Field title="Costo"><input type="number" min="0" step="0.00001" value={form.cost} onChange={e=>change('cost',e.target.value)}/></Field>
   <Field title="Moneda"><select value={form.currency} onChange={e=>change('currency',e.target.value)}><option value="CRC">CRC · Colones</option><option value="USD">USD · Dólares</option></select></Field></div>
-  <div className="posPricePreview"><span>Precio base sin IVA (calculado)</span><strong>{form.currency==='USD'?'$':'₡'}{(Number(form.price||0)/(1+Number(form.tax_rate||0)/100)).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong><small>El precio final incluye el impuesto seleccionado. En Ventas se mostrará el precio base.</small></div>
+  <Field title="Cómo se ingresa el precio"><select value={form.price_includes_tax} onChange={e=>change('price_includes_tax',e.target.value)}><option value="1">Precio final con IVA incluido (predeterminado)</option><option value="0">Precio base sin IVA · agregar impuesto</option></select></Field>
+  <div className="posPricePreview"><span>{form.price_includes_tax==='1'?'Base sin IVA · cinco decimales':'Precio final con IVA · cinco decimales'}</span>
+   <strong>{form.currency==='USD'?'$':'₡'}{productPricePreview?fiveString(form.price_includes_tax==='1'?productPricePreview.base5:productPricePreview.total5):'—'}</strong>
+   <small>La base, el IVA y el total se calculan con precisión decimal exacta. Se conserva la modalidad de precio elegida y no se altera una venta histórica.</small>
+  </div>
   <Field title="Tarifa de IVA"><select value={form.tax_code} onChange={e=>change('tax_code',e.target.value)}>{tariffs.map(([k,v])=><option key={k} value={k}>{v.replace(' · Código 10','')}</option>)}</select></Field>
   <p className="hint">Los códigos tributarios se conservan internamente para la futura integración con Hacienda. La tarifa se debe elegir según la clasificación tributaria del producto. Las tarifas transitorias solo aplican a los ajustes permitidos por Hacienda.</p>
   <h4>Inventario</h4>
@@ -1178,7 +1199,7 @@ function App({account,securityPanel}){
    <Field title="Teléfono" error={companyFieldErrors.phone}><input id="company-phone" aria-invalid={!!companyFieldErrors.phone} maxLength="160" placeholder="8888-8888" value={companyForm.phone} onChange={e=>editCompanyField('phone',e.target.value)}/></Field>
    <Field title="Nombre comercial" error={companyFieldErrors.trade_name}><input id="company-trade-name" aria-invalid={!!companyFieldErrors.trade_name} maxLength="160" placeholder="Nombre que verá en el punto de venta" value={companyForm.trade_name} onChange={e=>editCompanyField('trade_name',e.target.value)}/></Field>
    <Field title="Correo electrónico" error={companyFieldErrors.email}><input id="company-email" aria-invalid={!!companyFieldErrors.email} type="email" maxLength="300" placeholder="contabilidad@empresa.com" value={companyForm.email} onChange={e=>editCompanyField('email',e.target.value)}/></Field>
-   <CompanyFiscalFields value={companyForm.fe_preparation} onChange={setCompanyFiscal} idPrefix="company-modal-fiscal" showIdentificationType={false} errors={companyFieldErrors}
+   <CompanyFiscalFields value={companyForm.fe_preparation} onChange={setCompanyFiscal} idPrefix="company-modal-fiscal" showIdentificationType={false} errors={companyFieldErrors} companyId={editingCompany}
     addressField={<Field title="Dirección exacta (otras señas)" error={companyFieldErrors.address}><textarea id="company-address" aria-invalid={!!companyFieldErrors.address} rows="3" maxLength="160" placeholder="Ej. 150 metros norte del parque, local 2" value={companyForm.address} onChange={e=>editCompanyField('address',e.target.value)}/></Field>}/>
    <div className="companyModalTwo"><Field title="Sitio web" error={companyFieldErrors.website}><input id="company-website" aria-invalid={!!companyFieldErrors.website} maxLength="300" placeholder="https://..." value={companyForm.website} onChange={e=>editCompanyField('website',e.target.value)}/></Field><Field title="Redes sociales" error={companyFieldErrors.social}><input id="company-social" aria-invalid={!!companyFieldErrors.social} maxLength="300" placeholder="Cuenta o enlace" value={companyForm.social} onChange={e=>editCompanyField('social',e.target.value)}/></Field></div>
    <div className="companyColorArea"><div><strong className="companyColorHeading">Color de identificación</strong><p className="hint">Identifica visualmente tu empresa en las tarjetas y el menú lateral.</p><div className="companyColorChoices" role="group" aria-label="Color de identificación">{COMPANY_COLORS.map(color=><button key={color} type="button" aria-label={`Elegir color ${color}`} aria-pressed={companyForm.avatar_color===color} className={'companyColorOption '+(companyForm.avatar_color===color?'isActive':'')} style={{backgroundColor:color}} onClick={()=>setCompanyForm(prev=>({...prev,avatar_color:color}))}>{companyForm.avatar_color===color&&<UiIcon name="check" size={19}/>}</button>)}</div></div><div className="companyColorPreview"><small>Vista previa</small><div className="companyColorPreviewRow"><span className="companyColorPreviewAvatar" style={{background:`linear-gradient(180deg, ${companyForm.avatar_color||COMPANY_COLORS[0]}, ${companyForm.avatar_color||COMPANY_COLORS[0]})`}}>{(companyForm.trade_name||companyForm.legal_name||'E').charAt(0).toUpperCase()}</span><span><strong>{companyForm.trade_name||companyForm.legal_name||'Nombre de empresa'}</strong><small>{companyForm.identification||'Identificación'}</small></span></div></div></div><p className="companyModalInfo"><UiIcon name="shield" size={16}/> La información permanece en tu equipo. La identificación es obligatoria. La ficha fiscal prepara los datos de la futura emisión XML 4.4.</p></div>
