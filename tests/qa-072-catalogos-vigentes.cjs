@@ -1,0 +1,42 @@
+"use strict";
+const assert=require('node:assert/strict');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const root=path.join(__dirname,'..');
+ const activity=await import(pathToFileURL(path.join(root,'src/hacienda-activity-catalog.js')).href);
+ const cabys=await import(pathToFileURL(path.join(root,'server/hacienda-cabys-lookup.js')).href);
+ let n=0;
+ const check=(name,fn)=>{fn();n++;console.log('OK catálogos 0.6.72:',name);};
+ check('6619.0 figura en el índice oficial local',()=>assert.equal(activity.searchHaciendaActivityExcerpt('6619.0')[0]?.code,'6619.0'));
+ check('6619 se encuentra sin escribir punto y dígito',()=>assert.equal(activity.searchHaciendaActivityExcerpt('6619')[0]?.code,'6619.0'));
+ check('Se encuentra por descripción financiera',()=>assert.ok(activity.searchHaciendaActivityExcerpt('actividades auxiliares servicios financieros').some(x=>x.code==='6619.0')));
+ check('No duplica entradas CIIU4',()=>assert.equal(new Set(activity.HACIENDA_ACTIVITY_EXCERPT.map(x=>x.code)).size,activity.HACIENDA_ACTIVITY_EXCERPT.length));
+ check('Se reconoce el CABYS exacto de 13 dígitos',()=>assert.deepEqual(cabys.validateCabysQuery('2449001000000'),{kind:'codigo',value:'2449001000000'}));
+ const wrapped=cabys.normalizeCabysResults({code:200,data:{cabys:[{codigo:'2449001000000',descripcion:'Bebidas gaseosas',impuesto:13}]}});
+ check('Respuesta envuelta no confunde el status 200 con CABYS',()=>assert.equal(wrapped[0].code,'2449001000000'));
+ check('Resultado de API verificado indica procedencia',()=>assert.equal(wrapped[0].verification,'hacienda-api'));
+ const single=cabys.normalizeCabysResults({code:200,data:{codigo:'2449001000000',descripcion:'Bebidas gaseosas'}});
+ check('Respuesta singular envuelta se interpreta',()=>assert.equal(single[0].code,'2449001000000'));
+ const api=cabys.createCabysLookup({fetchImpl:async url=>{
+  assert.equal(url,'https://api.hacienda.go.cr/fe/cabys?codigo=2449001000000');
+  return {ok:true,status:200,text:async()=>JSON.stringify({code:200,data:{cabys:[{codigo:'2449001000000',descripcion:'Bebidas gaseosas'}]}})};
+ }});
+ const live=await api('2449001000000');
+ check('CABYS oficial encontrado con respuesta envuelta',()=>assert.equal(live.items[0].code,'2449001000000'));
+ check('Respuesta de API no se confunde con referencia',()=>assert.equal(live.referenceOnly,false));
+ const notFound=cabys.createCabysLookup({fetchImpl:async()=>({ok:false,status:404})});
+ const ref=await notFound('2449001000000');
+ check('Si API no confirma CABYS aparece como referencia, no válido automáticamente',()=>{
+  assert.equal(ref.items[0].code,'2449001000000');assert.equal(ref.referenceOnly,true);assert.equal(ref.items[0].verification,'reference');
+ });
+ const unknown=await notFound('9999999999999');
+ check('No se inventan coincidencias para códigos desconocidos',()=>assert.deepEqual(unknown.items,[]));
+ const mismatch=cabys.createCabysLookup({fetchImpl:async()=>({ok:true,status:200,text:async()=>JSON.stringify({cabys:[{codigo:'9999999999999',descripcion:'Otro'}]})})});
+ await assert.rejects(mismatch('2449001000000'),/distinto del código consultado/);
+ check('No se acepta ni reemplaza un código distinto del consultado',()=>{});
+ const bad=cabys.createCabysLookup({fetchImpl:async()=>({ok:true,status:200,text:async()=>JSON.stringify({code:200,status:'OK'})})});
+ await assert.rejects(bad('2449001000000'),/estructura no reconocida/);
+ check('Respuesta desconocida no se confunde con ausencia de resultados',()=>{});
+ console.log(`QA actualización CIIU4/CABYS: ${n}/${n} aprobadas`);
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -11,7 +11,7 @@ const assert=require('node:assert/strict'),path=require('node:path'),{pathToFile
  ok('Consulta de una sola letra rechazada',()=>assert.throws(()=>lookup.validateCabysQuery('a'),/3 caracteres/));
  ok('Búsqueda excesiva rechazada',()=>assert.throws(()=>lookup.validateCabysQuery('a'.repeat(81)),/80 caracteres/));
  ok('Respuestas CABYS de Hacienda se normalizan sin perder ceros',()=>{
-  assert.deepEqual(lookup.normalizeCabysResults({cabys:[{codigo:'0123400010100',descripcion:'Tomate',impuesto:1}]}),[{code:'0123400010100',description:'Tomate',taxRate:'1'}]);
+  assert.deepEqual(lookup.normalizeCabysResults({cabys:[{codigo:'0123400010100',descripcion:'Tomate',impuesto:1}]}),[{code:'0123400010100',description:'Tomate',taxRate:'1',verification:'hacienda-api'}]);
  });
  ok('Respuesta por código como objeto singular',()=>assert.equal(lookup.normalizeCabysResults({codigo:'2132100000100',descripcion:'Jugo de tomate',impuesto:13})[0].code,'2132100000100'));
  ok('Se eliminan códigos repetidos e inválidos',()=>assert.equal(lookup.normalizeCabysResults({cabys:[{codigo:'2132100000100'},{codigo:'2132100000100'},{codigo:'X'}]}).length,1));

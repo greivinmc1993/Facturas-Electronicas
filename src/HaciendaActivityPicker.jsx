@@ -34,7 +34,7 @@ export default function HaciendaActivityPicker({code='',onSelect=()=>{},companyI
  return <div className="companyFiscalActivityFinder">
    <div className="companyFiscalActivityFinderTop">
     <label htmlFor={inputId}>Buscar actividad por código o descripción</label>
-    <span>Referencia CIIU4 · extracto de Hacienda</span>
+    <span>Referencia CIIU4 · listado público de Hacienda</span>
    </div>
    <input id={inputId} type="search" autoComplete="off" value={query} onChange={event=>setQuery(event.target.value)}
     onKeyDown={event=>{if(event.key==='ArrowDown'&&firstResult.current){event.preventDefault();firstResult.current.focus()}if(event.key==='Escape')setQuery('')}}

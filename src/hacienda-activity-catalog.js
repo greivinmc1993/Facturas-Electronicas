@@ -1,5 +1,6 @@
 /**
- * FacturaCR v0.6.71 — índice LOCAL de referencia, NO un padrón tributario completo.
+ * FacturaCR v0.6.72 — índice LOCAL ampliado a partir del listado de TRIBU-CR.
+ * Sigue siendo un extracto, NO el catálogo completo ni el padrón tributario.
  * Los códigos y descripciones de este extracto se tomaron de la tabla publicada
  * por el Ministerio de Hacienda: correspondencia ATV (CIIU3) / TRIBU-CR (CIIU4).
  * Fuente: https://www.hacienda.go.cr/ClasificacionActividadesEconomicas.html
@@ -171,6 +172,7 @@ const SAMPLE=`0114.0|Cultivo de caña de azúcar
 6511.0|Seguros de vida
 6512.0|Seguros generales
 6611.0|Administración de mercados financieros
+6619.0|Otras actividades auxiliares a las actividades de servicios financieros
 6629.0|Otras actividades auxiliares de seguros y fondos de pensiones
 6820.0|Actividades inmobiliarias realizadas a cambio de una retribución
 7010.0|Actividades de oficinas principales

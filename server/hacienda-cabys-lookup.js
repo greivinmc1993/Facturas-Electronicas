@@ -16,29 +16,59 @@ export function validateCabysQuery(query){
  if(/[\x00-\x1F\x7F]/.test(value))throw Error('La búsqueda contiene caracteres no permitidos.');
  return {value,kind:'q'};
 }
+/** Referencia de recuperación puntual, NO sustituto del catálogo CABYS vigente.
+ * Código y descripción publicados en documentos públicos de Costa Rica y
+ * listas actualizadas CABYS 2025; la vigencia debe confirmarse ante Hacienda/BCCR.
+ * Nunca se usa para confirmar que un código será aceptado por Hacienda.
+ */
+const PUBLISHED_REFERENCES=Object.freeze({
+ '2449001000000':Object.freeze({
+  code:'2449001000000',
+  description:'Bebidas gaseosas azucaradas, edulcoradas o aromatizadas',
+  taxRate:'13',
+  verification:'reference'
+ })
+});
+const referenceMatch=(code)=>Object.hasOwn(PUBLISHED_REFERENCES,code)?[{...PUBLISHED_REFERENCES[code]}]:[];
+
+/** Admite estructuras documentadas y respuestas envueltas de API, sin
+ * confundir `code:200` (estado HTTP) con el código CABYS de 13 dígitos.
+ */
 export function normalizeCabysResults(payload){
  if(!payload||typeof payload!=='object')throw Error('Hacienda devolvió un catálogo CABYS no reconocido.');
- // Hacienda devuelve listas en cabys; los detalles por código pueden ser un objeto.
- const items=Array.isArray(payload)?payload:
-  (Array.isArray(payload.cabys)?payload.cabys:
-   Array.isArray(payload.resultados)?payload.resultados:
-   Array.isArray(payload.results)?payload.results:
-   Array.isArray(payload.data)?payload.data:
-   payload.codigo||payload.code?[payload]:
-   payload.cabys&&typeof payload.cabys==='object'?[payload.cabys]:null);
+ const seenObjects=new Set();
+ const unwrap=(value,depth=0)=>{
+  if(!value||typeof value!=='object'||depth>4||seenObjects.has(value))return null;
+  seenObjects.add(value);
+  if(Array.isArray(value))return value;
+  const code=clean(value.codigo??value.codigoCABYS??value.codigoCabys??value.cabysCode??value.code);
+  if(CODE.test(code))return [value];
+  for(const key of ['cabys','resultados','results','data','resultado','result','items']){
+   if(value[key]!==undefined){const matches=unwrap(value[key],depth+1);if(matches)return matches;}
+  }
+  return null;
+ };
+ const items=unwrap(payload);
  if(!items)throw Error('Hacienda devolvió un catálogo CABYS con estructura no reconocida.');
  const seen=new Set(),out=[];
  for(const item of items.slice(0,50)){
   if(!item||typeof item!=='object')continue;
-  const code=clean(item.codigo??item.code??item.codigoCABYS??item.codigoCabys??item.cabys);
+  const code=clean(item.codigo??item.codigoCABYS??item.codigoCabys??item.cabysCode??item.code??item.cabys);
   if(!CODE.test(code)||seen.has(code))continue;
   seen.add(code);
   const description=clean(item.descripcion??item.description??item.detalle??item.nombre).slice(0,280);
   const rate=item.impuesto??item.tarifa??item.taxRate??item.tax_rate??null;
   const taxRate=(typeof rate==='number'||typeof rate==='string')&&clean(rate)!==''?clean(rate).slice(0,20):null;
-  out.push({code,description:description||'Bien o servicio del catálogo CAByS',taxRate});
+  out.push({code,description:description||'Bien o servicio del catálogo CAByS',taxRate,verification:'hacienda-api'});
  }
  return out.slice(0,12);
+}
+function buildCabysResult({items,kind,value,source='api.hacienda.go.cr'}){
+ const exact=kind==='codigo'?items.filter(item=>item.code===value):items;
+ if(exact.length)return {items:exact,source,cached:false,referenceOnly:false};
+ if(kind==='codigo'&&items.length>0)throw Error('Hacienda devolvió un CABYS distinto del código consultado. No se utilizará ese resultado.');
+ const references=kind==='codigo'?referenceMatch(value):[];
+ return {items:references,source:references.length?'referencia-publicada':'api.hacienda.go.cr',cached:false,referenceOnly:references.length>0};
 }
 export function createCabysLookup({fetchImpl=globalThis.fetch,clock=()=>Date.now(),ttlMs=10*60_000}={}){
  const cache=new Map(),inFlight=new Map();
@@ -56,13 +86,13 @@ export function createCabysLookup({fetchImpl=globalThis.fetch,clock=()=>Date.now
    try{response=await fetchImpl(url,{method:'GET',headers:{Accept:'application/json'},signal:AbortSignal.timeout(7500),redirect:'error'});}
    catch{throw Error('No se pudo conectar al catálogo CABYS de Hacienda. Revisa Internet o intenta después.');}
    if(response.status===429)throw Error('Hacienda limitó temporalmente las búsquedas CABYS. Espera antes de volver a consultar.');
-   if(response.status===404){const result={items:[],source:'api.hacienda.go.cr',cached:false};cache.set(cacheKey,{data:result,expires:clock()+ttlMs});return result;}
+   if(response.status===404){const result=buildCabysResult({items:[],kind,value});cache.set(cacheKey,{data:result,expires:clock()+ttlMs});return result;}
    if(!response.ok)throw Error(`La consulta CABYS de Hacienda no respondió correctamente (HTTP ${response.status}).`);
    const body=await response.text();
    if(body.length>350000)throw Error('La respuesta CABYS de Hacienda excede el tamaño permitido.');
    let payload;
    try{payload=JSON.parse(body)}catch{throw Error('Hacienda devolvió una respuesta CABYS ilegible.');}
-   const result={items:normalizeCabysResults(payload),source:'api.hacienda.go.cr',cached:false};
+   const result=buildCabysResult({items:normalizeCabysResults(payload),kind,value});
    if(cache.size>=150)cache.clear();
    cache.set(cacheKey,{data:result,expires:clock()+ttlMs});
    return result;
