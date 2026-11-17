@@ -20,7 +20,10 @@ check('Venta, abono y anulación comparten el bloqueo',()=>{
 check('Se limpia el carrito después de guardar, antes de imprimir',()=>{
  const segment=source.split("const submit=()=>runCommercialAction('venta'")[1].split('const finish=')[0];
  assert.ok(segment.indexOf('setCart([])')>segment.indexOf("method:'POST'"));
- assert.ok(segment.indexOf('setCart([])')<segment.indexOf('if(ticketSettings.autoPrint)'));
+ // Sin vuelto: impresión inmediata. Con vuelto: solo se agenda al cerrar el diálogo.
+ assert.ok(segment.indexOf('setCart([])')<segment.indexOf('if(ticketSettings.autoPrint&&changeToReturn<=0)'));
+ assert.ok(segment.includes('if(changeToReturn>0)setChangeReceipt({saleId:result.id'));
+ assert.ok(segment.includes('printAfterClose:Boolean(ticketSettings.autoPrint)'));
 });
 check('Botones inhabilitados mientras se registra',()=>{
  assert.ok(source.includes('disabled={draftReadyCompany!==companyId||operationBusy||!cart.length'));

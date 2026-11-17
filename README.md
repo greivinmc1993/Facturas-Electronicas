@@ -1,5 +1,35 @@
 # FacturaCR v0.6.72 — Precisión fiscal de Ventas, vuelto visible y enlaces oficiales
 
+## Ajuste puntual de interfaz v0.6.72 · Orden de precios y catálogo de actividades de clientes
+
+- En **Inventario y servicios → Productos y servicios**, **Cómo se ingresa el precio** aparece ahora **antes** de los campos Precio / Costo / Moneda. Continúa seleccionada por defecto la opción **Precio final con IVA incluido**; la etiqueta dinámica, tarifas y la vista previa fiscal conservan su lógica.
+- En **Clientes → Registrar / Editar**, al introducir **dos o más caracteres** en el código de actividad económica aparecen sugerencias del **mismo extracto local de Hacienda** que ya usa la ficha de Empresas; también puedes buscar por descripción. Al escoger un resultado solo se copia el código al campo del cliente. Se conserva la escritura manual y los clientes anteriores.
+- **Importante:** para un receptor no se muestra el botón **Consultar mis actividades inscritas** de la empresa, porque consulta el RUT del **emisor**, no el del cliente. El catálogo local es un extracto orientativo; no garantiza la inscripción real del receptor ante Hacienda.
+- Cambios solo de presentación y reutilización del componente `HaciendaActivityPicker`, **sin migraciones SQLite ni cambios al motor de precisión fiscal, XML 4.4 o al flujo de impresión posterior al vuelto**. El XML continúa siendo un borrador que no se puede emitir ante Hacienda.
+- QA añadido: `tests/qa-072-clients-activity-price-order.cjs` incorporado a `npm test` y pruebas de sintaxis.
+
+### Instalación y GitHub
+
+**Antes de reemplazar el proyecto o actualizar la aplicación, crea y comprueba una copia de seguridad de tu archivo SQLite desde Respaldos y consérvala fuera de la carpeta que vas a reemplazar.** Ejecuta en Windows:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+Para publicar en tu rama principal de GitHub **después** de verificar las pruebas:
+
+```powershell
+git add -A
+git commit -m "fix: v0.6.72 - orden de precios y catalogo de actividades en clientes"
+git push origin main
+```
+
+Mantener `.gitignore`, `README.md`, `CHANGELOG.md` y `.github/workflows/` en cada entrega. El instalador NSIS debe comprobarse en Windows.
+
+
 > **ETAPA DE PREPARACIÓN:** FacturaCR sigue generando **borradores XML 4.4 sin validez tributaria**. No firma, asigna clave real, valida formalmente XSD ni envía documentos a Hacienda. Esta versión reestructura el cálculo de las **ventas NUEVAS**; nunca modifica importes históricos.
 
 ## 1. Artículos: dos modalidades de precio
@@ -1172,3 +1202,10 @@ Fuente normativa: Anexo técnico de comprobantes electrónicos 4.4, Ministerio d
 ### Ajuste visual de dirección en Empresas (v0.6.70)
 
 En **Nueva empresa** y **Abrir perfil / Editar empresa**, el campo **Dirección exacta (otras señas)** ahora aparece inmediatamente después de los selectores territoriales de **Provincia, Cantón y Distrito**, junto al **Código postal** calculado. Queda dentro del mismo bloque **Datos fiscales y ubicación de la empresa**. La validación de 160 caracteres, los errores vinculados al campo y el almacenamiento `address` se mantienen sin cambios. No es necesario modificar SQLite.
+
+
+### Ajuste puntual de impresión tras entregar vuelto (v0.6.72, sin nueva versión)
+
+Al registrar una venta con vuelto, se muestra primero **ENTREGAR VUELTO**. Si la empresa tiene activada **Imprimir automáticamente**, la impresión se inicia únicamente después de pulsar **Vuelto entregado · Cerrar** y de que React retire la ventana. El cierre consume la solicitud pendiente una sola vez. Si no hay vuelto y la impresión automática está activa, el tiquete se imprime al registrar la venta como antes. Si la impresión automática está desactivada, cerrar la ventana no imprime.
+
+La venta y el inventario quedan guardados antes de esta acción; un error o cancelación de impresión no anula la venta. Se mantiene la vista previa, la reimpresión del historial, la configuración de impresoras y las opciones de impresión. Prueba QA: `node tests/qa-072-impresion-tras-vuelto.cjs` (incluida en `npm run qa:static`).

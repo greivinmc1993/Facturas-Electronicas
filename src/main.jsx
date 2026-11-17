@@ -14,6 +14,7 @@ import AuditPanel from './AuditPanel.jsx';
 import FePreparationPanel from './FePreparationPanel.jsx';
 import CompanyFiscalFields,{EMPTY_COMPANY_FISCAL,postalFromLocation} from './CompanyFiscalFields.jsx';
 import HaciendaCabysPicker from './HaciendaCabysPicker.jsx';
+import HaciendaActivityPicker from './HaciendaActivityPicker.jsx';
 import {COMPANY_ID_RULES} from '../server/company-identity.js';
 import {validateCompanyForm,COMPANY_FIELD_TITLES,COMPANY_FIELD_DOM_IDS,companyServerErrorField} from './company-form-validation.js';
 import CashierStockPanel from './CashierStockPanel.jsx';
@@ -152,6 +153,8 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
  const savedDraftRef=useRef(null),draftEpoch=useRef(0),draftWriteQueue=useRef(Promise.resolve());
  const [cart,setCart]=useState([]),[clientId,setClientId]=useState(''),[clientQuery,setClientQuery]=useState(''),[clientResultIndex,setClientResultIndex]=useState(0),[saleType,setSaleType]=useState('contado');
  const [changeReceipt,setChangeReceipt]=useState(null);
+ // La impresión automática con vuelto espera al cierre real del diálogo (DOM ya desmontado).
+ const deferredChangePrintRef=useRef(null);
  const [cashTendered,setCashTendered]=useState(''),[discount,setDiscount]=useState('0'),[payments,setPayments]=useState([{method:'Efectivo',amount:''}]);
  const [query,setQuery]=useState(''),[scanCode,setScanCode]=useState(''),[productPage,setProductPage]=useState(1),[historyQuery,setHistoryQuery]=useState(''),[notice,setNotice]=useState('');
  const [historyPeriod,setHistoryPeriod]=useState('mes'),[historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
@@ -256,6 +259,18 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
  const printHtml=async html=>{if(!window.facturacrPrinter)throw Error('Impresión disponible solo en Electron.');const result=await window.facturacrPrinter.print(html,{printerName:ticketSettings.printerName,silent:ticketSettings.silent,copies:Number(ticketSettings.copies)||1,width:ticketSettings.width});if(!result?.success&&!result?.cancelled)throw Error(result?.error||'No se pudo imprimir.');return result};
  const testTicket=async()=>{try{const demo={id:'PRUEBA',created_at:new Date().toLocaleString('es-CR'),client:{name:'Cliente de prueba',identification:'',phone:''},lines:[{description:'Artículo de prueba',quantity:1,unit_price_cents:100000,total_cents:113000,tax_cents:13000,tax_rate:13}],total_cents:113000,balance_cents:0,payments:[],discount_cents:0};await printHtml(buildTicketHtml(demo,company,ticketSettings));}catch(e){setNotice(e.message)}};
  const openTicket=async(id,print=false)=>{try{const sale=await api(`/api/companies/${companyId}/sales/${id}`);sale.client_name=sale.client?.name||clients.find(c=>Number(c.id)===Number(sale.client_id))?.name||'Consumidor final';const html=buildTicketHtml(sale,company,ticketSettings);if(print){await printHtml(html)}else setTicketPreview(html)}catch(e){setNotice(e.message)}};
+ // Ejecutar después de que React retire la ventana de vuelto, nunca mientras siga visible.
+ useEffect(()=>{
+  if(changeReceipt!==null||deferredChangePrintRef.current==null)return;
+  const saleId=deferredChangePrintRef.current;
+  deferredChangePrintRef.current=null; // consumir una sola vez aunque haya más renders
+  void openTicket(saleId,true);
+ },[changeReceipt]);
+ const closeChangeReceipt=()=>{
+  if(!changeReceipt)return;
+  deferredChangePrintRef.current=changeReceipt.printAfterClose?changeReceipt.saleId:null;
+  setChangeReceipt(null);
+ };
  const methods=['Efectivo' ,'Tarjeta','SINPE Móvil','Transferencia bancaria','Cheque','Otros'];
  const loadCredits=async()=>{
   if(!companyId)return;
@@ -383,9 +398,10 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
    // Limpiar inmediatamente tras confirmar la escritura, incluso si la impresión o actualización falla.
    await api(`/api/companies/${companyId}/sales/draft`,{method:'DELETE'}).catch(()=>{});
    setCart([]);setPayments([{method:'Efectivo',amount:''}]);setDiscount('0');setCashTendered('');
-   if(changeToReturn>0)setChangeReceipt({saleId:result.id,changeCents:changeToReturn,receivedCents:receivedCash,appliedCents:cashUsed});
+   if(changeToReturn>0)setChangeReceipt({saleId:result.id,changeCents:changeToReturn,receivedCents:receivedCash,appliedCents:cashUsed,printAfterClose:Boolean(ticketSettings.autoPrint)});
    setNotice(`Venta interna #${result.id} registrada. Total ₡${saleMoney(result.total_cents)}. Saldo ₡${saleMoney(result.balance_cents)}. No es comprobante electrónico de Hacienda.`);
-   if(ticketSettings.autoPrint)try{await openTicket(result.id,true)}catch(e){setNotice(`Venta #${result.id} guardada; impresión pendiente: ${e.message}`)}
+   // Sin vuelto se imprime como antes; con vuelto solo después de pulsar Cerrar.
+   if(ticketSettings.autoPrint&&changeToReturn<=0)await openTicket(result.id,true);
    try{await load();if(canReadHistory)await loadCredits()}catch(e){setNotice(`Venta #${result.id} guardada, pero no se pudo actualizar el historial: ${e.message}`)}
   }catch(e){setNotice(e.message)}
  });
@@ -471,7 +487,8 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
       <strong className="posChangeAmount" aria-label={`Vuelto: ${saleMoney(changeReceipt.changeCents)} colones`}>₡{saleMoney(changeReceipt.changeCents)}</strong>
       <p id="pos-change-description">Venta #{changeReceipt.saleId} guardada · El cliente debe recibir este monto.</p>
       <div className="posChangeNumbers"><span>Efectivo recibido <b>₡{saleMoney(changeReceipt.receivedCents)}</b></span><span>Aplicado a la venta <b>₡{saleMoney(changeReceipt.appliedCents)}</b></span></div>
-      <button type="button" autoFocus onClick={()=>setChangeReceipt(null)}>Vuelto entregado · Cerrar</button>
+      {changeReceipt.printAfterClose&&<p className="posChangePrintHint">Al cerrar se iniciará la impresión del tiquete.</p>}
+      <button type="button" autoFocus onClick={closeChangeReceipt}>Vuelto entregado · Cerrar</button>
     </div>
   </div>}
 
@@ -1108,7 +1125,8 @@ function App({account,securityPanel}){
   <Field title="Nombre comercial"><input maxLength="80" value={form.trade_name} onChange={e=>change('trade_name',e.target.value)}/></Field>
   <div className="two"><Field title="Tipo de identificación"><select value={form.identification_type} onChange={e=>change('identification_type',e.target.value)}><option value="01">01 · Cédula física</option><option value="02">02 · Cédula jurídica</option><option value="03">03 · DIMEX</option><option value="04">04 · NITE</option><option value="05">05 · Extranjero no domiciliado</option></select></Field>
   <Field title="Número de identificación *"><input required maxLength="20" value={form.identification} onChange={e=>change('identification',e.target.value.replace(/[-\s]/g,''))}/></Field></div>
-  <Field title="Código de actividad económica del receptor"><input inputMode="decimal" pattern="([0-9]{4}\.[0-9]|[0-9]{6})?" maxLength="6" value={form.activity_code} onChange={e=>change('activity_code',e.target.value)} placeholder="Ejemplo: 3333.3"/></Field>
+  <Field title="Código de actividad económica del receptor"><input type="text" inputMode="decimal" pattern="([0-9]{4}\.[0-9]|[0-9]{6})?" maxLength="6" autoComplete="off" value={form.activity_code} onChange={e=>change('activity_code',e.target.value)} placeholder="Ejemplo: 6201.0"/></Field>
+  <HaciendaActivityPicker key={`client-activity-${selected}-${editing||'new'}`} code={form.activity_code} onSelect={code=>change('activity_code',code)} allowRegisteredLookup={false} inputId="client-activity-search"/>
   <h4>Dirección</h4>
   <div className="three"><Field title="Provincia"><select value={form.province} onChange={e=>{change('province',e.target.value);setForm(prev=>({...prev,province:e.target.value,canton:'',district:''}))}}><option value="">Seleccione</option>{Object.entries(provinces).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field>
   <Field title="Cantón"><select value={form.canton} disabled={!form.province||!Object.keys(geoCantons).length} onChange={e=>setForm(prev=>({...prev,canton:e.target.value,district:''}))}><option value="">Seleccione cantón</option>{Object.entries(geoCantons).map(([k,v])=><option key={k} value={pad2(k)}>{v}</option>)}</select></Field>
@@ -1128,10 +1146,10 @@ function App({account,securityPanel}){
   <Field title="Código de barras"><input maxLength="60" value={form.barcode} onChange={e=>change('barcode',e.target.value)}/></Field></div>
   <HaciendaCabysPicker code={form.cabys} onSelect={code=>change('cabys',code)} companyId={selected}/>
   <h4>Precios e impuestos</h4>
+  <Field title="Cómo se ingresa el precio"><select value={form.price_includes_tax} onChange={e=>change('price_includes_tax',e.target.value)}><option value="1">Precio final con IVA incluido (predeterminado)</option><option value="0">Precio base sin IVA · agregar impuesto</option></select></Field>
   <div className="three"><Field title={form.price_includes_tax==='1'?'Precio final con IVA incluido *':'Precio base sin IVA *'}><input type="number" min="0" step="0.00001" required value={form.price} onChange={e=>change('price',e.target.value)}/></Field>
   <Field title="Costo"><input type="number" min="0" step="0.00001" value={form.cost} onChange={e=>change('cost',e.target.value)}/></Field>
   <Field title="Moneda"><select value={form.currency} onChange={e=>change('currency',e.target.value)}><option value="CRC">CRC · Colones</option><option value="USD">USD · Dólares</option></select></Field></div>
-  <Field title="Cómo se ingresa el precio"><select value={form.price_includes_tax} onChange={e=>change('price_includes_tax',e.target.value)}><option value="1">Precio final con IVA incluido (predeterminado)</option><option value="0">Precio base sin IVA · agregar impuesto</option></select></Field>
   <div className="posPricePreview"><span>{form.price_includes_tax==='1'?'Base sin IVA · cinco decimales':'Precio final con IVA · cinco decimales'}</span>
    <strong>{form.currency==='USD'?'$':'₡'}{productPricePreview?fiveString(form.price_includes_tax==='1'?productPricePreview.base5:productPricePreview.total5):'—'}</strong>
    <small>La base, el IVA y el total se calculan con precisión decimal exacta. Se conserva la modalidad de precio elegida y no se altera una venta histórica.</small>

@@ -1488,6 +1488,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .posChangeDialog p{margin:0}
 .posChangeNumbers{width:100%;border-top:1px solid #d4e7e4;border-bottom:1px solid #d4e7e4;padding:13px 0;display:grid;gap:9px}
 .posChangeNumbers span{display:flex;justify-content:space-between;gap:10px;text-align:left;font-size:.9rem}
+.posChangePrintHint{font-size:.86rem;color:#146358;font-weight:700}
 .posChangeDialog>button{width:100%;min-height:54px;border-radius:12px;background:#087766;color:#fff;font-size:1rem;font-weight:800}
 @media(max-width:520px){.posChangeDialog{padding:24px 18px}.posChangeOverlay{padding:12px}}
 @media(prefers-reduced-motion:reduce){.posChangeOverlay{backdrop-filter:none}}

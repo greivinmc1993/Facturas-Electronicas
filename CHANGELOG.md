@@ -1,3 +1,17 @@
+### Ajuste puntual v0.6.72 — Orden de precios y catálogo en Clientes (17/11/2026)
+
+- Se adelanta **Cómo se ingresa el precio** antes de Precio, Costo y Moneda en **Inventario y servicios**, sin alterar valor predeterminado, persistencia, vista previa, tarifas ni motor fiscal.
+- En **Clientes**, el código de actividad económica reutiliza el buscador de **Empresas** y muestra coincidencias al escribir 2 o más caracteres; la búsqueda por descripción y selección de código se mantienen.
+- Se omite la consulta del RUT del **emisor** al trabajar con un **receptor**, evitando atribuir al cliente las actividades inscritas de la empresa. El extracto referencial no confirma inscripción del receptor.
+- Sin migraciones, cambios en SQLite, recalcular ventas, ni modificar XML 4.4 de prueba o impresión después del vuelto.
+- Prueba nueva `qa-072-clients-activity-price-order.cjs` integrada en `qa:static` y `qa:syntax`. Compilación Windows / NSIS y consulta real en Hacienda se verifican fuera de esta entrega.
+
+### Ajuste puntual v0.6.72 — Imprimir después de cerrar el vuelto (17/11/2026)
+
+- Cuando hay vuelto, la impresión automática se difiere hasta que se pulsa **Vuelto entregado · Cerrar** y se desmonta el diálogo. La solicitud se consume una sola vez para evitar dobles impresiones por renders repetidos.
+- Sin vuelto se conserva la impresión inmediata y con impresión automática desactivada no se imprime al cerrar. El guardado de la venta, los tiquetes manuales, los ajustes de impresora, el historial y SQLite no cambian.
+- QA estática nueva del flujo de impresión; se mantiene la versión **0.6.72** hasta la próxima versión planificada.
+
 ## v0.6.72 — Motor fiscal decimal, selector de precio, vuelto destacado y enlaces oficiales (17/11/2026)
 
 1. **Precisión monetaria:** módulo `server/fiscal-precision.js` con BigInt en 5 decimales, compartido por interfaz y API. Las ventas nuevas mantienen el precio final cuando incluye IVA y calculan base/tributo sin ajustes artificiales. Las líneas guardan fotografía fiscal de cinco decimales, con importes comerciales en centavos compatibles con reportes previos.
