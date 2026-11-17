@@ -37,6 +37,7 @@ fs.copyFileSync(path.join(root,'server','backup-verification.js'),path.join(stag
 fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging,'backup-rehearsal.js'));
 fs.copyFileSync(path.join(root,'server','backup-health.js'),path.join(staging,'backup-health.js'));
 fs.copyFileSync(path.join(root,'server','fe-preparation.js'),path.join(staging,'fe-preparation.js'));
+fs.copyFileSync(path.join(root,'server','fe-xml-draft.js'),path.join(staging,'fe-xml-draft.js'));
 fs.copyFileSync(path.join(root,'server','company-identity.js'),path.join(staging,'company-identity.js'));
 // El módulo ESM se interpreta como ESM incluso si el proyecto padre usa CommonJS.
 fs.writeFileSync(path.join(staging,'package.json'),'{'+'"type":"module"'+'}');
@@ -66,7 +67,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.70')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.71')});
   await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
    const before=fs.statSync(dbPath).size;
    const r=await call('GET','/api/backups/automatic');
@@ -682,6 +683,36 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(r.status,200,JSON.stringify(r.body));
    assert.equal(r.body.fe_preparation.branch,old.fe_preparation.branch);
    assert.equal(r.body.fe_preparation.terminal,old.fe_preparation.terminal);
+  });
+  await check('Borrador FE XML 4.4: detecta RUT no convertible y ventas de otras empresas',async()=>{
+   let r=await call('GET',`/api/companies/${a}/sales/${saleId}/fe/xml-draft`);
+   assert.equal(r.status,422);assert.equal(r.body.ready,false);assert.equal(r.body.xml,null);
+   assert.ok(r.body.issues.some(t=>t.includes('Actividad económica:')));
+   r=await call('GET',`/api/companies/${b}/sales/${saleId}/fe/xml-draft`);
+   assert.equal(r.status,404,'La empresa B no debe conocer la venta A');
+  });
+  await check('Borrador FE XML 4.4: preparación válida, lectura sin afectar SQLite',async()=>{
+   let r=await call('PUT',`/api/companies/${a}`,{
+     legal_name:'QA Comercio A',identification:'123456789',email:'empresa-qa@example.com',address:'Costado norte del parque',
+     fe_preparation:{identification_type:'01',activity_code:'123456',province:'1',canton:'01',district:'01',postal_code:'10101'}
+   });
+   assert.equal(r.status,200,JSON.stringify(r.body));
+   // Fixture de venta activa: las pruebas anteriores anulan la venta original.
+   const setup=new DatabaseSync(dbPath);
+   const qaSaleId=Number(setup.prepare(`INSERT INTO sales(company_id,client_id,sale_type,currency,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents) VALUES (?,?,?,'CRC',61900,0,8100,70000,70000,0)`).run(a,clientId,'contado').lastInsertRowid);
+   setup.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(qaSaleId,prodId,'Producto QA',1,61900,13,0,61900,8100,70000);
+   setup.close();
+   const sql=read();const stock=sql.prepare('SELECT stock FROM products WHERE id=?').get(prodId).stock;
+   const sales=sql.prepare('SELECT COUNT(*) AS n FROM sales').get().n;sql.close();
+   r=await call('GET',`/api/companies/${a}/sales/${qaSaleId}/fe/xml-draft`);
+   assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.ready,true);
+   assert.match(r.body.xml,/BORRADOR DE PRUEBA/);
+   assert.match(r.body.xml,/<TotalComprobante>700\.00000<\/TotalComprobante>/);
+   assert.match(r.body.xml,/<Clave>0{50}<\/Clave>/);
+   const after=read();assert.equal(after.prepare('SELECT stock FROM products WHERE id=?').get(prodId).stock,stock);
+   assert.equal(after.prepare('SELECT COUNT(*) AS n FROM sales').get().n,sales);
+   assert.equal(after.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name LIKE 'fe_invoices%'").get().n,0);
+   after.close();
   });
  } finally{await started.close()}
  console.log(`QA integración local: ${passed} superadas / ${passed+failed}, ${failed} errores`);

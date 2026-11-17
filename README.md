@@ -1,3 +1,35 @@
+# FacturaCR v0.6.71 — Primer borrador XML de Factura Electrónica 4.4
+
+> **SOLO PRUEBA LOCAL: SIN VALIDEZ FISCAL.** Este generador no asigna claves o consecutivos reales, no consulta el RUT, no valida contra XSD, no firma XML ni envía datos a Hacienda. **Nunca entregar el archivo como factura válida.**
+
+## Cómo probar el borrador
+
+1. Configura la ficha fiscal desde **Empresas → Abrir perfil** con tipo y número de identificación, correo, ubicación, dirección exacta y código de actividad RUT actual **de 6 dígitos**.
+2. Prepara productos con CAByS de 13 dígitos en el catálogo y un cliente registrado con identificación. La primera etapa admite únicamente **ventas de contado activas en CRC**, con tarifa 0, 1, 2, 4 o 13 por ciento.
+3. Entra a **Ventas → Historial → Ver** una venta existente. Pulsa **Borrador FE 4.4 (prueba)**.
+4. Si faltan datos, la ventana enumerará por qué no puede crear el XML. No modifica la venta ni inventa los datos fiscales faltantes.
+5. Si los datos locales son suficientes, permite revisar y descargar **FacturaCR_BORRADOR_FE44_venta_#.xml**. Contiene clave y consecutivo deliberadamente ficticios de ceros; NO sirven ante Hacienda.
+
+### Alcance y limitaciones
+
+- Los importes se toman de `sales` y `sale_lines` tal como se guardaron, en centavos CRC. No vuelve a calcular el IVA ni modifica el inventario.
+- Los CAByS se consultan del catálogo actual; las ventas internas antiguas **no guardan copia histórica del CAByS**, por lo que el XML es solo una demostración.
+- El formato histórico `4019.0` se conserva en Empresas, pero no se convierte arbitrariamente al `CodigoActividadEmisor` de seis dígitos que exige el XML; consulta tu código válido en el RUT.
+- Ventas anuladas, ventas a crédito sin plazo fiscal, clientes no identificados, productos sin CAByS e importes incongruentes se **bloquean con explicación**.
+- En 0.6.72 trabajaremos en los XSD oficiales, reglas y catálogos vigentes, sin habilitar emisión real hasta completar firma, clave, consecutivos y API.
+- El endpoint `GET /api/companies/:companyId/sales/:saleId/fe/xml-draft` exige el permiso `sales.read_all` de la empresa, utiliza solo consultas de lectura y responde `422` con problemas específicos cuando no puede generar el borrador.
+
+**Fuentes normativas de referencia:**
+- Portal oficial, «Anexos y estructuras»: https://atv.hacienda.go.cr/ATV/ComprobanteElectronico/frmAnexosyEstructuras.aspx
+- Anexos y estructuras v4.4, Ministerio de Hacienda: https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf
+- Actualización oficial de anexos v4.4 (2026): https://www.hacienda.go.cr/docs/ActualizacionAnexosyEstructurasVersion4.4CEv2.pdf
+
+## Comprobaciones de esta versión
+
+`npm ci` → `npm test` → `npm run qa:real-server` → `npm run dist:win` (compilación Electron/NSIS requiere Windows). QA de XML y UI incorporado a la suite, prueba de integración con base temporal y parseo de XML bien formado.
+
+---
+
 ## Corrección v0.6.70 · Errores detallados y formulario fiscal simplificado (13-11-2026)
 
 - En **Empresas → Nueva empresa / Abrir perfil**, las validaciones ahora presentan una lista de **campos concretos con errores**: el texto explica qué corregir, el campo se resalta, y pulsar la indicación lleva el foco directamente a ese campo aun si la ventana requiere desplazarse.
@@ -1044,3 +1076,8 @@ La ventana **Nueva empresa / Abrir perfil** reúne **Tipo de identificación** y
 QA añadido: 11 pruebas de identificación por tipo, cinco controles nuevos de interfaz, cuatro pruebas de integración para alta/edición y restricción del administrador. `npm test` y 66/66 pruebas de integración superadas. Comprobación visual en Chromium a 375, 480, 768, 1100 y 1440 px. La ejecución del instalador Electron/Windows sigue pendiente.
 
 Fuente normativa: Anexo técnico de comprobantes electrónicos 4.4, Ministerio de Hacienda / PGR, `https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf`.
+
+
+### Ajuste visual de dirección en Empresas (v0.6.70)
+
+En **Nueva empresa** y **Abrir perfil / Editar empresa**, el campo **Dirección exacta (otras señas)** ahora aparece inmediatamente después de los selectores territoriales de **Provincia, Cantón y Distrito**, junto al **Código postal** calculado. Queda dentro del mismo bloque **Datos fiscales y ubicación de la empresa**. La validación de 160 caracteres, los errores vinculados al campo y el almacenamiento `address` se mantienen sin cambios. No es necesario modificar SQLite.

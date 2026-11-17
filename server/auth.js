@@ -103,6 +103,7 @@ export function registerAuth(app,getDb,options={}){
     if(/^\/companies\/\d+\/fe\/preparation$/.test(p))return ['GET','PUT'].includes(method)?'tax.configure':null;
     if(/^\/companies\/\d+\/sales\/draft(?:\/beacon)?$/.test(p))return ['GET','PUT','DELETE','POST'].includes(method)?'sales.create':null;
     if(/^\/companies\/\d+\/sales$/.test(p))return method==='POST'?'sales.create':method==='GET'?'sales.read_all':null;
+    if(/^\/companies\/\d+\/sales\/\d+\/fe\/xml-draft$/.test(p)&&method==='GET')return 'sales.read_all';
     if(/^\/companies\/\d+\/sales\/\d+$/.test(p)&&method==='GET')return 'sales.read_all';
     if(/^\/companies\/\d+\/products$/.test(p))return method==='GET'?'inventory.read':method==='POST'?'inventory.manage':null;
     if(/^\/companies\/\d+\/clients$/.test(p))return method==='GET'?'clients.manage':method==='POST'?'clients.manage':null;

@@ -35,7 +35,7 @@ function useGeoCatalog(path){
 }
 const TYPES=[['','Seleccionar tipo'],['01','Cédula física'],['02','Cédula jurídica'],['03','DIMEX'],['04','NITE'],['05','Identificación extranjera (comprobar aplicabilidad)']];
 const optionRows=(rows)=>Object.entries(rows).sort((a,b)=>Number(a[0])-Number(b[0]));
-export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange=()=>{},idPrefix='company-fe',showIdentificationType=true,errors={}}){
+export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange=()=>{},idPrefix='company-fe',showIdentificationType=true,errors={},addressField=null}){
  const fiscal={...EMPTY_COMPANY_FISCAL,...value};
  const cantonPath=fiscal.province?`/provincia/${Number(fiscal.province)}/cantones.json`:null;
  const districtPath=fiscal.province&&fiscal.canton?`/provincia/${Number(fiscal.province)}/canton/${Number(fiscal.canton)}/distritos.json`:null;
@@ -55,6 +55,7 @@ export default function CompanyFiscalFields({value=EMPTY_COMPANY_FISCAL,onChange
    <label className={'field'+(errors.district?' companyFieldHasError':'')} htmlFor={idPrefix+'-district'}>Distrito<select aria-invalid={!!errors.district} id={idPrefix+'-district'} value={fiscal.district} disabled={!fiscal.canton||districts.loading} onChange={e=>onChange({district:e.target.value,postal_code:''})}><option value="">{districts.loading?'Cargando distritos…':'Seleccionar distrito'}</option>{districtMissing&&<option value={fiscal.district}>Distrito guardado (código {fiscal.district})</option>}{districtOptions.map(([code,label])=><option key={code} value={pad2(code)}>{label}</option>)}</select>{errors.district&&<small className="companyFieldError">{errors.district}</small>}</label>
    <label className={'field'+(errors.postal_code?' companyFieldHasError':'')} htmlFor={idPrefix+'-postal'}>Código postal<input id={idPrefix+'-postal'} type="text" aria-invalid={!!errors.postal_code} readOnly value={postal} placeholder="Se completa al elegir distrito" title="Código de 5 dígitos calculado con provincia, cantón y distrito"/>{errors.postal_code&&<small className="companyFieldError">{errors.postal_code}</small>}</label>
   </div>
+  {addressField&&<div className="companyFiscalAddress">{addressField}</div>}
   {(cantons.error||districts.error)&&<p className="companyFiscalGeoWarning" role="status">{cantons.error||districts.error} Se respetan los códigos ya guardados.</p>}
   <p className="hint companyFiscalHint">Actividad económica: use el dato registrado en el RUT, por ejemplo 4019.0. El XML 4.4 exige validar un código de seis dígitos vigente en Hacienda; no se convertirá automáticamente el código con punto. El código postal se calcula automáticamente. Estos datos son preparatorios: aún no se firman ni envían comprobantes a Hacienda.</p>
  </div>;

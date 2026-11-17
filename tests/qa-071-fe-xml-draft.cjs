@@ -1,0 +1,36 @@
+'use strict';
+const assert=require('node:assert/strict');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const {createFeXmlDraft}=await import(pathToFileURL(path.resolve(__dirname,'../server/fe-xml-draft.js')));
+ let passed=0;const check=(name,fn)=>{fn();passed++;console.log('OK XML 4.4 borrador:',name)};
+ const company={legal_name:'Comercial A & B <Central>',identification:'3101123456',email:'ventas@example.com',address:'Costado norte del parque & edificio 2'};
+ const fiscal={identification_type:'02',activity_code:'123456',province:'1',canton:'01',district:'01'};
+ const sale={id:7,status:'activa',sale_type:'contado',currency:'CRC',subtotal_cents:200000,discount_cents:0,tax_cents:26000,total_cents:226000};
+ const client={name:'Cliente <José> & Cía',identification_type:'01',identification:'115460323',email:'cliente@example.com'};
+ const lines=[{description:'Servicio & asesoría',cabys:'5999999999999',quantity:2,unit_price_cents:100000,subtotal_cents:200000,discount_cents:0,tax_rate:13,tax_cents:26000,total_cents:226000}];
+ const src=()=>({company,fiscal,sale,client,lines,generatedAt:new Date('2026-11-16T18:00:00Z')});
+ check('Genera XML local sin firma ni envío',()=>{const out=createFeXmlDraft(src());assert.equal(out.ready,true);assert.equal(out.mode,'draft-only');assert.match(out.xml,/FacturaElectronica/);assert.doesNotMatch(out.xml,/<Signature/);});
+ check('Clave y consecutivo sintéticos inservibles para Hacienda',()=>{const out=createFeXmlDraft(src());assert.match(out.xml,/<Clave>0{50}<\/Clave>/);assert.match(out.xml,/<NumeroConsecutivo>0{20}<\/NumeroConsecutivo>/);assert.match(out.xml,/BORRADOR DE PRUEBA/);});
+ check('Escapa contenido peligroso en receptor, emisor y detalle',()=>{const x=createFeXmlDraft(src()).xml;assert.match(x,/Comercial A &amp; B &lt;Central&gt;/);assert.match(x,/Cliente &lt;José&gt; &amp; Cía/);assert.match(x,/Servicio &amp; asesoría/);assert.doesNotMatch(x,/<Central>/);});
+ check('Montos históricos exactos CRC sin recalcular impuestos',()=>{const r=createFeXmlDraft(src());assert.equal(r.totals.totalCents,226000);assert.match(r.xml,/<TotalComprobante>2260\.00000<\/TotalComprobante>/);assert.match(r.xml,/<TotalImpuesto>260\.00000<\/TotalImpuesto>/);});
+ check('No inventa fecha fiscal histórica: fecha actual de simulación con -06:00',()=>assert.match(createFeXmlDraft(src()).xml,/<FechaEmision>2026-11-16T12:00:00-06:00<\/FechaEmision>/));
+ check('RUT histórico 4019.0 no se transforma en seis dígitos',()=>{const r=createFeXmlDraft({...src(),fiscal:{...fiscal,activity_code:'4019.0'}});assert.equal(r.ready,false);assert.ok(r.issues.some(x=>x.includes('4019.0')));assert.equal(r.xml,null);});
+ check('No permite venta anulada ni ventas a crédito sin plazo fiscal',()=>{for(const change of [{status:'anulada'},{sale_type:'credito'}]){const r=createFeXmlDraft({...src(),sale:{...sale,...change}});assert.equal(r.ready,false);}});
+ check('Una venta de empresa equivocada no podría pasar la ruta de SQL; dato parcial también se rechaza',()=>{const r=createFeXmlDraft({...src(),fiscal:null});assert.equal(r.ready,false)});
+ check('Bloquea venta sin receptor identificado',()=>{const r=createFeXmlDraft({...src(),client:null});assert.equal(r.ready,false);assert.ok(r.issues.some(x=>x.startsWith('Cliente:')));});
+ check('Bloquea líneas sin CAByS de 13 dígitos',()=>{const r=createFeXmlDraft({...src(),lines:[{...lines[0],cabys:''}]});assert.equal(r.ready,false);assert.ok(r.issues.some(x=>x.includes('CAByS')))});
+ check('Detecta modificación de importes históricos',()=>{const r=createFeXmlDraft({...src(),lines:[{...lines[0],tax_cents:24000}]});assert.equal(r.ready,false);assert.ok(r.issues.some(x=>x.includes('no concilian')))});
+ check('Rechaza suma de venta inconsistente y no presenta XML falso',()=>{const r=createFeXmlDraft({...src(),sale:{...sale,total_cents:226100}});assert.equal(r.ready,false);assert.equal(r.xml,null);});
+ check('Detecta tarifa todavía no cubierta por el borrador',()=>{const r=createFeXmlDraft({...src(),lines:[{...lines[0],tax_rate:0.5}]});assert.equal(r.ready,false)});
+ check('Cifras con descuentos conserva neto histórico y subtotal',()=>{
+  const a={...lines[0],discount_cents:10000,tax_cents:24700,total_cents:214700};
+  const s={...sale,discount_cents:10000,tax_cents:24700,total_cents:214700};
+  const out=createFeXmlDraft({...src(),sale:s,lines:[a]});assert.equal(out.ready,true);
+  assert.match(out.xml,/<MontoDescuento>100\.00000<\/MontoDescuento>/);
+  assert.match(out.xml,/<TotalVentaNeta>1900\.00000<\/TotalVentaNeta>/);
+ });
+ check('Borrador siempre declara pendientes XSD, firma y numeración fiscal',()=>{const x=createFeXmlDraft(src());assert.ok(x.warnings.some(s=>s.includes('XSD')));assert.ok(x.warnings.some(s=>s.includes('consecutivo')));});
+ console.log(`QA generador borrador FE 4.4: ${passed}/${passed} aprobadas`);
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1});

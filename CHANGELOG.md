@@ -1,3 +1,12 @@
+## v0.6.71 · 2026-11-16 — Primer generador XML 4.4 en modo de prueba
+
+- Nuevo botón **Borrador FE 4.4 (prueba)** en detalle de ventas; vista previa y descarga XML informativa con aviso destacado de ausencia de validez fiscal.
+- `server/fe-xml-draft.js`: construye estructuras locales de FE 4.4 a partir del emisor, receptor y las líneas **históricas** de la venta. Bloquea datos faltantes, ventas anuladas, crédito sin plazo y discrepancias de importes; escapa metacaracteres XML.
+- Clave de 50 dígitos y consecutivo de 20 dígitos deliberadamente ficticios y sin firma; nada se envía a Hacienda y no se consumen números fiscales.
+- Endpoint GET de solo lectura, condicionado por `sales.read_all` de la misma empresa. Ninguna migración SQLite ni cambio de inventario o ventas.
+- Pruebas nuevas del generador, UI y rutas SQL temporales. Versión, workflow y README consolidados.
+- **Pendiente v0.6.72:** contrastar el formato con el XSD oficial y catálogos vigentes, resolver descuentos especiales, plazos y restricciones; seguir sin habilitar emisión hasta completar firma/autenticación.
+
 ### Corrección de v0.6.70 · 2026-11-13 — Errores de Empresas precisos y ficha fiscal simplificada
 
 - Error genérico «No se pudo actualizar la empresa» reemplazado por respuesta útil: validación por campo en cliente, enlace a cada campo erróneo, borde visible, descripción y enfoque/scroll automático.
@@ -888,3 +897,8 @@ La ventana **Nueva empresa / Abrir perfil** reúne **Tipo de identificación** y
 QA añadido: 11 pruebas de identificación por tipo, cinco controles nuevos de interfaz, cuatro pruebas de integración para alta/edición y restricción del administrador. `npm test` y 66/66 pruebas de integración superadas. Comprobación visual en Chromium a 375, 480, 768, 1100 y 1440 px. La ejecución del instalador Electron/Windows sigue pendiente.
 
 Fuente normativa: Anexo técnico de comprobantes electrónicos 4.4, Ministerio de Hacienda / PGR, `https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf`.
+
+### v0.6.70 — Ajuste de orden en formulario de Empresas
+
+- Dirección exacta (otras señas) reubicada debajo de Provincia, Cantón, Distrito y Código postal en ambas ventanas de empresa.
+- Sin cambios en validación, modelo de datos ni lógica fiscal. Prueba QA dedicada para evitar regresiones.

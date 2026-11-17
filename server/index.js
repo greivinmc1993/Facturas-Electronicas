@@ -1,5 +1,6 @@
 import {registerSaleDraftRoutes} from './sale-drafts.js';
 import {FE_PREPARATION_EMPTY,parseFePreparation,describeFePreparation} from './fe-preparation.js';
+import {createFeXmlDraft} from './fe-xml-draft.js';
 import {validateCompanyIdentification} from './company-identity.js';
 import {BACKUP_DEFAULTS, normalizeBackupSettings, validateBackupSettings, backupIsDue} from './backup-schedule.js';
 import {backupDirectoryFor,checkCustomBackupDirectory} from './backup-directory.js';
@@ -1221,6 +1222,24 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       const client=sale.client_id?db.prepare('SELECT name,trade_name,identification_type,identification,email,phone,address,province,canton,district FROM clients WHERE id=? AND company_id=?').get(sale.client_id,companyId):null;
       res.json({...sale,client,lines:db.prepare('SELECT * FROM sale_lines WHERE sale_id=? ORDER BY id').all(id),payments:db.prepare('SELECT * FROM sale_payments WHERE sale_id=? ORDER BY id').all(id)});
     }catch(e){res.status(400).json({error:e.message})}
+  });
+  // v0.6.71: borrador XML FE 4.4 de SOLO LECTURA. Nunca asigna claves o consecutivos fiscales.
+  app.get('/api/companies/:companyId/sales/:saleId/fe/xml-draft',(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    try{
+      const companyId=saleCompany(req),saleId=Number(req.params.saleId);
+      if(!Number.isSafeInteger(saleId)||saleId<1)return res.status(400).json({error:'Número de venta inválido.'});
+      const sale=db.prepare('SELECT * FROM sales WHERE id=? AND company_id=?').get(saleId,companyId);
+      if(!sale)return res.status(404).json({error:'La venta no existe en esta empresa.'});
+      const company=db.prepare('SELECT * FROM companies WHERE id=?').get(companyId);
+      const fiscal=db.prepare('SELECT * FROM company_fe_preparation WHERE company_id=?').get(companyId);
+      const client=sale.client_id?db.prepare('SELECT * FROM clients WHERE id=? AND company_id=?').get(sale.client_id,companyId):null;
+      const lines=db.prepare(`SELECT sl.*,p.cabys,p.unit,p.kind FROM sale_lines sl
+        LEFT JOIN products p ON p.id=sl.product_id AND p.company_id=?
+        WHERE sl.sale_id=? ORDER BY sl.id`).all(companyId,saleId);
+      const result=createFeXmlDraft({company,fiscal,sale,client,lines});
+      return res.status(result.ready?200:422).json(result);
+    }catch(err){return res.status(400).json({error:'No se pudo generar el borrador: '+err.message});}
   });
   app.post('/api/companies/:companyId/sales',(req,res)=>{
     try{
