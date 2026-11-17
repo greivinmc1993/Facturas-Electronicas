@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {readFileSync}=require('node:fs');
+const {join}=require('node:path');
+const ui=readFileSync(join(__dirname,'../src/UsersPanel.jsx'),'utf8');
+const css=readFileSync(join(__dirname,'../src/style.css'),'utf8');
+let count=0;const check=(label,fn)=>{fn();count++;console.log('OK interfaz usuarios archivados:',label)};
+check('carga usuarios archivados desde ruta protegida separada',()=>assert.match(ui,/request\('\/api\/auth\/users\/archived'\)/));
+check('conserva formulario de alta con empresa, rol y contraseña temporal',()=>{for(const x of ['Crear usuario','Contraseña temporal','Seleccionar empresa','Asignar rol'])assert.ok(ui.includes(x));});
+check('titula correctamente las cuentas activas y suspendidas',()=>assert.ok(ui.includes('Cuentas activas y suspendidas')));
+check('permite expandir la sección de perfiles eliminados',()=>{assert.ok(ui.includes('Perfiles eliminados ('));assert.ok(ui.includes('aria-expanded={archivedOpen}'))});
+check('el duplicado archivado abre la vista en lugar de ocultar el usuario',()=>assert.match(ui,/e\.code==='USERNAME_ARCHIVED'\)setArchivedOpen\(true\)/));
+check('etiqueta el usuario eliminado, sin editar ni reactivar desde el archivo',()=>{const body=ui.split('className="userArchivedContents"')[1].split('</section>')[0];assert.ok(body.includes('Eliminado'));assert.ok(!body.includes('Reactivar'));assert.ok(!body.includes('onClick'));});
+check('mantiene estilos adaptables y foco visible',()=>{assert.ok(css.includes('.userArchivedSection'));assert.ok(css.includes('.userArchivedToggle:focus-visible'));});
+console.log(`QA interfaz usuarios archivados v0.6.72: ${count}/${count} aprobadas`);

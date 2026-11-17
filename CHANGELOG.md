@@ -1,3 +1,10 @@
+### Ajuste puntual v0.6.72 — Visibilidad de perfiles eliminados y error de usuario duplicado (17/11/2026)
+
+- El panel **Usuarios y permisos** muestra una sección desplegable **Perfiles eliminados**, en solo lectura, filtrada por los mismos permisos que el listado habitual. Deja de parecer que un nombre reservado no existe.
+- El servidor distingue los nombres de cuentas eliminadas visibles para el administrador de los nombres ya asignados, sin revelar usuarios ni empresas fuera de sus permisos. La interfaz abre automáticamente el archivo al detectar un duplicado archivado.
+- Se mantiene la baja lógica y la unicidad global de nombres: no se reciclan identificadores, no se restauran contraseñas ni se altera ninguna venta, rol, auditoría o cuenta histórica.
+- Pruebas nuevas para permisos, duplicados, auditoría e interfaz, sin migraciones SQLite ni cambios en el flujo de creación de cuentas válidas.
+
 ## Ajuste de catálogos 0.6.72 (17-11-2026)
 - Índice CIIU4: se añade la actividad 6619.0, verificada en la tabla de correspondencias ATV–TRIBU-CR publicada por Hacienda. El índice sigue siendo de referencia, NO un padrón completo ni prueba de inscripción; la consulta RUT permanece disponible.
 - CAByS: mantiene la API oficial en línea y ahora interpreta respuestas con datos envueltos, sin confundir `code:200` con un CABYS. Verifica el código de 13 dígitos contra lo solicitado.

@@ -46,6 +46,10 @@ Mantener `.gitignore`, `README.md`, `CHANGELOG.md` y `.github/workflows/` en cad
 
 > **ETAPA DE PREPARACIÓN:** FacturaCR sigue generando **borradores XML 4.4 sin validez tributaria**. No firma, asigna clave real, valida formalmente XSD ni envía documentos a Hacienda. Esta versión reestructura el cálculo de las **ventas NUEVAS**; nunca modifica importes históricos.
 
+## Ajuste v0.6.72: perfiles eliminados visibles
+
+En **Usuarios y permisos**, abre **Perfiles eliminados** para consultar perfiles dados de baja. El nombre de inicio de sesión continúa reservado incluso después de eliminar un perfil, porque las ventas y la auditoría conservan su identidad. Un intento de alta con un nombre archivado muestra una explicación y abre el listado. La sección es de solo lectura y respeta los permisos de cada rol. No se eliminan filas ni se reutilizan nombres automáticamente; crea un usuario con un nombre nuevo (por ejemplo, `cajero2`).
+
 ## 1. Artículos: dos modalidades de precio
 
 En **Productos y servicios → Crear / Editar**, el campo **Cómo se ingresa el precio** permite:

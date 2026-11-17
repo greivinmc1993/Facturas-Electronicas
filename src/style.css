@@ -1492,3 +1492,15 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .posChangeDialog>button{width:100%;min-height:54px;border-radius:12px;background:#087766;color:#fff;font-size:1rem;font-weight:800}
 @media(max-width:520px){.posChangeDialog{padding:24px 18px}.posChangeOverlay{padding:12px}}
 @media(prefers-reduced-motion:reduce){.posChangeOverlay{backdrop-filter:none}}
+
+/* v0.6.72 · Archivo de usuarios borrados: visible, solo lectura, sin reactivar credenciales. */
+.usersWorkspace .userArchivedSection{display:grid;gap:10px;margin-top:12px;border-top:1px solid #dbe8eb;padding-top:15px;min-width:0}
+.usersWorkspace .userArchivedToggle{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:43px;text-align:left;padding:9px 13px;border:1px solid #c4dadd;border-radius:10px;background:#f4f9fa;color:#19505c;font-size:12px;font-weight:750;cursor:pointer}
+.usersWorkspace .userArchivedToggle:hover{border-color:#148276;background:#eaf5f3}
+.usersWorkspace .userArchivedToggle:focus-visible{outline:2px solid #138578;outline-offset:2px}
+.usersWorkspace .userArchivedToggleHint{color:#5f7d86;font-weight:500}
+.usersWorkspace .userArchivedContents{display:grid;gap:9px;padding:3px 0 0}
+.usersWorkspace .userArchivedContents .hint{font-size:12px;line-height:1.5;margin:1px 2px 7px;color:#627984}
+.usersWorkspace .userArchivedCard{background:#fafcfd;border-style:dashed;box-shadow:none}
+.usersWorkspace .userArchivedBadge{font-size:11px;font-weight:750;border-radius:99px;padding:5px 10px;background:#eef1f4;color:#677581}
+@media(max-width:520px){.usersWorkspace .userArchivedToggle{flex-wrap:wrap}}

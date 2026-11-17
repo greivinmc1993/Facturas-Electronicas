@@ -261,12 +261,33 @@ export function registerAuth(app,getDb,options={}){
   const managesCashier=(a,companyId)=>manages(a,companyId)||a.delegated?.includes(companyId);
   const subordinate=(a,u)=>!u.is_owner&&userCompanies(u.id).length>0&&userCompanies(u.id).every(c=>c.role==='cashier'&&managesCashier(a,c.company_id));
   const manageableTarget=(a,u)=>!u.is_owner&&userCompanies(u.id).length>0&&userCompanies(u.id).every(c=>manages(a,c.company_id)&& (a.user.is_owner||c.role!=='company_admin'));
+  // Misma política de visibilidad para usuarios activos y archivados. No revela
+  // cuentas ni empresas ajenas a administradores/supervisores delegados.
+  const visibleAssignment=(a,c)=>a.user.is_owner||manages(a,c.company_id)||c.role==='cashier'&&a.delegated.includes(c.company_id);
+  const visibleUser=(a,u)=>a.user.is_owner||!u.is_owner&&userCompanies(u.id).some(c=>visibleAssignment(a,c));
+  const usersFor=(a,deleted)=>db.prepare(`SELECT id,username,display_name,is_owner,is_active,password_change_required,is_deleted,updated_at
+    FROM access_users WHERE is_deleted=? ORDER BY is_owner DESC,id ASC`).all(deleted)
+    .filter(u=>visibleUser(a,u))
+    .map(u=>({...u,companies:u.is_owner?[]:userCompanies(u.id).filter(c=>visibleAssignment(a,c))
+      .map(c=>({...c,cashierDelegation:c.role==='supervisor'&&!!db.prepare("SELECT allowed FROM access_permission_overrides WHERE user_id=? AND company_id=? AND permission='users.manage_cashiers'").get(u.id,c.company_id)?.allowed}))}));
   app.get('/api/auth/users',(req,res)=>{
     const a=manager(req,res);if(!a)return;
-    const users=db.prepare('SELECT id,username,display_name,is_owner,is_active,password_change_required,is_deleted FROM access_users WHERE is_deleted=0 ORDER BY is_owner DESC,id ASC').all();
-    res.json(users.filter(u=>a.user.is_owner||(!u.is_owner&&userCompanies(u.id).some(c=>manages(a,c.company_id)||c.role==='cashier'&&a.delegated.includes(c.company_id))))
-      .map(u=>({...u,companies:u.is_owner?[]:userCompanies(u.id).filter(c=>a.user.is_owner||manages(a,c.company_id)||c.role==='cashier'&&a.delegated.includes(c.company_id)).map(c=>({...c,cashierDelegation:c.role==='supervisor'&&!!db.prepare("SELECT allowed FROM access_permission_overrides WHERE user_id=? AND company_id=? AND permission='users.manage_cashiers'").get(u.id,c.company_id)?.allowed}))})));
+    res.setHeader('Cache-Control','no-store');
+    res.json(usersFor(a,0));
   });
+  // Archivo SOLO de lectura. Las cuentas conservan su ID, nombre de usuario
+  // y referencias fiscales; NO se reactivan ni se liberan nombres desde esta vista.
+  app.get('/api/auth/users/archived',(req,res)=>{
+    const a=manager(req,res);if(!a)return;
+    res.setHeader('Cache-Control','no-store');
+    res.json(usersFor(a,1));
+  });
+  const usernameConflict=(a,existing,username)=>{
+    const archived=!!existing?.is_deleted&&visibleUser(a,existing);
+    return archived
+      ?{code:'USERNAME_ARCHIVED',error:`El usuario «${username}» pertenece a un perfil eliminado. Su nombre se conserva para el historial y la auditoría. Revisa «Perfiles eliminados» o elige otro nombre.`}
+      :{code:'USERNAME_UNAVAILABLE',error:'El nombre de usuario ya está registrado o reservado. Prueba con otro nombre.'};
+  };
   app.post('/api/auth/users',localOriginOnly,(req,res)=>{
     const a=manager(req,res);if(!a)return;
     try{
@@ -275,6 +296,11 @@ export function registerAuth(app,getDb,options={}){
       if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username)||displayName.length<2||displayName.length>160)throw Error('Usuario o nombre inválido.');
       if(!['company_admin','supervisor','cashier'].includes(role)||!Number.isSafeInteger(companyId)||companyId<=0||!db.prepare('SELECT id FROM companies WHERE id=?').get(companyId))throw Error('Selecciona empresa y rol válidos.');
       if(!managesCashier(a,companyId)||!manages(a,companyId)&&role!=='cashier'||!a.user.is_owner&&role==='company_admin')return res.status(403).json({error:'No puedes asignar este rol o empresa.'});
+      // Antes de escribir, distinguir un perfil eliminado (oculto en la lista
+      // ordinaria) de un nombre activo. La reserva evita confundir auditorías
+      // históricas; no se alteran ni se reutilizan identificadores.
+      const existing=db.prepare('SELECT id,is_owner,is_deleted FROM access_users WHERE username=? COLLATE NOCASE').get(username);
+      if(existing)return res.status(409).json(usernameConflict(a,existing,username));
       const hash=passwordHash(req.body?.password);
       const id=db.transaction(()=>{
         const id=Number(db.prepare("INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required) VALUES (?,?,?,'scrypt',0,1,1)").run(username,displayName,hash).lastInsertRowid);
@@ -282,7 +308,16 @@ export function registerAuth(app,getDb,options={}){
         audit(a.user.id,'users.create','user',id,companyId);return id;
       })();
       res.status(201).json({ok:true,id});
-    }catch(e){res.status(400).json({error:String(e.message).includes('UNIQUE')?'El nombre de usuario ya está registrado.':e.message});}
+    }catch(e){
+      // La restricción UNIQUE sigue siendo la última defensa ante dos altas
+      // simultáneas; no confundir cualquier error de base de datos con duplicado.
+      if(String(e.message).includes('UNIQUE constraint failed: access_users.username')){
+        const username=String(req.body?.username||'').trim().toLowerCase();
+        const existing=db.prepare('SELECT id,is_owner,is_deleted FROM access_users WHERE username=? COLLATE NOCASE').get(username);
+        return res.status(409).json(usernameConflict(a,existing,username));
+      }
+      res.status(400).json({error:e.message});
+    }
   });
   // Recuperación de cuentas ajenas: SOLO propietario, nunca delegada a administradores.
   // Se confirma la contraseña propietaria para cada operación y se entrega una clave
