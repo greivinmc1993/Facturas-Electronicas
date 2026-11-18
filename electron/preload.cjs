@@ -5,5 +5,10 @@ contextBridge.exposeInMainWorld('facturacrReports',{savePdf:(html,filename,optio
 
 contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.invoke('facturacr:open-backups-folder'),chooseFolder:()=>ipcRenderer.invoke('facturacr:choose-backups-folder')});
 
-// El secreto solo viaja una vez al proceso principal; no se escribe en disco ni SQLite.
-contextBridge.exposeInMainWorld('facturacrSignature',{inspectP12:(passphrase)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase)});
+// v0.6.74: el navegador no recibe rutas ni bytes del certificado.
+// Elegir el archivo NO transmite la contraseña; Aceptar es una acción separada.
+contextBridge.exposeInMainWorld('facturacrSignature',{
+ chooseP12:(companyId)=>ipcRenderer.invoke('facturacr:choose-p12',companyId),
+ inspectP12:(passphrase,companyId,token)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase,companyId,token),
+ clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token)
+});

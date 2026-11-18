@@ -1559,3 +1559,23 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureCheckOk{color:#176c47;font-size:13px}
 .feSignatureCheckWarn{color:#996019;font-size:13px}
 @media(max-width:610px){.feSignatureControls{align-items:stretch}.feSignatureControls button{width:100%}.feSignatureResult dl>div{grid-template-columns:minmax(0,1fr);gap:3px}}
+
+/* v0.6.74: dos espacios claramente separados y botón Aceptar independiente. */
+.feSignatureForm{margin-top:16px;min-width:0}
+.feSignatureControls{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start;gap:16px}
+.feSignatureControls .feSignatureFileField,.feSignatureControls .feSignatureSecretField{display:flex;flex-direction:column;gap:6px;min-width:0}
+.feSignatureControls label{display:block;flex:none;margin:0;font-size:13px;font-weight:700;color:#193f56}
+.feSignatureFileRow,.feSignaturePasswordRow{display:flex;align-items:stretch;gap:8px;min-width:0}
+.feSignatureFileRow input,.feSignaturePasswordRow input{flex:1 1 0;min-width:0;margin:0;border:1px solid #c5d9e2;border-radius:9px;padding:10px 12px;min-height:44px;background:white;color:#164054;font-size:14px}
+.feSignatureFileRow input[readonly]{background:#f7fafc;cursor:default}
+.feSignatureControls small{font-size:11px;line-height:1.45;color:#677f8e;min-height:30px}
+.feSignatureControls .feSignatureBrowse,.feSignatureControls .feSignatureVisibility{flex:0 0 auto;min-height:44px;width:auto;min-width:100px;padding:9px 14px;border-radius:9px;font-weight:700;white-space:nowrap}
+.feSignatureControls .feSignatureVisibility{min-width:84px}
+.feSignatureActions{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #dfebf0}
+.feSignatureActions .feSignatureAccept{min-height:44px;padding:10px 18px;border-radius:9px;font-weight:700;white-space:normal}
+.feSignatureActions button:disabled{opacity:.55;cursor:not-allowed}
+.feSignatureControls button:not(:disabled):hover,.feSignatureActions button:not(:disabled):hover{transform:translateY(-1px)}
+.feSignatureControls button:not(:disabled):active,.feSignatureActions button:not(:disabled):active{transform:translateY(0)}
+.feSignatureControls button:focus-visible,.feSignatureActions button:focus-visible{outline:3px solid #51b7ab;outline-offset:2px}
+@media(max-width:790px){.feSignatureControls{grid-template-columns:minmax(0,1fr)}.feSignatureControls small{min-height:0}}
+@media(max-width:430px){.feSignatureFileRow,.feSignaturePasswordRow{flex-wrap:wrap}.feSignatureControls .feSignatureBrowse,.feSignatureControls .feSignatureVisibility{flex:1 1 100%;width:100%}.feSignatureActions .feSignatureAccept{width:100%}}

@@ -1,3 +1,46 @@
+# FacturaCR v0.6.74 — Selección independiente de certificado y aceptación segura (17/11/2026)
+
+## 1. Cambios en Empresas → Preparación FE 4.4
+
+La sección **Certificado digital de Hacienda** presenta **dos campos independientes**: (1) certificado `.p12` o `.pfx`, con botón **Examinar**; (2) **Contraseña del certificado**, con opción Mostrar/Ocultar. Debajo de ambos aparece el botón separado **Aceptar y verificar certificado**, deshabilitado hasta completar la selección y la clave. La selección del archivo **no** solicita la contraseña ni inicia inspección criptográfica; el resultado solo aparece después de pulsar Aceptar. En pantalla se muestra únicamente el nombre del archivo, nunca su ruta.
+
+La selección nativa se procesa en el proceso principal de Electron mediante un identificador aleatorio efímero vinculado a la empresa. El renderer no puede proporcionar rutas de archivos a la operación de inspección. Antes de leer, se comprueba que el archivo sigue siendo regular, que no es un enlace simbólico y que mantiene tamaño, dispositivo, inodo y fechas; se compara además el descriptor abierto. Tamaño máximo 4 MB. La contraseña se borra del estado del formulario antes de inspeccionar; no se guarda en SQLite, auditoría, configuración, ZIP ni en la API HTTP. El búfer leído se sobrescribe con ceros al terminar.
+
+Se conserva la validación local PKCS#12 de Node/OpenSSL: el contenedor debe incluir certificado y clave privada, fechas verificables y clave pública RSA. Para compatibilidad técnica con el perfil de Hacienda se señalan **RSA 2048 o 4096 bits**. Muestra los datos declarados del titular, emisor, vigencia y huella SHA-256 sin certificar inscripción, revocación ni cadena de confianza. Al cambiar de empresa o cerrar el panel se descarta la selección; aceptar correctamente consume el identificador, y una contraseña errónea puede reintentarse sin volver a seleccionar.
+
+## 2. Alcance fiscal y seguridad
+
+**Esta versión todavía NO genera una firma XML XAdES-EPES real**, NO valida una firma contra Hacienda, NO emite comprobantes y NO transmite datos del certificado. El borrador XML 4.4 sigue identificado como documento de prueba. La implementación de XMLDSig y XAdES-EPES (enveloped, canonicalización C14N, política y referencias/huellas, XSD, revocación y verificación independiente) continúa pendiente antes de habilitar firmas reales. No se añadieron dependencias criptográficas no auditadas ni firma ficticia.
+
+**Referencia normativa:** Anexo 2 del Ministerio de Hacienda/PGR sobre mecanismos de seguridad XML 4.4: https://www.pgrweb.go.cr/DOCS/NORMAS/1/VIGENTE/S/2020-2029/2020-2024/2024/1936C/1701B8.HTML
+
+## 3. Pruebas QA
+
+`npm test` integra `tests/qa-074-certificate-selection.cjs` (selección, aceptación, permisos por empresa, archivo alterado, clave errónea, tamaño, symlinks, lectura P12 de ensayo) y `tests/qa-074-certificate-ui.cjs` (dos campos, botones independientes, IPC, limpieza, interfaz adaptable), además de regresiones anteriores y SQLite. Las pruebas criptográficas generan certificados temporales de ensayo y no utilizan material real del usuario. El entorno de desarrollo utilizado para esta entrega no cuenta con dependencias de Express ni Vite instaladas, por lo que la prueba del servidor real y la compilación requieren ejecutarse después de `npm ci` en Windows. La aceptación final exige verificar la interfaz y el instalador en Windows.
+
+## 4. Instalación y GitHub
+
+**Antes de actualizar, crear y verificar un respaldo independiente de la base SQLite** y conservarlo fuera de la carpeta del proyecto. Ejecutar en PowerShell:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+Tras comprobar la ejecución local:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.74 - certificado y clave separados con aceptar seguro"
+git push origin main
+```
+
+Se conservan `.gitignore`, `README.md`, `CHANGELOG.md` y los workflows de GitHub Actions. No se necesitan cambios de esquema SQLite. La versión actual es **0.6.74**.
+
+---
+
 ## Ajuste de catálogos 0.6.72 (17-11-2026)
 - Índice CIIU4: se añade la actividad 6619.0, verificada en la tabla de correspondencias ATV–TRIBU-CR publicada por Hacienda. El índice sigue siendo de referencia, NO un padrón completo ni prueba de inscripción; la consulta RUT permanece disponible.
 - CAByS: mantiene la API oficial en línea y ahora interpreta respuestas con datos envueltos, sin confundir `code:200` con un CABYS. Verifica el código de 13 dígitos contra lo solicitado.

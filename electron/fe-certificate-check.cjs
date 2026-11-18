@@ -1,6 +1,6 @@
 'use strict';
 /**
- * FacturaCR 0.6.73 - inspección local y efímera de un PKCS#12.
+ * FacturaCR 0.6.74 - inspección local y efímera de un PKCS#12.
  * Esta función NO firma, almacena, exporta ni envía datos del certificado.
  * La compatibilidad de una firma XAdES-EPES con Hacienda debe probarse aparte.
  */
@@ -22,7 +22,7 @@ function inspectP12(data,passphrase,now=new Date()){
  const algorithm=cert.publicKey.asymmetricKeyType;
  const bits=algorithm==='rsa'||algorithm==='rsa-pss'?cert.publicKey.asymmetricKeyDetails?.modulusLength:null;
  const timeOk=from<=now && now<=until;
- const rsaOk=algorithm==='rsa' && Number.isInteger(bits) && bits>=2048;
+ const rsaOk=algorithm==='rsa' && (bits===2048||bits===4096);
  return {
   recognized:true,
   subject:String(cert.subject||'').slice(0,500),
@@ -32,8 +32,9 @@ function inspectP12(data,passphrase,now=new Date()){
   publicKeyType:algorithm||'desconocido',
   rsaBits:bits||null,
   checks:[
+   {key:'privateKey',ok:true,title:'PKCS#12 contiene una clave privada utilizable por OpenSSL'},
    {key:'validity',ok:timeOk,title:timeOk?'Dentro del período de validez':'Certificado vencido o aún no vigente'},
-   {key:'algorithm',ok:rsaOk,title:rsaOk?'Clave pública RSA de al menos 2048 bits':'Algoritmo o longitud de clave requiere revisión'}
+   {key:'algorithm',ok:rsaOk,title:rsaOk?'Clave pública RSA de 2048 o 4096 bits':'Algoritmo o longitud de clave requiere revisión'}
   ],
   technicallyReady:timeOk&&rsaOk,
   canSign:false,

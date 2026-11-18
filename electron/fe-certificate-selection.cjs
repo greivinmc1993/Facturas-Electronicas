@@ -1,0 +1,75 @@
+'use strict';
+/**
+ * FacturaCR v0.6.74 - selector efímero de PKCS#12 por ventana/empresa.
+ * El proceso de interfaz solo recibe nombre de archivo y un ticket aleatorio.
+ * La ruta NUNCA se devuelve al renderer. La clave solo llega al aceptar.
+ */
+const fs = require('node:fs/promises');
+const {randomBytes} = require('node:crypto');
+const path = require('node:path');
+const {inspectP12,MAX_P12_BYTES} = require('./fe-certificate-check.cjs');
+
+function companyKey(value){
+ if(!Number.isSafeInteger(value)||value<=0)throw Error('Selecciona una empresa válida.');
+ return value;
+}
+function safeStat(stat){
+ return stat&&stat.isFile()&&!stat.isSymbolicLink()&&stat.size>=32&&stat.size<=MAX_P12_BYTES;
+}
+function sameFile(a,b){
+ return !!a&&!!b&&a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
+}
+function createP12SelectionManager({fileSystem=fs,inspector=inspectP12}={}){
+ let selected=null;
+ let selectionSequence=0;
+ const clear=(token)=>{
+  if(selected&&token===selected.token){selected=null;return true;}
+  return false;
+ };
+ const clearAll=()=>{selected=null;selectionSequence++;};
+ const select=async(filename,companyId)=>{
+  const currentSequence=++selectionSequence;
+  selected=null;
+  companyKey(companyId);
+  if(typeof filename!=='string'||!path.isAbsolute(filename)||!/[.]p12$|[.]pfx$/i.test(filename))
+   throw Error('Selecciona un certificado .p12 o .pfx válido.');
+  const stat=await fileSystem.lstat(filename);
+  if(!safeStat(stat))throw Error('El certificado no es un archivo válido o supera los 4 MB.');
+  if(currentSequence!==selectionSequence)throw Error('La selección anterior ya no está disponible.');
+  const token=randomBytes(24).toString('hex');
+  selected={filename,companyId,stat,token,reading:false};
+  return {name:path.basename(filename).slice(0,180),token};
+ };
+ const inspect=async(token,companyId,passphrase)=>{
+  companyKey(companyId);
+  if(typeof passphrase!=='string'||passphrase.length>512||passphrase.length===0)
+   throw Error('Introduce la contraseña del certificado.');
+  const current=selected;
+  if(!current||typeof token!=='string'||token!==current.token||companyId!==current.companyId)
+   throw Error('Vuelve a seleccionar el certificado de esta empresa.');
+  if(current.reading)throw Error('La verificación del certificado ya está en curso.');
+  current.reading=true;
+  let bytes=null,handle=null;
+  try{
+   const before=await fileSystem.lstat(current.filename);
+   if(!safeStat(before)||!sameFile(current.stat,before))throw Error('El certificado cambió desde que lo seleccionaste. Vuelve a seleccionarlo.');
+   // Se comprueba también el descriptor, para detectar sustituciones entre lstat y readFile.
+   handle=await fileSystem.open(current.filename,'r');
+   const opened=await handle.stat();
+   if(!safeStat(opened)||!sameFile(before,opened))throw Error('El certificado cambió. Vuelve a seleccionarlo.');
+   bytes=await handle.readFile();
+   const after=await handle.stat();
+   if(bytes.length!==opened.size||!sameFile(opened,after))throw Error('El certificado cambió durante su lectura.');
+   const report=inspector(bytes,passphrase);
+   // Una comprobación satisfactoria consume el ticket; el archivo no queda asociado a la empresa.
+   if(selected===current)selected=null;
+   return report;
+  }finally{
+   if(bytes)bytes.fill(0);
+   if(handle)await handle.close();
+   current.reading=false;
+  }
+ };
+ return {select,inspect,clear,clearAll};
+}
+module.exports={createP12SelectionManager};

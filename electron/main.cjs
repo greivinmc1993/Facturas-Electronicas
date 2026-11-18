@@ -1,6 +1,6 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require('electron');
 const {createMailSettingsStore}=require('./mail-settings.cjs');
-const {inspectP12,MAX_P12_BYTES}=require('./fe-certificate-check.cjs');
+const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -45,7 +45,9 @@ async function runPackagedSmoke(){
      preloadPrinter:typeof window.facturacrPrinter?.list==='function',
      preloadReports:typeof window.facturacrReports?.savePdf==='function',
      preloadBackups:typeof window.facturacrBackups?.openFolder==='function',
-     preloadSignature:typeof window.facturacrSignature?.inspectP12==='function',
+     preloadSignature:typeof window.facturacrSignature?.inspectP12==='function'&&
+       typeof window.facturacrSignature?.chooseP12==='function'&&
+       typeof window.facturacrSignature?.clearP12==='function',
      preloadBackupPicker:typeof window.facturacrBackups?.chooseFolder==='function'
    };
  })()`;
@@ -134,29 +136,39 @@ async function runPackagedSmoke(){
      authenticatedOwner:true,commercialScreenAfterLogin:true},screenshot:shot||null};
 }
 
-// Inspección efímera: el certificado se selecciona por diálogo nativo, nunca por ruta
-// escrita en el renderer. No se almacena el archivo ni la contraseña, ni se firma XML.
-ipcMain.handle('facturacr:inspect-p12',async(event,passphrase)=>{
- if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
- if(typeof passphrase!=='string'||passphrase.length>512)return {success:false,error:'Contraseña inválida.'};
- let bytes;
+// v0.6.74: selección y aceptación son operaciones independientes.
+// La ruta queda exclusivamente en memoria del proceso principal de Electron.
+const certificateSelection=createP12SelectionManager();
+const authorizedCertificateFrame=event=>event.sender===mainWindow?.webContents &&
+  event.senderFrame===mainWindow?.webContents.mainFrame;
+ipcMain.handle('facturacr:choose-p12',async(event,companyId)=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{
+  certificateSelection.clearAll();
   const chosen=await dialog.showOpenDialog(mainWindow,{
-   title:'Revisar certificado digital de Hacienda (solo lectura)',
+   title:'Seleccionar certificado digital (.p12 / .pfx)',
    properties:['openFile'],filters:[{name:'Certificado PKCS#12',extensions:['p12','pfx']}]
   });
   if(chosen.canceled||!chosen.filePaths?.[0])return {success:false,cancelled:true};
-  const filename=chosen.filePaths[0];
-  if(!/\.(p12|pfx)$/i.test(filename))return {success:false,error:'Selecciona un archivo .p12 o .pfx.'};
-  const meta=await fs.lstat(filename);
-  if(!meta.isFile()||meta.isSymbolicLink()||meta.size<32||meta.size>MAX_P12_BYTES)
-   return {success:false,error:'El archivo no es válido o supera el límite de 4 MB.'};
-  bytes=await fs.readFile(filename);
-  const report=inspectP12(bytes,passphrase);
+  const selection=await certificateSelection.select(chosen.filePaths[0],companyId);
+  return {success:true,selection};
+ }catch{return {success:false,error:'No se pudo seleccionar el certificado. Revisa el formato y tamaño (máximo 4 MB).'};}
+});
+ipcMain.handle('facturacr:inspect-p12',async(event,passphrase,companyId,token)=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{
+  const report=await certificateSelection.inspect(token,companyId,passphrase);
   return {success:true,report};
- }catch{
-  return {success:false,error:'No se pudo leer el certificado. Comprueba la contraseña, el formato y el estado del archivo.'};
- }finally{if(bytes)bytes.fill(0);}
+ }catch(err){
+  // No comunicar rutas locales ni detalles de OpenSSL al proceso de interfaz.
+  if(/Vuelve a seleccionar|El certificado cambió|Introduce la contraseña/.test(err.message))
+   return {success:false,error:err.message};
+  return {success:false,error:'No se pudo verificar el certificado. Comprueba la contraseña y el archivo.'};
+ }
+});
+ipcMain.handle('facturacr:clear-p12',async(event,token)=>{
+ if(!authorizedCertificateFrame(event))return false;
+ return certificateSelection.clear(token);
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
@@ -237,6 +249,7 @@ app.whenReady().then(async () => {
     mainWindow = new BrowserWindow({width:1180,height:760,minWidth:850,minHeight:580,
       title:'FacturaCR', icon:path.join(__dirname,'../build/icon.png'),
       webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'preload.cjs')}});
+    mainWindow.on('closed',()=>certificateSelection.clearAll());
     if(qaSmoke){
       mainWindow.webContents.on('render-process-gone',(_event,details)=>qaErrors.push('Renderer cerrado: '+details.reason));
       mainWindow.webContents.on('console-message',(_event,details)=>{
@@ -279,4 +292,4 @@ app.whenReady().then(async () => {
   }
 });
 app.on('window-all-closed',()=>app.quit());
-app.on('before-quit',()=>{if(server)server.close().catch(console.error);});
+app.on('before-quit',()=>{certificateSelection.clearAll();if(server)server.close().catch(console.error);});

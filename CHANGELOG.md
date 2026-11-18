@@ -1,3 +1,11 @@
+## v0.6.74 — Formulario de certificado en dos campos y aceptación independiente (17/11/2026)
+
+- **UX:** dos espacios independientes «Certificado digital (.p12/.pfx)» con botón «Examinar» y «Contraseña del certificado» con opción Mostrar/Ocultar; botón primario aparte «Aceptar y verificar certificado». Diseño responsivo, sin lectura anticipada al seleccionar.
+- **Electron seguro:** selector nativo sin ruta visible para React, ticket efímero vinculado a empresa y ventana principal, control de sustituciones y symlinks, máximo 4 MB, limpieza de selección al abandonar el módulo. Contraseña y bytes se utilizan temporalmente, sin almacenarse. Sin migraciones SQLite.
+- **Validación:** reporte añade control explícito de clave privada PKCS#12 utilizable; RSA 2048/4096 y vigencia. La inspección **no** equivale a una firma XAdES-EPES verificable ni a emisión ante Hacienda.
+- **QA:** nuevos ensayos `qa-074-certificate-selection` y `qa-074-certificate-ui`, corrección de las pruebas heredadas de v0.6.73 por cambio de interfaz y nuevo indicador de clave privada, preservación de la suite completa.
+- **Pendiente:** implementar y validar firma XAdES-EPES auténtica con canonicalización XML, política y prueba contra verificador independiente y ambiente oficial, sin habilitar emisión prematuramente.
+
 ## v0.6.73 — Inspección efímera de PKCS#12 y preparación segura para firma (17/11/2026)
 
 - Nuevo panel **Revisión local de certificado digital** en la preparación FE 4.4 por empresa (propietario y administrador con acceso), sin ofrecer firma ni emisión.

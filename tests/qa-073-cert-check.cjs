@@ -25,8 +25,8 @@ if(openssl.status===0){
   test('Nunca declara emisión ni firma disponible',()=>{assert.equal(report.canSign,false);assert.equal(report.canIssue,false);assert.match(report.note,/No comprueba revocación/)});
   test('No devuelve la contraseña, archivo ni material privado',()=>{const payload=JSON.stringify(report);assert.doesNotMatch(payload,/TemporalQA123|BEGIN PRIVATE KEY|key\.pem|cert\.p12/);assert.match(report.fingerprint256,/^[0-9A-F]{2}(:[0-9A-F]{2}){31}$/)});
   test('Rechaza contraseña incorrecta',()=>assert.throws(()=>inspectP12(bytes,'Incorrecta')));
-  test('Distingue vencimiento',()=>{const result=inspectP12(bytes,'TemporalQA123',new Date('2032-01-01T00:00:00Z'));assert.equal(result.technicallyReady,false);assert.equal(result.checks[0].ok,false)});
-  test('Distingue todavía no vigente',()=>{const result=inspectP12(bytes,'TemporalQA123',new Date('2000-01-01T00:00:00Z'));assert.equal(result.checks[0].ok,false)});
+  test('Distingue vencimiento',()=>{const result=inspectP12(bytes,'TemporalQA123',new Date('2032-01-01T00:00:00Z'));assert.equal(result.technicallyReady,false);assert.equal(result.checks.find(c=>c.key==='validity').ok,false)});
+  test('Distingue todavía no vigente',()=>{const result=inspectP12(bytes,'TemporalQA123',new Date('2000-01-01T00:00:00Z'));assert.equal(result.checks.find(c=>c.key==='validity').ok,false)});
   run(['pkcs12','-export','-nokeys','-in',cert,'-passout','pass:TemporalQA123','-out',pfxWithoutKey]);
   test('Rechaza un contenedor sin clave privada',()=>assert.throws(()=>inspectP12(fs.readFileSync(pfxWithoutKey),'TemporalQA123')));
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
