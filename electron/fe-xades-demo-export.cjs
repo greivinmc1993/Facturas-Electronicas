@@ -7,6 +7,7 @@
 const crypto=require('node:crypto');
 const path=require('node:path');
 const {createXmlProof}=require('./fe-xades-xml-lab.cjs');
+const {verifySyntheticXml}=require('./fe-xades-demo-verifier.cjs');
 const MAX_DEMO_BYTES=100_000;
 
 async function saveSyntheticXml({showSaveDialog,writeFile,documentsPath,clock=()=>new Date(),generate=createXmlProof}){
@@ -37,11 +38,15 @@ async function saveSyntheticXml({showSaveDialog,writeFile,documentsPath,clock=()
    throw Error('La prueba sintética no superó las comprobaciones requeridas.');
  const bytes=Buffer.from(proof.xml,'utf8');
  if(bytes.length>MAX_DEMO_BYTES||bytes.length<1000)throw Error('Tamaño del XML de prueba fuera de rango.');
+ // Segunda barrera independiente del indicador de éxito del generador:
+ // recalcular digestos y verificar RSA antes de autorizar un archivo.
+ const verified=verifySyntheticXml(bytes);
+ if(!verified.valid||verified.canIssue!==false)throw Error('La firma de prueba no pasó el verificador local.');
  // Exclusivo: no sigue enlaces simbólicos ni sustituye archivos existentes.
  await writeFile(filePath,bytes,{flag:'wx',mode:0o600});
  return {success:true,report:{name:path.basename(filePath),bytes:bytes.length,
    sha256:crypto.createHash('sha256').update(bytes).digest('hex').toUpperCase(),
-   syntheticXml:true,usesRealCertificate:false,canIssue:false,canSend:false,
-   note:'XML de LABORATORIO con certificado ficticio. No es factura electrónica ni sirve para Hacienda. La firma debe validarse externamente.'}};
+   syntheticXml:true,usesRealCertificate:false,canIssue:false,canSend:false,locallyVerifiedBeforeSave:true,
+   note:'XML de LABORATORIO con certificado ficticio. Firma y referencias comprobadas localmente antes del guardado; no es factura electrónica ni sustituye verificación externa general.'}};
 }
 module.exports={saveSyntheticXml,MAX_DEMO_BYTES};

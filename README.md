@@ -1,3 +1,39 @@
+# FacturaCR v0.6.81 — Verificación local del XML ficticio exportado (19/11/2026)
+
+## Qué hay de nuevo
+
+En **Empresas → Preparación FE 4.4**, puedes ejecutar el laboratorio XMLDSig/XAdES-EPES como antes y utilizar **«Guardar XML ficticio»**. La exportación ahora verifica criptográficamente su propia firma y dos referencias **antes de escribir el archivo**. El botón independiente **«Verificar XML ficticio guardado»** está disponible **sin seleccionar el certificado real ni ingresar su contraseña**: abre un selector de Windows y repite la verificación local sobre ese archivo, sin necesitar que compartas el XML.
+
+La pantalla confirma firma RSA-SHA256, las dos referencias SHA-256 (documento `enveloped` y `SignedProperties`), variante, huella del archivo y fecha de vigencia del certificado ficticio. Si una referencia, contenido, firma o política fueron modificados, el diagnóstico muestra **«NO pasó la verificación»**. No devuelve claves ni la ruta completa al navegador. Los certificados de prueba duran una hora; después de ese plazo, una firma histórica correcta sigue siendo comprobable criptográficamente con el aviso de vigencia correspondiente.
+
+**Limitación fundamental:** este verificador solo entiende las **tres plantillas sintéticas exactas** que genera FacturaCR; rechaza cambios incluso de serialización. No es una biblioteca XMLDSig/XAdES general, no valida certificado real, cadena de confianza, revocación, XSD 4.4 ni aceptación de Hacienda. No permite firmar ni emitir facturas electrónicas reales. Nunca elijas un XML con datos tributarios reales en este módulo. La comprobación de política sigue siendo documental y referencial.
+
+**Dependencia especializada pendiente:** se comprobó XAdESjs 3.x (ESM, requiere Node.js compatible). El entorno actual no puede acceder a `registry.npmjs.org` (`EAI_AGAIN`), por lo que no se alteró el lockfile para añadir un paquete sin instalar ni verificar. El objetivo siguiente es integrar y ensayar un motor XMLDSig/XAdES general para comprobantes válidos, con verificador independiente y XSD oficial 4.4.
+
+## Instalación / GitHub
+
+1. **Antes de reemplazar archivos**, crear y verificar una copia independiente de la base SQLite. No sobrescribir ni borrar la base de datos de producción.
+2. En PowerShell, desde la carpeta del proyecto, ejecutar:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+3. Comprobar el instalador en Windows, el XML de prueba y los workflows. Luego publicar:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.81 - verificacion local de XML ficticio firmado"
+git push origin main
+```
+
+Se conservan `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows/`. No se generan informes ni notas de versión adicionales en el ZIP.
+
+---
+
 # FacturaCR v0.6.80 — Ensayos de distintas estructuras XML con verificación externa (19/11/2026)
 
 **Nuevo:** en **Empresas → Preparación FE 4.4 → Prototipo XMLDSig**, tras ejecutar la firma XML sintética aparece **«Probar 3 variantes de XML»**. El ensayo genera y firma tres estructuras de laboratorio (monto sencillo, servicio ficticio y mercadería ficticia). La clave RSA de cada prueba es temporal y el certificado es autofirmado, sin ninguna relación con el `.p12` real. React recibe solo un reporte de los resultados, **no** el XML, el certificado ni las claves privadas.

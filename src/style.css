@@ -1632,3 +1632,6 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureVariantResult{margin-top:.75rem;border:1px solid #c7e2d7;border-radius:11px;padding:1rem;background:#f0faf5;overflow-wrap:anywhere}
 .feSignatureVariantResult p{margin:.45rem 0}
 @media(max-width:640px){.feSignatureVariantLab{align-items:stretch}.feSignatureVariantLab button{width:100%;white-space:normal}}
+
+/* v0.6.81: el verificador de XML ficticio usa las tarjetas adaptables del laboratorio. */
+.feSignatureVariantLab button:focus-visible{outline:3px solid #0e8175;outline-offset:3px}

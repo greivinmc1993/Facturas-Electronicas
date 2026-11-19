@@ -25,12 +25,15 @@ export default function FeSignatureReadiness({companyId}){
  const [variantsReport,setVariantsReport]=useState(null);
  const [variantsError,setVariantsError]=useState('');
  const [variantsChecking,setVariantsChecking]=useState(false);
+ const [xmlLocalVerification,setXmlLocalVerification]=useState(null);
+ const [xmlLocalVerificationError,setXmlLocalVerificationError]=useState('');
+ const [xmlLocalVerifying,setXmlLocalVerifying]=useState(false);
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlLocalVerifying(false);
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -77,7 +80,7 @@ export default function FeSignatureReadiness({companyId}){
  const inspectPolicy=async()=>{
   if(policyChecking||!result||typeof bridge?.inspectXadesPolicy!=='function')return;
   const id=generation.current;
-  setVariantsReport(null);setVariantsError('');setPolicyChecking(true);setPolicyError('');setPolicyReport(null);setLabReport(null);setLabError('');setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');
+  setVariantsReport(null);setVariantsError('');setXmlLocalVerification(null);setXmlLocalVerificationError('');setPolicyChecking(true);setPolicyError('');setPolicyReport(null);setLabReport(null);setLabError('');setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');
   try{
    const response=await bridge.inspectXadesPolicy();
    if(id!==generation.current)return;
@@ -90,7 +93,7 @@ export default function FeSignatureReadiness({companyId}){
  const runLab=async()=>{
   if(labChecking||busy||!policyReport?.matchesAnnexSample||!result?.keyPossession?.ok||typeof bridge?.runXadesCryptoLab!=='function')return;
   const id=generation.current;
-  setVariantsReport(null);setVariantsError('');setLabChecking(true);setLabError('');setLabReport(null);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');
+  setVariantsReport(null);setVariantsError('');setXmlLocalVerification(null);setXmlLocalVerificationError('');setLabChecking(true);setLabError('');setLabReport(null);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');
   try{
    const response=await bridge.runXadesCryptoLab();
    if(id!==generation.current)return;
@@ -102,7 +105,7 @@ export default function FeSignatureReadiness({companyId}){
  const runXmlLab=async()=>{
   if(xmlChecking||busy||labChecking||!labReport?.keyProofVerified||!policyReport?.matchesAnnexSample||!result?.keyPossession?.ok||typeof bridge?.runXadesXmlLab!=='function')return;
   const id=generation.current;
-  setVariantsReport(null);setVariantsError('');setXmlChecking(true);setXmlError('');setXmlReport(null);setXmlExport(null);setXmlExportError('');
+  setVariantsReport(null);setVariantsError('');setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlChecking(true);setXmlError('');setXmlReport(null);setXmlExport(null);setXmlExportError('');
   try{
    const response=await bridge.runXadesXmlLab();
    if(id!==generation.current)return;
@@ -143,9 +146,22 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setVariantsError(err.message||'No pudo completarse la prueba de variantes.');}
   finally{if(id===generation.current)setVariantsChecking(false);}
  };
+ const verifyExportedXml=async()=>{
+  if(xmlLocalVerifying||busy||typeof bridge?.verifyXadesXmlDemo!=='function')return;
+  const id=generation.current;
+  setXmlLocalVerifying(true);setXmlLocalVerification(null);setXmlLocalVerificationError('');
+  try{
+   const response=await bridge.verifyXadesXmlDemo();
+   if(id!==generation.current)return;
+   if(response?.cancelled)return;
+   if(!response?.success||!response.report)throw Error(response?.error||'No se pudo verificar el XML guardado.');
+   setXmlLocalVerification(response.report);
+  }catch(err){if(id===generation.current)setXmlLocalVerificationError(err.message||'No se pudo comprobar el XML.');}
+  finally{if(id===generation.current)setXmlLocalVerifying(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.80 · Verificación de variantes XML sintéticas (laboratorio)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.81 · Verificación local de XML exportado (laboratorio)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -215,6 +231,17 @@ export default function FeSignatureReadiness({companyId}){
       <p className="hint"><strong>Importante:</strong> este prototipo no firma comprobantes fiscales ni valida la política tributaria. El verificador externo y el XSD oficial siguen siendo requisitos para un motor de producción.</p>
     </div>}
     </div>}
+      <div className="feSignatureVariantLab" aria-label="Verificación local del XML ficticio guardado">
+        <div><strong>Verificar XML ficticio guardado</strong><p className="hint">Selecciona el XML que exportaste. Electron vuelve a comprobar su contenido, los dos digestos y la firma RSA-SHA256 sin confiar en el resultado del generador. No acepta facturas de Hacienda ni XML ajenos al laboratorio.</p></div>
+        <button type="button" className="secondary" onClick={verifyExportedXml} disabled={xmlLocalVerifying||busy||!bridge?.verifyXadesXmlDemo}>{xmlLocalVerifying?'Verificando archivo…':'Verificar XML ficticio guardado'}</button>
+      </div>
+      {xmlLocalVerificationError&&<p role="alert" className="fePreparationError">{xmlLocalVerificationError}</p>}
+      {xmlLocalVerification&&<div className={xmlLocalVerification.valid?'feSignatureExportResult':'feSignatureVariantResult'} role="status">
+        <strong>{xmlLocalVerification.valid?'Firma e integridad del XML ficticio verificadas':'El XML ficticio NO pasó la verificación'}</strong>
+        <p>Archivo: {xmlLocalVerification.name}</p>
+        {xmlLocalVerification.valid&&<><p className="feSignatureCheckOk">✓ Firma RSA-SHA256 y 2 referencias válidas ({xmlLocalVerification.variant})</p><p className="feSignatureFingerprint">SHA-256: {xmlLocalVerification.sha256}</p>{!xmlLocalVerification.certificateWithinValidityNow&&<p className="hint">El certificado temporal de prueba ya no está vigente. Su firma histórica se ha verificado criptográficamente.</p>}</>}
+        <p className="hint">{xmlLocalVerification.note}</p>
+      </div>}
   <p className="fePreparationDisclaimer">Esta etapa <strong>no firma archivos XML fiscales</strong>, no confirma la inscripción tributaria ni transmite información a Hacienda. La firma XAdES-EPES y la emisión siguen bloqueadas hasta validar los algoritmos, la política oficial, el XSD y realizar pruebas independientes.</p>
  </section>;
 }

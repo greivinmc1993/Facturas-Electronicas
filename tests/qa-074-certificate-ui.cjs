@@ -13,5 +13,5 @@ check('Cambio de empresa limpia selección y contraseña',()=>{assert.match(ui,/
 check('No agrega API HTTP, ni botones para firmar o emitir',()=>{assert.doesNotMatch(read('server/index.js'),/app\.(?:post|put)\([^\n]*sign-xml/);assert.match(ui,/no firma archivos XML/);assert.doesNotMatch(ui,/onClick=.*[Ee]mitir|onClick=.*[Ff]irmar/)});
 check('En navegador no pide contraseña ni archivo',()=>assert.match(ui,/No se solicitan contraseñas desde el navegador web/));
 check('Se ajusta a pantallas angostas y mantiene botón de aceptar aparte',()=>{assert.match(css,/\.feSignatureControls\{display:grid/);assert.match(css,/\.feSignatureActions\{display:flex/);assert.match(css,/@media\(max-width:430px\)/)});
-check('Versiones actualizadas sin divergencias',()=>{const p=require('../package.json'),l=require('../package-lock.json');assert.equal(p.version,'0.6.80');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version)});
+check('Versiones actualizadas sin divergencias',()=>{const p=require('../package.json'),l=require('../package-lock.json');assert.equal(p.version,'0.6.81');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version)});
 console.log(`QA interfaz v0.6.74: ${count}/${count} aprobadas`);

@@ -5,6 +5,7 @@ const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const {runXmlProof,runXmlVariantsProof}=require('./fe-xades-xml-lab.cjs');
 const {saveSyntheticXml}=require('./fe-xades-demo-export.cjs');
+const {inspectSavedDemoXml}=require('./fe-xades-demo-verifier.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -221,6 +222,18 @@ ipcMain.handle('facturacr:save-xades-xml-demo',async event=>{
    ?'Ese archivo ya existe. Elige otro nombre para conservar el anterior.'
    :'No se pudo guardar el XML de prueba. Comprueba la carpeta y los permisos.'};
  }
+});
+// v0.6.81: reabre una exportación ficticia en el proceso principal y verifica
+// datos + SignedProperties + RSA-SHA256 SIN invocar al generador de firmas.
+// NO es un verificador XMLDSig de propósito general ni acepta facturas fiscales.
+ipcMain.handle('facturacr:verify-xades-xml-demo',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{return await inspectSavedDemoXml({
+  showOpenDialog:opts=>dialog.showOpenDialog(mainWindow,opts),
+  lstat:filename=>fs.lstat(filename),
+  openFile:(filename,flags)=>fs.open(filename,flags)
+ });}
+ catch{return {success:false,error:'No se pudo abrir el XML de laboratorio seleccionado. Comprueba el archivo y sus permisos.'};}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
