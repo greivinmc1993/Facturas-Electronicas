@@ -17,6 +17,13 @@ async function check(title,fn){await fn();count++;console.log('OK v0.6.76 polít
    assert(ANNEX_URL.startsWith('https://www.hacienda.go.cr/docs/'));
    assert.equal(Buffer.from(ANNEX_SAMPLE_SHA256_B64,'base64').length,32);
   });
+  await check('El digest oficial del Anexo 2 corresponde exactamente al SHA-256 del PDF de Hacienda reportado en Windows',()=>{
+   // Regresión: «WOeI8» usa I mayúscula. «WOel8» daba un hash distinto y falsos rechazos.
+   const expectedHex='0D6C629F5C5639E23C3AE5905DACE1E158CB5806822C003DE787A6EC3321D21F';
+   const expectedB64='DWxin1xWOeI8OuWQXazh4VjLWAaCLAA954em7DMh0h8=';
+   assert.equal(ANNEX_SAMPLE_SHA256_B64,expectedB64);
+   assert.equal(Buffer.from(ANNEX_SAMPLE_SHA256_B64,'base64').toString('hex').toUpperCase(),expectedHex);
+  });
   await check('La política local usa SHA-256 real y no identifica un PDF diferente como oficial',()=>{
    const result=policyDigestResult(pdf);
    assert.equal(result.sha256,createHash('sha256').update(pdf).digest('hex').toUpperCase());

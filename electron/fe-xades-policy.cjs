@@ -10,7 +10,8 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const {createHash}=require('node:crypto');
 const POLICY_URL='https://cdn.comprobanteselectronicos.go.cr/xml-schemas/Resoluci%C3%B3n_General_sobre_disposiciones_t%C3%A9cnicas_comprobantes_electr%C3%B3nicos_para_efectos_tributarios.pdf';
-const ANNEX_SAMPLE_SHA256_B64='DWxin1xWOel8OuWQXazh4VjLWAaCLAA954em7DMh0h8=';
+// Referencia del Anexo 2, página 88: la I de «WOeI8» es i mayúscula, no ele minúscula.
+const ANNEX_SAMPLE_SHA256_B64='DWxin1xWOeI8OuWQXazh4VjLWAaCLAA954em7DMh0h8=';
 const ANNEX_URL='https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf';
 const MAX_POLICY_BYTES=12*1024*1024;
 function policyDigestResult(bytes){

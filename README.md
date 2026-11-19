@@ -1,5 +1,7 @@
 # FacturaCR v0.6.76 — Cotejo referencial de política XAdES-EPES (18/11/2026)
 
+**Corrección puntual del 18/11/2026 — falso negativo de huella PDF:** se corrige una transcripción en `electron/fe-xades-policy.cjs`: el valor Base64 del ejemplo oficial debe contener `WOeI8` (**I mayúscula**), no `WOel8` (ele minúscula). El SHA-256 oficial de referencia decodificado es `0D6C629F5C5639E23C3AE5905DACE1E158CB5806822C003DE787A6EC3321D21F`, exactamente el mostrado en la prueba real del usuario con el PDF de Hacienda. Se añade prueba de regresión que compara **el valor literal Base64 y sus bytes decodificados** con el digest oficial. No requiere seleccionar otro certificado, cambiar PDF, instalar dependencias ni modificar SQLite. La coincidencia sigue siendo **documental/referencial**; no activa firma ni envío a Hacienda.
+
 ## 1. Funcionalidad nueva
 
 La prueba anterior de lectura y correspondencia del certificado continúa intacta. **Empresas → Preparación FE 4.4** muestra ahora, después del diagnóstico del `.p12/.pfx`, el bloque «Política oficial XAdES-EPES» con un botón **Examinar PDF y comparar huella**.
@@ -12,7 +14,7 @@ https://cdn.comprobanteselectronicos.go.cr/xml-schemas/Resoluci%C3%B3n_General_s
 **Fuente del anexo:**
 https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf
 
-**Referencia histórica de huella de ejemplo (SHA-256, Base64):** `DWxin1xWOel8OuWQXazh4VjLWAaCLAA954em7DMh0h8=`.
+**Referencia histórica de huella de ejemplo (SHA-256, Base64):** `DWxin1xWOeI8OuWQXazh4VjLWAaCLAA954em7DMh0h8=`.
 
 ## 2. Estado de seguridad y límites
 
@@ -20,7 +22,7 @@ https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf
 
 ## 3. QA
 
-- `tests/qa-076-xades-policy.cjs`: 11/11 (cálculo SHA-256, cotejo referencial, rechazo de archivos/symlinks/tamaño, preservación de bytes, no fuga de rutas, barrera de firma).
+- `tests/qa-076-xades-policy.cjs`: 12/12 (cálculo SHA-256, cotejo referencial, rechazo de archivos/symlinks/tamaño, preservación de bytes, no fuga de rutas, barrera de firma).
 - `tests/qa-076-xades-policy-ui.cjs`: 7/7 (selector nativo, mensajes, controles, limpieza de estado, no activación de firma, diseño adaptable).
 - `npm test`: aprobado; incluye las pruebas anteriores y las 74 pruebas locales de integración SQLite.
 - `npm run qa:real-server`: pendiente por ausencia de Express en el entorno. `npm run build`: pendiente por ausencia de Vite. Instalador NSIS y prueba visual real de Windows: pendientes.
