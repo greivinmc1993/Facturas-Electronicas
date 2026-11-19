@@ -44,3 +44,5 @@ jobs:
         run: node -e "require('./electron/fe-xades-xml-lab.cjs').createXmlProof().then(p=>require('node:fs').writeFileSync(process.env.RUNNER_TEMP+'/facturacr-xmlsig-demo.xml',p.xml))"
       - name: Comprobar C14N, referencias, RSA-SHA256 y alteraciones con verificador externo
         run: python tests/qa-078-xmlsig-independiente.py "$RUNNER_TEMP/facturacr-xmlsig-demo.xml"
+      - name: Endurecimiento de estructura y ataques a XML sintético
+        run: python tests/qa-079-xmlsig-endurecimiento.py "$RUNNER_TEMP/facturacr-xmlsig-demo.xml"

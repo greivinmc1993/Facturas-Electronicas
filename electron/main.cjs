@@ -4,6 +4,7 @@ const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const {runXmlProof}=require('./fe-xades-xml-lab.cjs');
+const {saveSyntheticXml}=require('./fe-xades-demo-export.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -198,6 +199,22 @@ ipcMain.handle('facturacr:xades-xml-lab',async event=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{return {success:true,report:await runXmlProof()};}
  catch{return {success:false,error:'Falló el prototipo XMLDSig de laboratorio.'};}
+});
+// 0.6.79: entrega únicamente un XML sintético mediante diálogo nativo.
+// El renderer no suministra contenido, rutas, certificados ni contraseñas.
+ipcMain.handle('facturacr:save-xades-xml-demo',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{
+  return await saveSyntheticXml({
+   showSaveDialog:opts=>dialog.showSaveDialog(mainWindow,opts),
+   writeFile:(filename,bytes,options)=>fs.writeFile(filename,bytes,options),
+   documentsPath:app.getPath('documents')
+  });
+ }catch(error){
+  return {success:false,error:error?.code==='EEXIST'
+   ?'Ese archivo ya existe. Elige otro nombre para conservar el anterior.'
+   :'No se pudo guardar el XML de prueba. Comprueba la carpeta y los permisos.'};
+ }
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{

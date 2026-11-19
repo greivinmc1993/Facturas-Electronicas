@@ -13,5 +13,6 @@ contextBridge.exposeInMainWorld('facturacrSignature',{
  clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token),
  inspectXadesPolicy:()=>ipcRenderer.invoke('facturacr:inspect-xades-policy'),
  runXadesCryptoLab:()=>ipcRenderer.invoke('facturacr:xades-crypto-lab'),
- runXadesXmlLab:()=>ipcRenderer.invoke('facturacr:xades-xml-lab')
+ runXadesXmlLab:()=>ipcRenderer.invoke('facturacr:xades-xml-lab'),
+ saveXadesXmlDemo:()=>ipcRenderer.invoke('facturacr:save-xades-xml-demo')
 });

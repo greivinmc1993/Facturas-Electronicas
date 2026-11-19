@@ -1,3 +1,21 @@
+# FacturaCR v0.6.79 — Exportación verificable de XMLDSig/XAdES ficticio (19/11/2026)
+
+**Novedad:** en **Empresas → Preparación FE 4.4 → Prototipo XMLDSig**, tras ejecutar «Ensayar firma XML ficticia», aparece el botón «Guardar XML ficticio». Electron abre el diálogo nativo y genera **otra firma sintética nueva** con certificado RSA efímero. Guarda únicamente un XML de demostración `FacturaCRLaboratorio`, NO una factura. La interfaz informa nombre y huella SHA-256, sin mostrar la ruta local. El guardado usa `wx` (no sobrescribe archivos anteriores ni sigue enlaces simbólicos), requiere extensión `.xml`, aplica límite de 100 KB y no recibe XML ni rutas desde React. Si el usuario cancela, no genera la clave. NO guarda la clave privada ni el certificado real `.p12`.
+
+**Verificador externo reforzado:** en GitHub Actions, `tests/qa-078-xmlsig-independiente.py` comprueba C14N, los dos digestos, política de ejemplo y RSA-SHA256; `tests/qa-079-xmlsig-endurecimiento.py` prueba mutaciones de contenido, duplicación de firmas/IDs, DTD y referencias externas. Los scripts necesitan Python 3 con `lxml` y `cryptography`, instalados solamente en el job de CI. Para probar manualmente un archivo ficticio exportado:
+
+```powershell
+python -m pip install lxml cryptography
+python tests/qa-078-xmlsig-independiente.py "RUTA_AL_XML_FICTICIO.xml"
+python tests/qa-079-xmlsig-endurecimiento.py "RUTA_AL_XML_FICTICIO.xml"
+```
+
+**Límite:** el prototipo anterior sigue limitado a una sola plantilla fija y a un certificado autofirmado. La comprobación NO es una validación XAdES/PKI para comprobantes reales. Las verificaciones en CI tampoco autorizan emisión. La instalación de la biblioteca especializada XMLDSig/XAdES y el XSD oficial continúan pendientes, al igual que las pruebas con Hacienda. El borrador XML 4.4, las ventas, SQLite, permisos y respaldos no se modifican.
+
+**Instalación y GitHub:** primero crear y verificar copia de la base SQLite fuera del proyecto. Después ejecutar `npm ci`, `npm test`, `npm run qa:real-server` y `npm run dist:win`. Tras comprobar los resultados en Windows: `git add -A`, `git commit -m "feat: v0.6.79 - exportacion XML ficticio y verificacion reforzada"`, `git push origin main`. Se conservan `.gitignore`, `CHANGELOG.md`, workflows de Actions y este README.
+
+---
+
 # FacturaCR v0.6.78 — Prototipo XMLDSig/XAdES-EPES aislado (19/11/2026)
 
 **Alcance real:** en Empresas → Preparación FE 4.4, después de completar el certificado, cotejar la política y ejecutar el laboratorio RSA previo, se muestra un segundo botón **Ensayar firma XML ficticia**. El módulo `electron/fe-xades-xml-lab.cjs` produce únicamente una plantilla de simulación inmutable (`<FacturaCRLaboratorio>`), la firma con una clave RSA 2048 recién generada, añade `ds:SignedInfo`, `ds:SignatureValue`, certificado X.509 temporal AUTO-FIRMADO no confiable, `xades:SignedProperties` y referencia explícita a la política del Anexo 2. Incluye canonicalización C14N-20010315 **solo para la plantilla fija**, dos referencias SHA-256, transform enveloped y controles de alteración.

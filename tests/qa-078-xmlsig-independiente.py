@@ -19,9 +19,20 @@ POLICY_B64='DWxin1xWOeI8OuWQXazh4VjLWAaCLAA954em7DMh0h8='
 
 def verify_synthetic(raw):
     if len(raw)>100_000: raise ValueError('XML de prueba demasiado grande')
+    # Estrictamente para plantilla sintética: DTD, entidades y declaraciones
+    # externas no tienen cabida, aunque el parser desactive su resolución.
+    if b'<!DOCTYPE' in raw.upper() or b'<!ENTITY' in raw.upper(): raise ValueError('DTD prohibido')
     parser=etree.XMLParser(resolve_entities=False,no_network=True,load_dtd=False,huge_tree=False)
     root=etree.fromstring(raw,parser)
     assert root.tag=='FacturaCRLaboratorio'
+    assert [item.tag for item in root]==['Tipo','Monto','EnsayoId',f'{{{DS}}}Signature']
+    assert root.find('Monto').text=='100.00'
+    assert root.find('Tipo').text=='SIMULACION_NO_FISCAL'
+    assert len(root.xpath('//ds:Signature',namespaces=NS))==1
+    assert len(root.xpath('//xades:SignedProperties',namespaces=NS))==1
+    assert not root.xpath('//comment()')
+    ids=[item.get('Id') for item in root.iter() if item.get('Id') is not None]
+    assert len(ids)==2 and len(ids)==len(set(ids))
     assert root.find('Tipo').text=='SIMULACION_NO_FISCAL'
     sig=root.find('ds:Signature',NS)
     assert sig is not None and sig.get('Id')
@@ -33,6 +44,8 @@ def verify_synthetic(raw):
     assert info.find('ds:SignatureMethod',NS).get('Algorithm')=='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256'
     refs=info.findall('ds:Reference',NS)
     assert len(refs)==2
+    assert [ref.get('URI') for ref in refs]==['','#'+props.get('Id')]
+    assert [ref.get('Type') for ref in refs]==[None,'http://uri.etsi.org/01903#SignedProperties']
     for ref in refs:
         uri=ref.get('URI')
         digest=ref.find('ds:DigestValue',NS).text
@@ -44,6 +57,7 @@ def verify_synthetic(raw):
             transforms=[t.get('Algorithm') for t in ref.findall('.//ds:Transform',NS)]
             assert transforms==[DS+'enveloped-signature','http://www.w3.org/TR/2001/REC-xml-c14n-20010315']
         else:
+            assert [t.get('Algorithm') for t in ref.findall('.//ds:Transform',NS)]==['http://www.w3.org/TR/2001/REC-xml-c14n-20010315']
             assert uri=='#'+props.get('Id')
             assert ref.get('Type')=='http://uri.etsi.org/01903#SignedProperties'
             source=props
@@ -60,6 +74,9 @@ def verify_synthetic(raw):
     assert issuer_serial is not None and issuer_serial.text==str(cert.serial_number)
     policy_hash=props.find('.//xades:SigPolicyHash/ds:DigestValue',NS)
     assert policy_hash is not None and policy_hash.text==POLICY_B64
+    assert len(sig.findall('ds:SignedInfo',NS))==1
+    assert len(sig.findall('ds:KeyInfo',NS))==1
+    assert len(sig.findall('ds:SignatureValue',NS))==1
     signedinfo=etree.tostring(info,method='c14n',exclusive=False,with_comments=False)
     signature=base64.b64decode(sig.find('ds:SignatureValue',NS).text)
     cert.public_key().verify(signature,signedinfo,padding.PKCS1v15(),hashes.SHA256())

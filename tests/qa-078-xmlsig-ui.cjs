@@ -7,8 +7,8 @@ const main=read('electron/main.cjs'),preload=read('electron/preload.cjs'),ui=rea
 let n=0;function check(name,fn){fn();n++;console.log('OK UI XMLDSig 0.6.78:',name)}
 check('Nueva versión y metadatos 0.6.78',()=>{
  const p=require('../package.json'),l=require('../package-lock.json');
- assert.equal(p.version,'0.6.78');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
- assert.match(ui,/v0\.6\.78 · Prototipo XMLDSig/);
+ assert.equal(p.version,'0.6.79');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
+ assert.match(ui,/v0\.6\.79 · Exportación verificable XMLDSig/);
 });
 check('IPC expone únicamente operación sin argumentos',()=>{
  assert.match(preload,/runXadesXmlLab:\(\)=>ipcRenderer\.invoke\('facturacr:xades-xml-lab'\)/);
@@ -23,8 +23,8 @@ check('El botón exige laboratorio previo, política y certificado comprobados',
  assert.match(ui,/!labReport\?\.keyProofVerified\|\|!policyReport\?\.matchesAnnexSample\|\|!result\?\.keyPossession\?\.ok/);
 });
 check('Estado se reinicia al cambiar de empresa o certificado',()=>{
- assert.match(ui,/setXmlReport\(null\);setXmlError\(''\);setXmlChecking\(false\)/);
- assert.match(ui,/setXmlReport\(null\);setXmlError\(''\);setSelecting\(true\)/);
+ assert.match(ui,/setXmlReport\(null\);setXmlError\(''\);setXmlExport\(null\);setXmlExportError\(''\);setXmlChecking\(false\)/);
+ assert.match(ui,/setXmlReport\(null\);setXmlError\(''\);setXmlExport\(null\);setXmlExportError\(''\);setSelecting\(true\)/);
 });
 check('Interfaz distingue XML sintético de comprobante fiscal',()=>{
  assert.match(ui,/XML de simulación fijo/);

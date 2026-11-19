@@ -1616,3 +1616,11 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureXmlLab .feSignatureCryptoLabHeader>div{min-width:0;flex:1 1 250px}
 .feSignatureXmlLab .feSignatureCryptoLabResult p{overflow-wrap:anywhere}
 @media(max-width:640px){.feSignatureXmlLab .feSignatureCryptoLabHeader button{width:100%}}
+
+/* v0.6.79: exportación inequívocamente NO FISCAL del laboratorio XML. */
+.feSignatureExportDemo{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1rem;padding:1rem;border:1px solid var(--border-color,#d8e5e8);border-radius:12px;background:rgba(229,239,242,.45)}
+.feSignatureExportDemo>div{flex:1;min-width:230px}
+.feSignatureExportDemo button{flex-shrink:0}
+.feSignatureExportResult{margin-top:.75rem;padding:1rem;border:1px solid #b9d9d0;border-radius:12px;background:#f0faf6;overflow-wrap:anywhere}
+.feSignatureExportResult p{margin:.5rem 0}
+@media(max-width:640px){.feSignatureExportDemo{align-items:stretch}.feSignatureExportDemo button{width:100%;white-space:normal}}

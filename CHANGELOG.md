@@ -1,3 +1,10 @@
+## v0.6.79 — Exportación XML de laboratorio y verificador independiente endurecido (19/11/2026)
+
+- Nuevo botón «Guardar XML ficticio» después de la firma sintética, mediante selector nativo de Electron. Nunca firma comprobantes reales; exporta solo XML de simulación con clave/certificado temporal, sin datos fiscales.
+- Módulo `electron/fe-xades-demo-export.cjs`: guardado exclusivo sin sobrescribir, límite 100 KB, extensión XML, sólo diálogo autorizado; retorno de SHA-256 y nombre sin rutas ni claves.
+- Nuevas pruebas Node de exportación y seguridad de interfaz; el verificador externo Python ahora rechaza firmas/IDs duplicados, DTD, contenido extra y referencias inesperadas. Nuevo ensayo de 13 mutaciones en el workflow CI.
+- No se modifican SQLite ni el motor fiscal. Sigue pendiente motor XAdES general especializado, XSD, cadena de confianza, certificado real y pruebas de Hacienda. La emisión continúa bloqueada.
+
 ## v0.6.78 — Prototipo XMLDSig/XAdES-EPES sobre XML estrictamente ficticio (19/11/2026)
 
 - Nuevo `electron/fe-xades-xml-lab.cjs`: genera clave y certificado autofirmado RSA 2048 efímeros, XML de simulación **sin namespace fiscal**, firma enveloped RSA-SHA256 con C14N-20010315 de plantilla fija, digest de documento y `xades:SignedProperties`, con referencia de política publicada en Anexo 2.
