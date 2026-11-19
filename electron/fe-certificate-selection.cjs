@@ -8,6 +8,8 @@ const fs = require('node:fs/promises');
 const {randomBytes} = require('node:crypto');
 const path = require('node:path');
 const {inspectP12,MAX_P12_BYTES} = require('./fe-certificate-check.cjs');
+const {proveP12PrivateKey} = require('./fe-private-key-proof.cjs');
+const {signatureReadiness} = require('./fe-signature-gate.cjs');
 
 function companyKey(value){
  if(!Number.isSafeInteger(value)||value<=0)throw Error('Selecciona una empresa válida.');
@@ -19,7 +21,7 @@ function safeStat(stat){
 function sameFile(a,b){
  return !!a&&!!b&&a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
 }
-function createP12SelectionManager({fileSystem=fs,inspector=inspectP12}={}){
+function createP12SelectionManager({fileSystem=fs,inspector=inspectP12,proof=proveP12PrivateKey}={}){
  let selected=null;
  let selectionSequence=0;
  const clear=(token)=>{
@@ -61,6 +63,18 @@ function createP12SelectionManager({fileSystem=fs,inspector=inspectP12}={}){
    const after=await handle.stat();
    if(bytes.length!==opened.size||!sameFile(opened,after))throw Error('El certificado cambió durante su lectura.');
    const report=inspector(bytes,passphrase);
+   // v0.6.75: prueba de correspondencia real, sin extraer la clave a disco ni
+   // enviarla a React. El handshake TLS local no sustituye XMLDSig/XAdES.
+   if(inspector===inspectP12&&report.technicallyReady){
+    try{
+     report.keyPossession=await proof(bytes,passphrase);
+     report.checks.push({key:'keyProof',ok:true,title:'Correspondencia criptográfica de la clave demostrada localmente'});
+    }catch(_){
+     report.keyPossession={ok:false,status:'indeterminado'};
+     report.checks.push({key:'keyProof',ok:false,title:'No se pudo completar el ensayo criptográfico local; requiere comprobación adicional'});
+    }
+   }
+   report.signatureReadiness=signatureReadiness(report);
    // Una comprobación satisfactoria consume el ticket; el archivo no queda asociado a la empresa.
    if(selected===current)selected=null;
    return report;

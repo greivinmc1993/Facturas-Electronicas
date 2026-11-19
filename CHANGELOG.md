@@ -1,3 +1,12 @@
+## v0.6.75 — Ensayo criptográfico local de clave PKCS#12 y barrera de firma (18/11/2026)
+
+- Se incorpora `electron/fe-private-key-proof.cjs`: handshake TLS local efímero limitado a `127.0.0.1`, sin servicio remoto ni exportación de claves, cotejando con huella SHA-256 del certificado en memoria. Un fallo se reporta como **indeterminado** y no invalida automáticamente el certificado para otros usos.
+- Se integra en `electron/fe-certificate-selection.cjs` al pulsar **Aceptar y verificar**, sin alterar los tres controles separados ni la limpieza de contraseña y buffers.
+- Nuevo `electron/fe-signature-gate.cjs`: checklist técnico-fiscal que mantiene `canSign:false` y `canIssue:false` aunque el ensayo sea satisfactorio. Se señalan cadena/revocación, RUT, política, XSD, verificador XMLDSig/XAdES y pruebas de Hacienda como pendientes.
+- `src/FeSignatureReadiness.jsx` muestra progreso verificable y pendientes con estilos adaptables, sin botones de emisión ni de firma XML.
+- QA: 8 nuevas pruebas criptográficas, 5 nuevas pruebas de interfaz, `npm test` completo e integración SQLite 74/74 correctos. `qa:real-server` y `build` no ejecutados por ausencia de Express/Vite en el entorno; pendientes de Windows/Actions.
+- No existe todavía motor de firma XML XAdES-EPES. No se modifican SQLite, precios, ventas, XML históricos, roles ni la política de no enviar a Hacienda.
+
 ## v0.6.74 — Formulario de certificado en dos campos y aceptación independiente (17/11/2026)
 
 - **UX:** dos espacios independientes «Certificado digital (.p12/.pfx)» con botón «Examinar» y «Contraseña del certificado» con opción Mostrar/Ocultar; botón primario aparte «Aceptar y verificar certificado». Diseño responsivo, sin lectura anticipada al seleccionar.

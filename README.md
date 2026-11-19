@@ -1,3 +1,48 @@
+# FacturaCR v0.6.75 — Comprobación criptográfica local de clave privada (18/11/2026)
+
+## 1. Funcionalidad nueva en Empresas → Preparación FE 4.4
+
+Se conservan **dos campos independientes** (archivo `.p12/.pfx` y contraseña) y el botón **Aceptar y verificar certificado** de la v0.6.74. Al aceptarlo, cuando el certificado está vigente y utiliza RSA admitido, se realiza adicionalmente **un ensayo local TLS** con el P12 dentro del proceso principal de Electron, únicamente sobre `127.0.0.1`, con un puerto efímero: el handshake prueba que se puede utilizar la clave privada y se coteja la huella SHA-256 del certificado mostrado. No se instala ni llama a ningún servidor remoto. La clave privada no se exporta, copia a SQLite, escribe a disco ni pasa al renderer; la contraseña se elimina del formulario y el búfer del P12 se sobreescribe al salir. El ensayo puede ser *indeterminado* si el certificado no admite uso TLS u ocurre un error local: **eso no equivale a certificar que la clave sea inválida**.
+
+El diagnóstico ahora muestra **Preparación XAdES-EPES**, con dos estados verificables cuando corresponda (P12 legible/vigente y ensayo local de correspondencia), y seis **pendientes explícitos**: cadena de confianza y revocación, titularidad ante Hacienda, política oficial, validación XSD 4.4 y numeración real, motor XMLDSig/XAdES verificado y aceptación en ambiente de pruebas. Esta revisión no genera ni firma ningún XML.
+
+## 2. Motivo del bloqueo de firma y emisión
+
+El XML actual es un **borrador con clave y consecutivo ficticios**. No se debe firmar ni emitir como comprobante tributario. La norma exige una firma **XAdES-EPES v1.3.2 o superior**, tipo **ENVELOPED**, basada en certificado RSA 2048/4096 y digest SHA-256/512. No incorporamos una implementación improvisada de canonicalización o una URL de política inventada: primero se requiere biblioteca XMLDSig/XAdES auditable, política vigente verificable y pruebas criptográficas independientes. **`canSign` y `canIssue` permanecen falsos**, sin endpoint de firma o envío.
+
+Referencias normativas: [Anexo 2 XML 4.4 (PGR)](https://pgrweb.go.cr/DOCS/NORMAS/1/VIGENTE/S/2020-2029/2020-2024/2024/1936C/1701B7.HTML) y [API de comprobantes (Hacienda)](https://www.hacienda.go.cr/docs/ComprobantesElectronicosAPI.html).
+
+## 3. QA de v0.6.75
+
+- `tests/qa-075-private-key-proof.cjs`: 8 casos aprobados (certificados RSA ficticios generados temporalmente con OpenSSL, clave equivocada, bloqueo de firma/emisión, no exposición de material privado, error del ensayo).
+- `tests/qa-075-signature-gate-ui.cjs`: 5 casos aprobados (pantalla, IPC, restricciones y adaptación responsiva).
+- `npm test`: aprobado; incluye 74 pruebas de integración SQLite y todas las regresiones de versiones anteriores.
+- `npm run qa:real-server`: no ejecutable aquí por ausencia de Express (`ERR_MODULE_NOT_FOUND`).
+- `npm run build`: no ejecutable aquí porque Vite no está instalado. La instalación completa/NSIS y ensayo con certificado real en Windows quedan pendientes. No se ha probado emisión real.
+
+## 4. Instalación y GitHub
+
+**Respaldar y verificar la base SQLite antes de reemplazar el proyecto**, fuera de la carpeta de actualización. Desde PowerShell:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+Tras comprobar el programa y los tests en Windows:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.75 - prueba criptografica local y control XAdES"
+git push origin main
+```
+
+Se mantienen `.gitignore`, `README.md`, `CHANGELOG.md`, workflows de GitHub Actions, historial de ventas, SQLite, usuarios y respaldos. No hay migraciones ni nuevas dependencias. **Versión actual: 0.6.75.**
+
+---
+
 # FacturaCR v0.6.74 — Selección independiente de certificado y aceptación segura (17/11/2026)
 
 ## 1. Cambios en Empresas → Preparación FE 4.4
