@@ -25,3 +25,22 @@ jobs:
         run: npm test
       - name: Compilar React/Vite
         run: npm run build
+
+  xmlsig-independent-lab:
+    name: QA independiente XMLDSig con Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar bibliotecas externas de verificación
+        run: python -m pip install --disable-pip-version-check 'lxml>=5,<7' 'cryptography>=42,<47'
+      - name: Firmar plantilla sintética (clave y certificado temporal)
+        run: node -e "require('./electron/fe-xades-xml-lab.cjs').createXmlProof().then(p=>require('node:fs').writeFileSync(process.env.RUNNER_TEMP+'/facturacr-xmlsig-demo.xml',p.xml))"
+      - name: Comprobar C14N, referencias, RSA-SHA256 y alteraciones con verificador externo
+        run: python tests/qa-078-xmlsig-independiente.py "$RUNNER_TEMP/facturacr-xmlsig-demo.xml"

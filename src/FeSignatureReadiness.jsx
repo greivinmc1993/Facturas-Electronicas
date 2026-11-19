@@ -16,12 +16,15 @@ export default function FeSignatureReadiness({companyId}){
  const [labReport,setLabReport]=useState(null);
  const [labError,setLabError]=useState('');
  const [labChecking,setLabChecking]=useState(false);
+ const [xmlReport,setXmlReport]=useState(null);
+ const [xmlError,setXmlError]=useState('');
+ const [xmlChecking,setXmlChecking]=useState(false);
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlChecking(false);
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -37,7 +40,7 @@ export default function FeSignatureReadiness({companyId}){
   const previous=selectedToken.current;
   selectedToken.current=null;
   if(previous)bridge.clearP12?.(previous)?.catch?.(()=>{});
-  setSelection(null);setResult(null);setError('');setSecret('');setPolicyReport(null);setPolicyError('');setLabReport(null);setLabError('');setSelecting(true);
+  setSelection(null);setResult(null);setError('');setSecret('');setPolicyReport(null);setPolicyError('');setLabReport(null);setLabError('');setXmlReport(null);setXmlError('');setSelecting(true);
   try{
    const response=await bridge.chooseP12(companyId);
    if(id!==generation.current){if(response?.selection?.token)bridge.clearP12?.(response.selection.token)?.catch?.(()=>{});return;}
@@ -68,7 +71,7 @@ export default function FeSignatureReadiness({companyId}){
  const inspectPolicy=async()=>{
   if(policyChecking||!result||typeof bridge?.inspectXadesPolicy!=='function')return;
   const id=generation.current;
-  setPolicyChecking(true);setPolicyError('');setPolicyReport(null);setLabReport(null);setLabError('');
+  setPolicyChecking(true);setPolicyError('');setPolicyReport(null);setLabReport(null);setLabError('');setXmlReport(null);setXmlError('');
   try{
    const response=await bridge.inspectXadesPolicy();
    if(id!==generation.current)return;
@@ -81,7 +84,7 @@ export default function FeSignatureReadiness({companyId}){
  const runLab=async()=>{
   if(labChecking||busy||!policyReport?.matchesAnnexSample||!result?.keyPossession?.ok||typeof bridge?.runXadesCryptoLab!=='function')return;
   const id=generation.current;
-  setLabChecking(true);setLabError('');setLabReport(null);
+  setLabChecking(true);setLabError('');setLabReport(null);setXmlReport(null);setXmlError('');
   try{
    const response=await bridge.runXadesCryptoLab();
    if(id!==generation.current)return;
@@ -90,9 +93,21 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setLabError(err.message||'No se pudo ejecutar el ensayo local.');}
   finally{if(id===generation.current)setLabChecking(false);}
  };
+ const runXmlLab=async()=>{
+  if(xmlChecking||busy||labChecking||!labReport?.keyProofVerified||!policyReport?.matchesAnnexSample||!result?.keyPossession?.ok||typeof bridge?.runXadesXmlLab!=='function')return;
+  const id=generation.current;
+  setXmlChecking(true);setXmlError('');setXmlReport(null);
+  try{
+   const response=await bridge.runXadesXmlLab();
+   if(id!==generation.current)return;
+   if(!response?.success||!response.report)throw Error(response?.error||'No se pudo ejecutar la prueba XMLDSig.');
+   setXmlReport(response.report);
+  }catch(err){if(id===generation.current)setXmlError(err.message||'Falló el laboratorio XML.');}
+  finally{if(id===generation.current)setXmlChecking(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.77 · Laboratorio criptográfico y política XAdES-EPES</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.78 · Prototipo XMLDSig/XAdES-EPES de laboratorio</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -134,7 +149,20 @@ export default function FeSignatureReadiness({companyId}){
         <p className="feSignatureCheckOk">{labReport.alteredSignatureRejected?'✓ La alteración de la firma se detectó':'! Error de integridad'}</p>
         <p className="hint">{labReport.note}</p>
       </div>}
-      <p className="hint"><strong>Pendiente:</strong> biblioteca XMLDSig/XAdES especializada, canonicalización, SignedProperties, certificado real y verificación independiente de un XML firmado. Emisión bloqueada.</p>
+      <p className="hint"><strong>Pendiente:</strong> integración general con biblioteca XMLDSig/XAdES auditada, certificado real, XSD y pruebas oficiales. Emisión bloqueada.</p>
+    </div>}
+    {labReport?.keyProofVerified&&policyReport?.matchesAnnexSample&&result.keyPossession?.ok&&<div className="feSignatureXmlLab" aria-label="Prototipo de firma XMLDSig en XML de prueba">
+      <div className="feSignatureCryptoLabHeader"><div><strong>Prototipo XMLDSig + XAdES-EPES (solo demostración)</strong><p className="hint">Genera y verifica una firma enveloped sobre XML de simulación fijo. Utiliza RSA 2048 y certificado autofirmado ficticio creado en memoria; nunca tu .p12 real.</p></div>
+      <button type="button" className="secondary" onClick={runXmlLab} disabled={xmlChecking||busy||labChecking||!bridge?.runXadesXmlLab}>{xmlChecking?'Verificando XML de prueba…':'Ensayar firma XML ficticia'}</button></div>
+      {xmlError&&<p role="alert" className="fePreparationError">{xmlError}</p>}
+      {xmlReport&&<div className="feSignatureCryptoLabResult" role="status">
+        <p className="feSignatureCheckOk">{xmlReport.signatureValid?'✓ Firma RSA-SHA256 de SignedInfo verificada':'! Firma incorrecta'}</p>
+        <p className="feSignatureCheckOk">{xmlReport.documentReferenceVerified?'✓ Referencia enveloped del XML de prueba calculada':'! Referencia inválida'}</p>
+        <p className="feSignatureCheckOk">{xmlReport.signedPropertiesReferenceVerified?'✓ Referencia SignedProperties calculada':'! Referencia inválida'}</p>
+        <p className="feSignatureCheckOk">{xmlReport.documentTamperRejected&&xmlReport.propsTamperRejected&&xmlReport.changedSignedInfoRejected?'✓ Alteraciones detectadas en documento, propiedades y firma':'! Revisar comprobaciones de integridad'}</p>
+        <p className="hint">{xmlReport.note}</p>
+      </div>}
+      <p className="hint"><strong>Importante:</strong> este prototipo no firma comprobantes fiscales ni valida la política tributaria. El verificador externo y el XSD oficial siguen siendo requisitos para un motor de producción.</p>
     </div>}
     </div>}
   <p className="fePreparationDisclaimer">Esta etapa <strong>no firma archivos XML</strong>, no confirma la inscripción tributaria ni transmite información a Hacienda. La firma XAdES-EPES y la emisión siguen bloqueadas hasta validar los algoritmos, la política oficial, el XSD y realizar pruebas independientes.</p>

@@ -1,3 +1,10 @@
+## v0.6.78 — Prototipo XMLDSig/XAdES-EPES sobre XML estrictamente ficticio (19/11/2026)
+
+- Nuevo `electron/fe-xades-xml-lab.cjs`: genera clave y certificado autofirmado RSA 2048 efímeros, XML de simulación **sin namespace fiscal**, firma enveloped RSA-SHA256 con C14N-20010315 de plantilla fija, digest de documento y `xades:SignedProperties`, con referencia de política publicada en Anexo 2.
+- Nuevo IPC solo del frame autorizado `facturacr:xades-xml-lab`, sin argumentos ni devolución de XML, certificado o claves. Botón independiente después de completar laboratorio previo, certificado y PDF de política; no usa el `.p12` personal.
+- Verificación independiente con Python `lxml`/`cryptography` en desarrollo y job dedicado de GitHub Actions; nuevas pruebas detectan alteración del XML, de SignedProperties y de SignedInfo.
+- **No firma XML tributario, no implementa un motor XMLDSig general, no valida XSD ni habilita emisión**. Sin cambios SQLite o reglas fiscales, sin dependencias npm adicionales.
+
 ## v0.6.77 — Ensayo RSA-SHA256 con datos sintéticos y verificación independiente (19/11/2026)
 
 - Añadido `electron/fe-xades-crypto-lab.cjs`: genera RSA 2048 efímera, firma y verifica bytes de XML ficticio, y exige que la modificación del texto o de la firma sea rechazada. No accede al `.p12` real ni produce una factura firmada.

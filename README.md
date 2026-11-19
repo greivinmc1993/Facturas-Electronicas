@@ -1,3 +1,15 @@
+# FacturaCR v0.6.78 — Prototipo XMLDSig/XAdES-EPES aislado (19/11/2026)
+
+**Alcance real:** en Empresas → Preparación FE 4.4, después de completar el certificado, cotejar la política y ejecutar el laboratorio RSA previo, se muestra un segundo botón **Ensayar firma XML ficticia**. El módulo `electron/fe-xades-xml-lab.cjs` produce únicamente una plantilla de simulación inmutable (`<FacturaCRLaboratorio>`), la firma con una clave RSA 2048 recién generada, añade `ds:SignedInfo`, `ds:SignatureValue`, certificado X.509 temporal AUTO-FIRMADO no confiable, `xades:SignedProperties` y referencia explícita a la política del Anexo 2. Incluye canonicalización C14N-20010315 **solo para la plantilla fija**, dos referencias SHA-256, transform enveloped y controles de alteración.
+
+**Verificación externa:** `tests/qa-078-xmlsig-independiente.py` recomputa ambos digestos con `lxml` mediante C14N y verifica RSA-SHA256 con `cryptography` usando exclusivamente la clave pública del certificado de demostración. Para ensayarla, usar Python con `lxml` y `cryptography`, generar el XML de prueba desde `createXmlProof()` y pasárselo al script. La ejecución normal `npm test` no requiere Python.
+
+**Límites estrictos:** nunca se firma XML fiscal ni se usa el `.p12` real en este prototipo; no se recibe XML externo ni se entrega certificado, clave o XML a React. La clave privada ficticia vive solo durante la función de ensayo. No hay persistencia SQLite, conexión de red, cambio de permisos ni envío a Hacienda. **NO se trata de un motor XAdES de producción:** la canonicalización construida para una plantilla fija no procesa XML arbitrario, y queda pendiente una biblioteca general auditada, validación estructural/criptográfica XAdES independiente, cadena y revocación, XSD oficial 4.4, numeración fiscal y aceptación por Hacienda. Los resultados no habilitan emisión.
+
+Pruebas: `npm test`, `npm run qa:real-server`, `npm run dist:win`; para comprobar XMLDSig con herramientas externas se utiliza el ensayo independiente de CI. Antes de actualizar, crear y verificar un respaldo separado de SQLite.
+
+---
+
 # FacturaCR v0.6.77 — Laboratorio criptográfico local (19/11/2026)
 
 ## 1. Alcance implementado

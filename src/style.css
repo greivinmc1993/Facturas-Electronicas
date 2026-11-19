@@ -1610,3 +1610,9 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureCryptoLabResult{margin-top:12px;border-top:1px solid #dce8ec;padding-top:8px}
 .feSignatureCryptoLabResult p{overflow-wrap:anywhere}
 @media(max-width:640px){.feSignatureCryptoLabHeader button{width:100%}}
+
+/* 0.6.78: prototipo XMLDSig aislado del botón de laboratorio RSA. */
+.feSignatureXmlLab{margin-top:14px;padding:16px;border:1px solid #d3e4e7;border-radius:11px;background:#f5fbfa;min-width:0}
+.feSignatureXmlLab .feSignatureCryptoLabHeader>div{min-width:0;flex:1 1 250px}
+.feSignatureXmlLab .feSignatureCryptoLabResult p{overflow-wrap:anywhere}
+@media(max-width:640px){.feSignatureXmlLab .feSignatureCryptoLabHeader button{width:100%}}

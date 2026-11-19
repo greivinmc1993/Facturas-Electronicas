@@ -3,6 +3,7 @@ const {createMailSettingsStore}=require('./mail-settings.cjs');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
+const {runXmlProof}=require('./fe-xades-xml-lab.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -191,6 +192,12 @@ ipcMain.handle('facturacr:xades-crypto-lab',async event=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{return {success:true,report:await runLocalCryptoLab()};}
  catch{return {success:false,error:'No pudo completarse el ensayo criptográfico local.'};}
+});
+// 0.6.78: prueba XMLDSig/XAdES exclusiva de XML ficticio y clave generada en memoria.
+ipcMain.handle('facturacr:xades-xml-lab',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{return {success:true,report:await runXmlProof()};}
+ catch{return {success:false,error:'Falló el prototipo XMLDSig de laboratorio.'};}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{

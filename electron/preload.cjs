@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('facturacrSignature',{
  inspectP12:(passphrase,companyId,token)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase,companyId,token),
  clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token),
  inspectXadesPolicy:()=>ipcRenderer.invoke('facturacr:inspect-xades-policy'),
- runXadesCryptoLab:()=>ipcRenderer.invoke('facturacr:xades-crypto-lab')
+ runXadesCryptoLab:()=>ipcRenderer.invoke('facturacr:xades-crypto-lab'),
+ runXadesXmlLab:()=>ipcRenderer.invoke('facturacr:xades-xml-lab')
 });

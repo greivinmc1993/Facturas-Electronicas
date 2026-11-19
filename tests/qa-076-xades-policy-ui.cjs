@@ -34,7 +34,7 @@ check('El botón es adaptable y muestra estados y errores',()=>{
 });
 check('Cambiar de empresa o certificado limpia datos de política',()=>{
  assert.match(ui,/setPolicyReport\(null\);setPolicyError\(''\);setPolicyChecking\(false\)/);
- assert.match(ui,/setPolicyReport\(null\);setPolicyError\(''\);(?:setLabReport\(null\);setLabError\(''\);)?setSelecting\(true\)/);
+ assert.match(ui,/setPolicyReport\(null\);setPolicyError\(''\);.*setSelecting\(true\)/);
 });
 check('La huella no se promueve a lista de firma verificada',()=>{
  const gate=get('electron/fe-signature-gate.cjs');
