@@ -44,12 +44,26 @@ function demoCert(privateKey,publicKey){
  return {der,x509,serial:x509.serialNumber,issuer:'CN='+SUBJECT};
 }
 
-async function createXmlProof(){
+const DEMO_VARIANTS=Object.freeze({
+ standard:'Monto simple, sin datos tributarios',
+ servicio:'Servicio ficticio, campos anidados',
+ mercaderia:'Mercadería ficticia, múltiples conceptos'
+});
+function getDemoRoot(nonce,variant){
+ // Lista cerrada, sin parámetros de negocio, XML externo, entradas de usuarios ni importes reales.
+ const base=`<Tipo>SIMULACION_NO_FISCAL</Tipo><Monto>100.00</Monto><EnsayoId>${nonce}</EnsayoId>`;
+ if(variant==='standard')return `<FacturaCRLaboratorio>${base}</FacturaCRLaboratorio>`;
+ if(variant==='servicio')return `<FacturaCRLaboratorio>${base}<Servicio><Descripcion>DEMO SERVICIO</Descripcion><Cantidad>1</Cantidad><Precio>100.00</Precio></Servicio></FacturaCRLaboratorio>`;
+ if(variant==='mercaderia')return `<FacturaCRLaboratorio>${base}<Mercaderia><Producto><Descripcion>DEMO A</Descripcion><Cantidad>1</Cantidad><Precio>50.00</Precio></Producto><Producto><Descripcion>DEMO B</Descripcion><Cantidad>2</Cantidad><Precio>25.00</Precio></Producto></Mercaderia></FacturaCRLaboratorio>`;
+ throw Error('Variante XML de laboratorio no autorizada.');
+}
+async function createXmlProof({variant='standard'}={}){
+ if(!Object.hasOwn(DEMO_VARIANTS,variant))throw Error('Variante XML de laboratorio no autorizada.');
  const {privateKey,publicKey}=await pair('rsa',{modulusLength:2048,publicExponent:65537});
  const cert=demoCert(privateKey,publicKey);
  const nonce=crypto.randomBytes(12).toString('hex');
  const sigId='demo-sig-'+nonce,propsId='demo-props-'+nonce;
- const root=`<FacturaCRLaboratorio><Tipo>SIMULACION_NO_FISCAL</Tipo><Monto>100.00</Monto><EnsayoId>${nonce}</EnsayoId></FacturaCRLaboratorio>`;
+ const root=getDemoRoot(nonce,variant);
  const now=new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
  const issuerNum=BigInt('0x'+cert.serial).toString(10);
  const propsInner=`<xades:SignedSignatureProperties>`+
@@ -82,7 +96,7 @@ async function createXmlProof(){
  const changedSignedInfoRejected=!crypto.verify('RSA-SHA256',Buffer.from(canonInfo.replace('sha256','sha512')),cert.x509.publicKey,signature);
  const documentTamperRejected=hash(root.replace('100.00','100.01'))!==hash(root);
  const propsTamperRejected=hash(canonProps.replace(ANNEX_SAMPLE_SHA256_B64,'INVALIDO'))!==hash(canonProps);
- const summary={status:'xmlsig-demo-verificado',rsaBits:2048,signatureValid,documentTamperRejected,propsTamperRejected,changedSignedInfoRejected,
+ const summary={status:'xmlsig-demo-verificado',variant,variantLabel:DEMO_VARIANTS[variant],rsaBits:2048,signatureValid,documentTamperRejected,propsTamperRejected,changedSignedInfoRejected,
   documentReferenceVerified:true,signedPropertiesReferenceVerified:true,policyReferenceIncluded:true,
   syntheticXml:true,selfSignedTestCertificate:true,usesRealCertificate:false,
   canSignFiscalXml:false,canIssue:false,canSend:false,
@@ -91,4 +105,18 @@ async function createXmlProof(){
  return {xml,summary,certDer:cert.der,canonicalSignedInfo:canonInfo,canonicalSignedProperties:canonProps,canonicalDocument:root};
 }
 async function runXmlProof(){const {summary}=await createXmlProof();return summary;}
-module.exports={createXmlProof,runXmlProof,DS,XADES,C14N,SHA,RSA,SIGNED_PROPS};
+async function runXmlVariantsProof(){
+ const variants=[];
+ // Este API solamente devuelve indicadores, jamás XML, P12, rutas, claves o certificados.
+ for(const variant of Object.keys(DEMO_VARIANTS)){
+  const {summary}=await createXmlProof({variant});
+  if(!summary.signatureValid||!summary.documentReferenceVerified||
+     !summary.signedPropertiesReferenceVerified||summary.canIssue!==false)
+   throw Error('Fallo de ensayo de plantilla: '+variant);
+  variants.push({variant,label:DEMO_VARIANTS[variant],ok:true});
+ }
+ return {success:true,syntheticXml:true,usesRealCertificate:false,canIssue:false,
+  canSend:false,verifiedCount:variants.length,variants,
+  note:'Tres plantillas cerradas de XML sintético, NO un motor XAdES general ni una comprobación de aceptación fiscal.'};
+}
+module.exports={createXmlProof,runXmlProof,runXmlVariantsProof,DEMO_VARIANTS,DS,XADES,C14N,SHA,RSA,SIGNED_PROPS};

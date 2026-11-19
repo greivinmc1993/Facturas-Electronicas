@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('facturacrSignature',{
  inspectXadesPolicy:()=>ipcRenderer.invoke('facturacr:inspect-xades-policy'),
  runXadesCryptoLab:()=>ipcRenderer.invoke('facturacr:xades-crypto-lab'),
  runXadesXmlLab:()=>ipcRenderer.invoke('facturacr:xades-xml-lab'),
+ runXadesXmlVariants:()=>ipcRenderer.invoke('facturacr:xades-xml-variants'),
  saveXadesXmlDemo:()=>ipcRenderer.invoke('facturacr:save-xades-xml-demo')
 });

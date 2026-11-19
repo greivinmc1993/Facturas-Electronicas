@@ -46,3 +46,9 @@ jobs:
         run: python tests/qa-078-xmlsig-independiente.py "$RUNNER_TEMP/facturacr-xmlsig-demo.xml"
       - name: Endurecimiento de estructura y ataques a XML sintético
         run: python tests/qa-079-xmlsig-endurecimiento.py "$RUNNER_TEMP/facturacr-xmlsig-demo.xml"
+
+      - name: Producir tres variantes XML sintéticas sin certificados reales
+        run: |
+          node -e "const f=require('node:fs');const lab=require('./electron/fe-xades-xml-lab.cjs');(async()=>{for(const v of ['standard','servicio','mercaderia']){const p=await lab.createXmlProof({variant:v});f.writeFileSync(process.env.RUNNER_TEMP+'/facturacr-080-'+v+'.xml',p.xml)}})().catch(e=>{console.error(e);process.exitCode=1})"
+      - name: Verificación externa de las tres estructuras y manipulaciones
+        run: python tests/qa-080-xmlsig-variantes.py "$RUNNER_TEMP/facturacr-080-standard.xml" "$RUNNER_TEMP/facturacr-080-servicio.xml" "$RUNNER_TEMP/facturacr-080-mercaderia.xml"

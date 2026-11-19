@@ -1624,3 +1624,11 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureExportResult{margin-top:.75rem;padding:1rem;border:1px solid #b9d9d0;border-radius:12px;background:#f0faf6;overflow-wrap:anywhere}
 .feSignatureExportResult p{margin:.5rem 0}
 @media(max-width:640px){.feSignatureExportDemo{align-items:stretch}.feSignatureExportDemo button{width:100%;white-space:normal}}
+
+/* v0.6.80: ensayos de distintas estructuras XML, siempre de laboratorio. */
+.feSignatureVariantLab{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1rem;padding:1rem;border:1px solid #cee2e4;border-radius:12px;background:#f1f8fa}
+.feSignatureVariantLab>div{flex:1;min-width:230px}
+.feSignatureVariantLab button{flex-shrink:0}
+.feSignatureVariantResult{margin-top:.75rem;border:1px solid #c7e2d7;border-radius:11px;padding:1rem;background:#f0faf5;overflow-wrap:anywhere}
+.feSignatureVariantResult p{margin:.45rem 0}
+@media(max-width:640px){.feSignatureVariantLab{align-items:stretch}.feSignatureVariantLab button{width:100%;white-space:normal}}

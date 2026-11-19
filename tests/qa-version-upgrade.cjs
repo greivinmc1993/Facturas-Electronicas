@@ -17,7 +17,7 @@ const currentVersion=require('../package.json').version;
 if(process.platform!=='win32'||process.env.GITHUB_ACTIONS!=='true'||process.env.RUNNER_OS!=='Windows'){
  console.error('Seguridad: esta prueba solo puede ejecutarse en un runner temporal Windows de GitHub Actions.');process.exit(1);
 }
-assert.equal(currentVersion,'0.6.79','La prueba requiere ajustar explícitamente las versiones esperadas');
+assert.equal(currentVersion,'0.6.80','La prueba requiere ajustar explícitamente las versiones esperadas');
 function installerFromEnv(key){
  const value=process.env[key];
  assert.ok(value,`Falta ${key}`);

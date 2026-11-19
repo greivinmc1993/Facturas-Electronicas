@@ -17,7 +17,7 @@ XADES='http://uri.etsi.org/01903/v1.3.2#'
 NS={'ds':DS,'xades':XADES}
 POLICY_B64='DWxin1xWOeI8OuWQXazh4VjLWAaCLAA954em7DMh0h8='
 
-def verify_synthetic(raw):
+def verify_synthetic(raw, expected_variant=None):
     if len(raw)>100_000: raise ValueError('XML de prueba demasiado grande')
     # Estrictamente para plantilla sintética: DTD, entidades y declaraciones
     # externas no tienen cabida, aunque el parser desactive su resolución.
@@ -25,9 +25,28 @@ def verify_synthetic(raw):
     parser=etree.XMLParser(resolve_entities=False,no_network=True,load_dtd=False,huge_tree=False)
     root=etree.fromstring(raw,parser)
     assert root.tag=='FacturaCRLaboratorio'
-    assert [item.tag for item in root]==['Tipo','Monto','EnsayoId',f'{{{DS}}}Signature']
-    assert root.find('Monto').text=='100.00'
+    tags=[item.tag for item in root]
+    base=['Tipo','Monto','EnsayoId']
+    if tags==base+[f'{{{DS}}}Signature']:
+        variant='standard'
+    elif tags==base+['Servicio',f'{{{DS}}}Signature']:
+        variant='servicio'
+        svc=root.find('Servicio')
+        assert [item.tag for item in svc]==['Descripcion','Cantidad','Precio']
+        assert [item.text for item in svc]==['DEMO SERVICIO','1','100.00']
+    elif tags==base+['Mercaderia',f'{{{DS}}}Signature']:
+        variant='mercaderia'
+        products=root.find('Mercaderia').findall('Producto')
+        assert len(products)==2 and len(root.find('Mercaderia'))==2
+        assert [[c.tag for c in prod] for prod in products]==[['Descripcion','Cantidad','Precio']]*2
+        assert [[c.text for c in prod] for prod in products]==[['DEMO A','1','50.00'],['DEMO B','2','25.00']]
+    else:
+        raise AssertionError('XML no corresponde a una plantilla de laboratorio permitida')
+    if expected_variant is not None: assert variant==expected_variant
+    assert root.find('Monto').text=='100.00' 
     assert root.find('Tipo').text=='SIMULACION_NO_FISCAL'
+    assert root.find('EnsayoId') is not None and len(root.find('EnsayoId').text)==24
+    assert all(ch in '0123456789abcdef' for ch in root.find('EnsayoId').text)
     assert len(root.xpath('//ds:Signature',namespaces=NS))==1
     assert len(root.xpath('//xades:SignedProperties',namespaces=NS))==1
     assert not root.xpath('//comment()')

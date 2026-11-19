@@ -1,3 +1,11 @@
+## v0.6.80 — Tres variantes XML ficticias y comprobación independiente (19/11/2026)
+
+- Tres plantillas de laboratorio cerradas: monto sencillo, servicio ficticio y mercadería ficticia; cada una genera clave y certificado RSA efímeros y firma XMLDSig/XAdES de demostración. No admite contenido XML suministrado por usuarios ni XML fiscal.
+- Nueva operación Electron protegida `facturacr:xades-xml-variants` y botón «Probar 3 variantes de XML», disponible exclusivamente después de las comprobaciones de laboratorio anteriores; retorna solamente resultados, nunca el XML ni las claves.
+- Nuevo QA independiente en Python integrado a GitHub Actions para revisar referencias, estructura y firmas de las tres variantes; tests Node y controles de interfaz nuevos.
+- XAdESjs evaluado, pero no agregado al proyecto por falta de acceso al registro npm. La biblioteca especializada, XSD, certificado real y aceptación de Hacienda siguen pendientes; firma/emisión bloqueadas.
+- Sin cambios SQLite, en ventas, fiscalidad, auditorías o permisos. Se conserva el historial de `README.md`, `.gitignore`, `CHANGELOG.md` y workflows.
+
 ## v0.6.79 — Exportación XML de laboratorio y verificador independiente endurecido (19/11/2026)
 
 - Nuevo botón «Guardar XML ficticio» después de la firma sintética, mediante selector nativo de Electron. Nunca firma comprobantes reales; exporta solo XML de simulación con clave/certificado temporal, sin datos fiscales.

@@ -3,7 +3,7 @@ const {createMailSettingsStore}=require('./mail-settings.cjs');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
-const {runXmlProof}=require('./fe-xades-xml-lab.cjs');
+const {runXmlProof,runXmlVariantsProof}=require('./fe-xades-xml-lab.cjs');
 const {saveSyntheticXml}=require('./fe-xades-demo-export.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
@@ -199,6 +199,12 @@ ipcMain.handle('facturacr:xades-xml-lab',async event=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{return {success:true,report:await runXmlProof()};}
  catch{return {success:false,error:'Falló el prototipo XMLDSig de laboratorio.'};}
+});
+// v0.6.80: tres escenarios totalmente sintéticos. No recibe XML ni datos fiscales.
+ipcMain.handle('facturacr:xades-xml-variants',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{return {success:true,report:await runXmlVariantsProof()};}
+ catch{return {success:false,error:'No se pudo completar la comparación de plantillas ficticias.'};}
 });
 // 0.6.79: entrega únicamente un XML sintético mediante diálogo nativo.
 // El renderer no suministra contenido, rutas, certificados ni contraseñas.
