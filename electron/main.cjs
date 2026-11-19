@@ -2,6 +2,7 @@ const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require(
 const {createMailSettingsStore}=require('./mail-settings.cjs');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
+const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -184,6 +185,12 @@ ipcMain.handle('facturacr:inspect-xades-policy',async event=>{
   const report=await inspectPolicyPdf(chosen.filePaths[0]);
   return {success:true,report};
  }catch{return {success:false,error:'No se pudo revisar el PDF. Elige un archivo válido de hasta 12 MB.'};}
+});
+// v0.6.77: laboratorio RSA sobre datos ficticios, sin certificados ni XML fiscales.
+ipcMain.handle('facturacr:xades-crypto-lab',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{return {success:true,report:await runLocalCryptoLab()};}
+ catch{return {success:false,error:'No pudo completarse el ensayo criptográfico local.'};}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{

@@ -1,3 +1,10 @@
+## v0.6.77 — Ensayo RSA-SHA256 con datos sintéticos y verificación independiente (19/11/2026)
+
+- Añadido `electron/fe-xades-crypto-lab.cjs`: genera RSA 2048 efímera, firma y verifica bytes de XML ficticio, y exige que la modificación del texto o de la firma sea rechazada. No accede al `.p12` real ni produce una factura firmada.
+- Nuevo botón **Ejecutar ensayo local** en **Empresas → Preparación FE 4.4**, disponible tras la verificación del certificado y el cotejo documental exitoso. Es independiente de la firma fiscal, y `canSign`/`canIssue` continúan en `false`.
+- Las pruebas incluyen una verificación con OpenSSL externo cuando está disponible; en Windows las comprobaciones de Node se ejecutan siempre sin depender de OpenSSL instalado.
+- Sin dependencias npm añadidas porque el acceso al registro no estuvo disponible; no se implementó XAdES/ XMLDSig ni se desbloqueó Hacienda. No se modifican SQLite ni transacciones comerciales.
+
 ## Corrección puntual v0.6.76 — Referencia Base64 oficial de política XAdES-EPES (18/11/2026)
 
 - Se corrige un carácter mal transcrito en la huella SHA-256 Base64 de ejemplo del Anexo 2: `WOel8` (ele minúscula) → `WOeI8` (i mayúscula). El hash corregido decodifica a `0D6C629F5C5639E23C3AE5905DACE1E158CB5806822C003DE787A6EC3321D21F`, que coincide con el SHA-256 del PDF oficial mostrado por el usuario.

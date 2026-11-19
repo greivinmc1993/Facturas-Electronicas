@@ -1,3 +1,48 @@
+# FacturaCR v0.6.77 — Laboratorio criptográfico local (19/11/2026)
+
+## 1. Alcance implementado
+
+En **Empresas → Preparación FE 4.4**, tras aceptar un certificado y comprobar la huella del PDF oficial del Anexo 2, aparece **Laboratorio de firma RSA-SHA256 → Ejecutar ensayo local**. Esta prueba genera una **clave RSA 2048 ficticia**, firma bytes de un XML de laboratorio (no fiscal), verifica criptográficamente la firma y comprueba que cambiar el contenido o la firma invalida la verificación. Se ejecuta localmente en el proceso principal de Electron y no lee, usa ni almacena el `.p12` real del contribuyente.
+
+**Advertencia esencial:** este laboratorio NO genera `ds:Signature`, XMLDSig ni XAdES-EPES: no hay canonicalización, SignedProperties, política efectivamente firmada, ni firmado de XML fiscal. No guarda un comprobante firmado, no emite, no envía a Hacienda y nunca habilita `canSign` ni `canIssue`. El borrador fiscal continúa con numeración ficticia. Esta versión comprueba **un componente criptográfico** mientras se prepara una integración XMLDSig/XAdES especializada y auditable, que no pudo instalarse en este entorno por falta de acceso a npm.
+
+## 2. Seguridad y persistencia
+
+- Las claves RSA se generan para cada ensayo y se utilizan solo en memoria, con datos de prueba. No se pide ni se expone una contraseña adicional.
+- React recibe únicamente resultados booleanos y metadatos del ensayo; no recibe certificados, claves, firma ni XML.
+- El IPC solo acepta el marco principal autorizado; no permite archivos ni XML proporcionados por el usuario.
+- El ensayo queda disponible después de un certificado técnicamente verificado y una comparación documental exitosa de política; esto **no valida** la autenticidad del emisor fiscal.
+- La suite anterior, la base SQLite, las ventas, el IVA, las notas de crédito, el inventario y la impresión permanecen sin cambios.
+
+## 3. QA
+
+- `tests/qa-077-crypto-lab.cjs`: firma RSA-SHA256, rechazo de contenido/firma alterados, política de referencia, no emisión y resultado filtrado; verifica también con **OpenSSL**, si está instalado (en Windows no se requiere OpenSSL para ejecutar la suite).
+- `tests/qa-077-crypto-lab-ui.cjs`: nueva interfaz, IPC permitido, limpieza por empresa, diseño responsivo, acceso condicionado y advertencias de no emisión.
+- `npm test`: ejecuta unidades, UI estática, integración SQLite y sintaxis. **Resultados de la ejecución actual se documentan en el chat; no se da por ejecutada compilación Windows.**
+- Pendientes: `npm run qa:real-server`, `npm run build` y `npm run dist:win` en un entorno con dependencias; verificación visual en Windows.
+- Pendiente de firma efectiva: instalar y auditar biblioteca XMLDSig/XAdES con canonicalización, `SignedProperties` y verificador independiente, validar XSD, titular y política, y obtener respuesta del ambiente de Hacienda.
+
+## 4. Instalación y GitHub
+
+**Crear y comprobar un respaldo de SQLite, guardado fuera de la carpeta del proyecto, antes de reemplazar archivos.**
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+```bash
+git add -A
+git commit -m "feat: v0.6.77 - laboratorio local RSA-SHA256 seguro"
+git push origin main
+```
+
+Se conservan `.gitignore`, `README.md`, `CHANGELOG.md` y `.github/workflows/`.
+
+---
+
 # FacturaCR v0.6.76 — Cotejo referencial de política XAdES-EPES (18/11/2026)
 
 **Corrección puntual del 18/11/2026 — falso negativo de huella PDF:** se corrige una transcripción en `electron/fe-xades-policy.cjs`: el valor Base64 del ejemplo oficial debe contener `WOeI8` (**I mayúscula**), no `WOel8` (ele minúscula). El SHA-256 oficial de referencia decodificado es `0D6C629F5C5639E23C3AE5905DACE1E158CB5806822C003DE787A6EC3321D21F`, exactamente el mostrado en la prueba real del usuario con el PDF de Hacienda. Se añade prueba de regresión que compara **el valor literal Base64 y sus bytes decodificados** con el digest oficial. No requiere seleccionar otro certificado, cambiar PDF, instalar dependencias ni modificar SQLite. La coincidencia sigue siendo **documental/referencial**; no activa firma ni envío a Hacienda.

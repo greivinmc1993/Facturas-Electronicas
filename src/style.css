@@ -1601,3 +1601,12 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignaturePolicyResult dt{font-size:12px;font-weight:700;color:#50687b}
 .feSignaturePolicyResult dd{margin:0;overflow-wrap:anywhere;font-size:12px}
 @media(max-width:640px){.feSignaturePolicyHeading button{width:100%}.feSignaturePolicyResult dl>div{grid-template-columns:1fr;gap:2px}}
+
+/* v0.6.77: laboratorio RSA sobre XML sintético, separado del diagnóstico fiscal. */
+.feSignatureCryptoLab{margin-top:16px;padding:16px;border-radius:11px;border:1px solid #d8e6eb;background:#f8fbfd;min-width:0}
+.feSignatureCryptoLabHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.feSignatureCryptoLabHeader>div{flex:1 1 260px;min-width:0}
+.feSignatureCryptoLabHeader button{padding:10px 14px;min-height:42px;border-radius:9px;font-weight:700}
+.feSignatureCryptoLabResult{margin-top:12px;border-top:1px solid #dce8ec;padding-top:8px}
+.feSignatureCryptoLabResult p{overflow-wrap:anywhere}
+@media(max-width:640px){.feSignatureCryptoLabHeader button{width:100%}}

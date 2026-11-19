@@ -13,12 +13,15 @@ export default function FeSignatureReadiness({companyId}){
  const [policyReport,setPolicyReport]=useState(null);
  const [policyError,setPolicyError]=useState('');
  const [policyChecking,setPolicyChecking]=useState(false);
+ const [labReport,setLabReport]=useState(null);
+ const [labError,setLabError]=useState('');
+ const [labChecking,setLabChecking]=useState(false);
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -34,7 +37,7 @@ export default function FeSignatureReadiness({companyId}){
   const previous=selectedToken.current;
   selectedToken.current=null;
   if(previous)bridge.clearP12?.(previous)?.catch?.(()=>{});
-  setSelection(null);setResult(null);setError('');setSecret('');setPolicyReport(null);setPolicyError('');setSelecting(true);
+  setSelection(null);setResult(null);setError('');setSecret('');setPolicyReport(null);setPolicyError('');setLabReport(null);setLabError('');setSelecting(true);
   try{
    const response=await bridge.chooseP12(companyId);
    if(id!==generation.current){if(response?.selection?.token)bridge.clearP12?.(response.selection.token)?.catch?.(()=>{});return;}
@@ -65,7 +68,7 @@ export default function FeSignatureReadiness({companyId}){
  const inspectPolicy=async()=>{
   if(policyChecking||!result||typeof bridge?.inspectXadesPolicy!=='function')return;
   const id=generation.current;
-  setPolicyChecking(true);setPolicyError('');setPolicyReport(null);
+  setPolicyChecking(true);setPolicyError('');setPolicyReport(null);setLabReport(null);setLabError('');
   try{
    const response=await bridge.inspectXadesPolicy();
    if(id!==generation.current)return;
@@ -75,9 +78,21 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setPolicyError(err.message||'No se pudo revisar el PDF.');}
   finally{if(id===generation.current)setPolicyChecking(false);}
  };
+ const runLab=async()=>{
+  if(labChecking||busy||!policyReport?.matchesAnnexSample||!result?.keyPossession?.ok||typeof bridge?.runXadesCryptoLab!=='function')return;
+  const id=generation.current;
+  setLabChecking(true);setLabError('');setLabReport(null);
+  try{
+   const response=await bridge.runXadesCryptoLab();
+   if(id!==generation.current)return;
+   if(!response?.success||!response.report)throw Error(response?.error||'No se pudo ejecutar el ensayo local.');
+   setLabReport(response.report);
+  }catch(err){if(id===generation.current)setLabError(err.message||'No se pudo ejecutar el ensayo local.');}
+  finally{if(id===generation.current)setLabChecking(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.76 · Política XAdES-EPES y certificado</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.77 · Laboratorio criptográfico y política XAdES-EPES</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -108,6 +123,18 @@ export default function FeSignatureReadiness({companyId}){
       <p className="hint">Referencia: Anexo 2, versión 4.4. No se guarda el PDF ni se modifica el certificado.</p>
       {policyError&&<p role="alert" className="fePreparationError">{policyError}</p>}
       {policyReport&&<div className="feSignaturePolicyResult" role="status"><strong>{policyReport.title}</strong><dl><div><dt>Archivo</dt><dd>{policyReport.name}</dd></div><div><dt>SHA-256 calculado</dt><dd className="feSignatureFingerprint">{policyReport.sha256}</dd></div><div><dt>Comparación con ejemplo</dt><dd>{policyReport.matchesAnnexSample?'Coincide con ejemplo documental':'No coincide; requiere revisión'}</dd></div></dl><p className="hint">{policyReport.note}</p></div>}
+    </div>}
+    {policyReport?.matchesAnnexSample&&result.keyPossession?.ok&&<div className="feSignatureCryptoLab" aria-label="Laboratorio RSA de prueba">
+      <div className="feSignatureCryptoLabHeader"><div><strong>Laboratorio de firma RSA-SHA256</strong><p className="hint">Ensayo con una clave ficticia y XML de simulación, independiente de tu certificado real. No crea una factura firmada ni una firma XAdES-EPES.</p></div>
+        <button type="button" className="secondary" onClick={runLab} disabled={labChecking||busy||!bridge?.runXadesCryptoLab}>{labChecking?'Ejecutando prueba…':'Ejecutar ensayo local'}</button></div>
+      {labError&&<p role="alert" className="fePreparationError">{labError}</p>}
+      {labReport&&<div role="status" className="feSignatureCryptoLabResult">
+        <p className="feSignatureCheckOk">{labReport.keyProofVerified?'✓ Firma de prueba RSA-SHA256 verificada':'! No se pudo verificar la firma'}</p>
+        <p className="feSignatureCheckOk">{labReport.changedContentRejected?'✓ La alteración del contenido se detectó':'! Error de integridad'}</p>
+        <p className="feSignatureCheckOk">{labReport.alteredSignatureRejected?'✓ La alteración de la firma se detectó':'! Error de integridad'}</p>
+        <p className="hint">{labReport.note}</p>
+      </div>}
+      <p className="hint"><strong>Pendiente:</strong> biblioteca XMLDSig/XAdES especializada, canonicalización, SignedProperties, certificado real y verificación independiente de un XML firmado. Emisión bloqueada.</p>
     </div>}
     </div>}
   <p className="fePreparationDisclaimer">Esta etapa <strong>no firma archivos XML</strong>, no confirma la inscripción tributaria ni transmite información a Hacienda. La firma XAdES-EPES y la emisión siguen bloqueadas hasta validar los algoritmos, la política oficial, el XSD y realizar pruebas independientes.</p>
