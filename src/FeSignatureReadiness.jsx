@@ -10,12 +10,15 @@ export default function FeSignatureReadiness({companyId}){
  const [selecting,setSelecting]=useState(false);
  const [checking,setChecking]=useState(false);
  const [showSecret,setShowSecret]=useState(false);
+ const [policyReport,setPolicyReport]=useState(null);
+ const [policyError,setPolicyError]=useState('');
+ const [policyChecking,setPolicyChecking]=useState(false);
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -31,7 +34,7 @@ export default function FeSignatureReadiness({companyId}){
   const previous=selectedToken.current;
   selectedToken.current=null;
   if(previous)bridge.clearP12?.(previous)?.catch?.(()=>{});
-  setSelection(null);setResult(null);setError('');setSecret('');setSelecting(true);
+  setSelection(null);setResult(null);setError('');setSecret('');setPolicyReport(null);setPolicyError('');setSelecting(true);
   try{
    const response=await bridge.chooseP12(companyId);
    if(id!==generation.current){if(response?.selection?.token)bridge.clearP12?.(response.selection.token)?.catch?.(()=>{});return;}
@@ -59,9 +62,22 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setError(err.message||'No se pudo verificar el certificado.');}
   finally{if(id===generation.current)setChecking(false);}
  };
+ const inspectPolicy=async()=>{
+  if(policyChecking||!result||typeof bridge?.inspectXadesPolicy!=='function')return;
+  const id=generation.current;
+  setPolicyChecking(true);setPolicyError('');setPolicyReport(null);
+  try{
+   const response=await bridge.inspectXadesPolicy();
+   if(id!==generation.current)return;
+   if(response?.cancelled)return;
+   if(!response?.success||!response.report)throw Error(response?.error||'No se pudo comprobar el PDF.');
+   setPolicyReport(response.report);
+  }catch(err){if(id===generation.current)setPolicyError(err.message||'No se pudo revisar el PDF.');}
+  finally{if(id===generation.current)setPolicyChecking(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.75 · Verificación criptográfica</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.76 · Política XAdES-EPES y certificado</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -86,6 +102,13 @@ export default function FeSignatureReadiness({companyId}){
   {error&&<p className="fePreparationError" role="alert">{error}</p>}
   {result&&<div className="feSignatureResult" role="status"><strong>{result.technicallyReady?'Certificado técnicamente legible':'Se requiere revisar el certificado'}</strong><dl><div><dt>Titular declarado</dt><dd>{result.subject}</dd></div><div><dt>Emisor del certificado</dt><dd>{result.issuer}</dd></div><div><dt>Vigencia</dt><dd>{result.validFrom?.slice(0,10)} — {result.validTo?.slice(0,10)}</dd></div><div><dt>Clave pública</dt><dd>{result.publicKeyType}{result.rsaBits?` · ${result.rsaBits} bits`:''}</dd></div><div><dt>Huella SHA-256</dt><dd className="feSignatureFingerprint">{result.fingerprint256}</dd></div></dl>{result.checks?.map(c=><p key={c.key} className={c.ok?'feSignatureCheckOk':'feSignatureCheckWarn'}>{c.ok?'✓':'!'} {c.title}</p>)}<p className="hint">{result.note}</p>
     {result.signatureReadiness&&<div className="feSignatureProgress" aria-label="Etapas de firma electrónica"><div className="feSignatureProgressHeader"><strong>Preparación XAdES-EPES</strong><span className="fePreparationStage">Firma y envío bloqueados</span></div><p className="hint">La prueba local de la clave es independiente de la validación tributaria. Estas comprobaciones no firman ni envían XML.</p><ul>{result.signatureReadiness.checks.map(step=><li key={step.key} className={step.ok?'feSignatureStepOk':'feSignatureStepPending'}><span aria-hidden="true">{step.ok?'✓':'○'}</span>{step.title}</li>)}</ul></div>}
+    {result.signatureReadiness&&<div className="feSignaturePolicy" aria-label="Cotejo del documento de política de firma">
+      <div className="feSignaturePolicyHeading"><div><strong>Política oficial XAdES-EPES</strong><p className="hint">Comprueba localmente un PDF descargado de la fuente oficial de Hacienda. Es una comparación con la huella del ejemplo del Anexo 2, no una validación de vigencia ni una firma.</p></div>
+      {typeof bridge?.inspectXadesPolicy==='function'&&<button type="button" className="secondary" onClick={inspectPolicy} disabled={policyChecking||busy}>{policyChecking?'Revisando PDF…':'Examinar PDF y comparar huella'}</button>}</div>
+      <p className="hint">Referencia: Anexo 2, versión 4.4. No se guarda el PDF ni se modifica el certificado.</p>
+      {policyError&&<p role="alert" className="fePreparationError">{policyError}</p>}
+      {policyReport&&<div className="feSignaturePolicyResult" role="status"><strong>{policyReport.title}</strong><dl><div><dt>Archivo</dt><dd>{policyReport.name}</dd></div><div><dt>SHA-256 calculado</dt><dd className="feSignatureFingerprint">{policyReport.sha256}</dd></div><div><dt>Comparación con ejemplo</dt><dd>{policyReport.matchesAnnexSample?'Coincide con ejemplo documental':'No coincide; requiere revisión'}</dd></div></dl><p className="hint">{policyReport.note}</p></div>}
+    </div>}
     </div>}
   <p className="fePreparationDisclaimer">Esta etapa <strong>no firma archivos XML</strong>, no confirma la inscripción tributaria ni transmite información a Hacienda. La firma XAdES-EPES y la emisión siguen bloqueadas hasta validar los algoritmos, la política oficial, el XSD y realizar pruebas independientes.</p>
  </section>;

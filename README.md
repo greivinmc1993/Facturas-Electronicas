@@ -1,3 +1,54 @@
+# FacturaCR v0.6.76 — Cotejo referencial de política XAdES-EPES (18/11/2026)
+
+## 1. Funcionalidad nueva
+
+La prueba anterior de lectura y correspondencia del certificado continúa intacta. **Empresas → Preparación FE 4.4** muestra ahora, después del diagnóstico del `.p12/.pfx`, el bloque «Política oficial XAdES-EPES» con un botón **Examinar PDF y comparar huella**.
+
+La operación abre un selector nativo del sistema operativo, solo acepta archivos PDF regulares de hasta 12 MB y calcula SHA-256 localmente. Compara ese resultado con la huella **de ejemplo** publicada por Hacienda en el **Anexo 2, versión 4.4**. Un PDF diferente no necesariamente es falso: puede ser una revisión posterior. **No se considera la coincidencia como garantía de procedencia, vigencia o aprobación**. El proceso no guarda una copia del PDF, ni la contraseña o la clave privada en SQLite.
+
+**Fuente del PDF de política (indicada en el Anexo 2):**
+https://cdn.comprobanteselectronicos.go.cr/xml-schemas/Resoluci%C3%B3n_General_sobre_disposiciones_t%C3%A9cnicas_comprobantes_electr%C3%B3nicos_para_efectos_tributarios.pdf
+
+**Fuente del anexo:**
+https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf
+
+**Referencia histórica de huella de ejemplo (SHA-256, Base64):** `DWxin1xWOel8OuWQXazh4VjLWAaCLAA954em7DMh0h8=`.
+
+## 2. Estado de seguridad y límites
+
+**Firma XML XAdES-EPES y envío a Hacienda siguen bloqueados.** No se implementó un motor XMLDSig/XAdES ni una validación XSD oficial completa, y los borradores existentes contienen claves y consecutivos sintéticos, por lo que no son comprobantes válidos. Un hash correcto NO desbloquea la firma. Para firmar realmente faltan una biblioteca especializada verificable, canonicalización, referencias XML firmadas, política vigente, verificador independiente, validación XSD, autorización del emisor y pruebas oficiales.
+
+## 3. QA
+
+- `tests/qa-076-xades-policy.cjs`: 11/11 (cálculo SHA-256, cotejo referencial, rechazo de archivos/symlinks/tamaño, preservación de bytes, no fuga de rutas, barrera de firma).
+- `tests/qa-076-xades-policy-ui.cjs`: 7/7 (selector nativo, mensajes, controles, limpieza de estado, no activación de firma, diseño adaptable).
+- `npm test`: aprobado; incluye las pruebas anteriores y las 74 pruebas locales de integración SQLite.
+- `npm run qa:real-server`: pendiente por ausencia de Express en el entorno. `npm run build`: pendiente por ausencia de Vite. Instalador NSIS y prueba visual real de Windows: pendientes.
+- `src/FeSignatureReadiness.jsx`: análisis de sintaxis JSX con TypeScript aprobado, sin ejecutar la aplicación visualmente.
+
+## 4. Instalación y GitHub
+
+**Antes de reemplazar el proyecto, crear y verificar un respaldo de la base SQLite** en una carpeta independiente:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+Tras comprobarlo en Windows:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.76 - cotejo documental de politica XAdES-EPES"
+git push origin main
+```
+
+Se mantienen `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows`. Sin cambios de esquema SQLite y sin nuevas dependencias. **Versión: 0.6.76.**
+
+---
+
 # FacturaCR v0.6.75 — Comprobación criptográfica local de clave privada (18/11/2026)
 
 ## 1. Funcionalidad nueva en Empresas → Preparación FE 4.4

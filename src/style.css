@@ -1588,3 +1588,16 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feSignatureProgress li span{flex:0 0 14px;font-weight:700}
 .feSignatureStepOk{color:#146b4e}.feSignatureStepPending{color:#637d8d}
 @media(max-width:640px){.feSignatureProgress ul{grid-template-columns:1fr}}
+
+/* v0.6.76 — contraste documental referencial de política XAdES-EPES. */
+.feSignaturePolicy{margin-top:16px;border:1px solid #d6e5ef;background:#fff;border-radius:11px;padding:16px;min-width:0}
+.feSignaturePolicyHeading{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.feSignaturePolicyHeading>div{flex:1 1 250px;min-width:0}
+.feSignaturePolicyHeading button{min-height:42px;border-radius:9px;padding:10px 14px;font-weight:700;white-space:normal}
+.feSignaturePolicyHeading button:not(:disabled):hover{transform:translateY(-1px)}
+.feSignaturePolicyResult{border-top:1px solid #dfebef;padding-top:12px;margin-top:12px}
+.feSignaturePolicyResult dl{display:grid;gap:6px;margin:8px 0}
+.feSignaturePolicyResult dl>div{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,2fr);gap:10px}
+.feSignaturePolicyResult dt{font-size:12px;font-weight:700;color:#50687b}
+.feSignaturePolicyResult dd{margin:0;overflow-wrap:anywhere;font-size:12px}
+@media(max-width:640px){.feSignaturePolicyHeading button{width:100%}.feSignaturePolicyResult dl>div{grid-template-columns:1fr;gap:2px}}

@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.i
 contextBridge.exposeInMainWorld('facturacrSignature',{
  chooseP12:(companyId)=>ipcRenderer.invoke('facturacr:choose-p12',companyId),
  inspectP12:(passphrase,companyId,token)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase,companyId,token),
- clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token)
+ clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token),
+ inspectXadesPolicy:()=>ipcRenderer.invoke('facturacr:inspect-xades-policy')
 });

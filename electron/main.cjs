@@ -1,6 +1,7 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require('electron');
 const {createMailSettingsStore}=require('./mail-settings.cjs');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
+const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -169,6 +170,20 @@ ipcMain.handle('facturacr:inspect-p12',async(event,passphrase,companyId,token)=>
 ipcMain.handle('facturacr:clear-p12',async(event,token)=>{
  if(!authorizedCertificateFrame(event))return false;
  return certificateSelection.clear(token);
+});
+// v0.6.76: el usuario elige un PDF local, nunca proporciona una ruta arbitraria
+// a Electron. La huella es SOLO cotejo con un ejemplo normativo, no autorización.
+ipcMain.handle('facturacr:inspect-xades-policy',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{
+  const chosen=await dialog.showOpenDialog(mainWindow,{
+   title:'Seleccionar PDF de política XAdES-EPES para cotejo local',
+   properties:['openFile'],filters:[{name:'Documento PDF',extensions:['pdf']}]
+  });
+  if(chosen.canceled||!chosen.filePaths?.[0])return {success:false,cancelled:true};
+  const report=await inspectPolicyPdf(chosen.filePaths[0]);
+  return {success:true,report};
+ }catch{return {success:false,error:'No se pudo revisar el PDF. Elige un archivo válido de hasta 12 MB.'};}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
