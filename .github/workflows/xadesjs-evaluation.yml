@@ -1,0 +1,29 @@
+name: Evaluacion aislada XAdESjs (NO FISCAL)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine-evaluation:
+    name: Node 22 + XAdESjs 3.x en carpeta temporal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar entorno aislado sin modificar dependencias del proyecto
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/xades-eval"
+          npm install --prefix "$RUNNER_TEMP/xades-eval" --no-save --ignore-scripts --no-audit --no-fund \
+            xadesjs@3.1.0 xmldsigjs@3.1.0 xml-core@3.1.0 @xmldom/xmldom@0.9.10 xpath@0.0.35
+          cp tests/qa-082-xadesjs-evaluation.mjs "$RUNNER_TEMP/xades-eval/probe.mjs"
+      - name: Ensayar firma y verificación sin certificados fiscales
+        run: node "$RUNNER_TEMP/xades-eval/probe.mjs"
+      - name: Comprobar que package-lock de producción permanece intacto
+        run: git diff --exit-code -- package.json package-lock.json

@@ -28,12 +28,15 @@ export default function FeSignatureReadiness({companyId}){
  const [xmlLocalVerification,setXmlLocalVerification]=useState(null);
  const [xmlLocalVerificationError,setXmlLocalVerificationError]=useState('');
  const [xmlLocalVerifying,setXmlLocalVerifying]=useState(false);
+ const [engineChecking,setEngineChecking]=useState(false);
+ const [engineStatus,setEngineStatus]=useState(null);
+ const [engineError,setEngineError]=useState('');
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlLocalVerifying(false);
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlLocalVerifying(false);setEngineChecking(false);setEngineStatus(null);setEngineError('');
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -159,9 +162,21 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setXmlLocalVerificationError(err.message||'No se pudo comprobar el XML.');}
   finally{if(id===generation.current)setXmlLocalVerifying(false);}
  };
+ const diagnoseXadesEngine=async()=>{
+  if(engineChecking||typeof bridge?.checkXadesEngine!=='function')return;
+  const id=generation.current;
+  setEngineChecking(true);setEngineError('');setEngineStatus(null);
+  try{
+   const response=await bridge.checkXadesEngine();
+   if(id!==generation.current)return;
+   if(!response?.success||!response.report)throw Error(response?.error||'No se pudo comprobar la compatibilidad.');
+   setEngineStatus(response.report);
+  }catch(err){if(id===generation.current)setEngineError(err.message||'No se pudo revisar el motor.');}
+  finally{if(id===generation.current)setEngineChecking(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.81 · Verificación local de XML exportado (laboratorio)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.82 · Diagnóstico del motor XAdESjs (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -241,6 +256,18 @@ export default function FeSignatureReadiness({companyId}){
         <p>Archivo: {xmlLocalVerification.name}</p>
         {xmlLocalVerification.valid&&<><p className="feSignatureCheckOk">✓ Firma RSA-SHA256 y 2 referencias válidas ({xmlLocalVerification.variant})</p><p className="feSignatureFingerprint">SHA-256: {xmlLocalVerification.sha256}</p>{!xmlLocalVerification.certificateWithinValidityNow&&<p className="hint">El certificado temporal de prueba ya no está vigente. Su firma histórica se ha verificado criptográficamente.</p>}</>}
         <p className="hint">{xmlLocalVerification.note}</p>
+      </div>}
+      <div className="feSignatureVariantLab" aria-label="Diagnóstico de integración XAdESjs">
+        <div><strong>Compatibilidad del motor XAdESjs (v0.6.82)</strong><p className="hint">Comprueba las capacidades de Node/Electron y si la biblioteca especializada está integrada. Esta prueba no usa el certificado, no firma XML y nunca habilita emisión.</p></div>
+        <button type="button" className="secondary" onClick={diagnoseXadesEngine} disabled={engineChecking||!bridge?.checkXadesEngine}>{engineChecking?'Comprobando compatibilidad…':'Comprobar motor XAdESjs'}</button>
+      </div>
+      {engineError&&<p role="alert" className="fePreparationError">{engineError}</p>}
+      {engineStatus&&<div className="feSignatureExportResult" role="status">
+        <strong>{engineStatus.specializedEngineInstalled?'Biblioteca localizada, pendiente de validación completa':'Integración XAdESjs pendiente (modo seguro)'}</strong>
+        <p>Node/Electron: {engineStatus.nodeVersion} — {engineStatus.nodeCompatible?'compatible para evaluación':'requiere versión compatible'}</p>
+        <p>WebCrypto RSA-SHA256: {engineStatus.cryptoOk?'prueba satisfactoria':'no disponible'}</p>
+        <p>Paquetes especializados: {engineStatus.specializedEngineInstalled?'detectados':'todavía no integrados'}</p>
+        <p className="hint">{engineStatus.note}</p>
       </div>}
   <p className="fePreparationDisclaimer">Esta etapa <strong>no firma archivos XML fiscales</strong>, no confirma la inscripción tributaria ni transmite información a Hacienda. La firma XAdES-EPES y la emisión siguen bloqueadas hasta validar los algoritmos, la política oficial, el XSD y realizar pruebas independientes.</p>
  </section>;

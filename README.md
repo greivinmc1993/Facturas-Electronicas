@@ -1,3 +1,11 @@
+## v0.6.82 — Diagnóstico de motor XMLDSig/XAdESjs y QA aislado (sin emisión)
+
+- Añadido en Empresas → Preparación FE 4.4 el control **Comprobar motor XAdESjs**: evalúa Node.js/Electron, WebCrypto RSA-SHA256 y presencia de las dependencias de firma especializadas, sin pedir certificados, contraseñas ni datos de ventas. Si no están integradas, informa "pendiente"; **no habilita firma fiscal**.
+- Incorporado `electron/fe-xades-engine-readiness.cjs` con diagnóstico de solo lectura, inyección verificable en pruebas y resultados limitados al renderer.
+- Incorporado un workflow separado y manual de GitHub Actions para instalar temporalmente XAdESjs, XMLDSigjs y XML Core en un entorno de evaluación, sin modificar `package-lock.json` del sistema ni incorporarlo como dependencia de producción. El ensayo comprueba firma y verificación sobre XML ficticio; los resultados remotos todavía deben ejecutarse y evaluarse.
+- El acceso a npm desde el entorno de preparación falló con `EAI_AGAIN`: **no se afirma que el motor XAdESjs haya sido integrado ni probado aquí**. No se cambia el motor restringido del laboratorio ni se utiliza la clave privada real.
+- Sin migraciones SQLite ni modificaciones de ventas. Firma y envío a Hacienda bloqueados. Antes de actualizar, verificar respaldo y correr `npm ci`, `npm test`, `npm run qa:real-server`, `npm run dist:win` en Windows.
+
 # FacturaCR v0.6.81 — Verificación local del XML ficticio exportado (19/11/2026)
 
 ## Qué hay de nuevo

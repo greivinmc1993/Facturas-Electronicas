@@ -6,6 +6,7 @@ const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const {runXmlProof,runXmlVariantsProof}=require('./fe-xades-xml-lab.cjs');
 const {saveSyntheticXml}=require('./fe-xades-demo-export.cjs');
 const {inspectSavedDemoXml}=require('./fe-xades-demo-verifier.cjs');
+const {diagnoseXadesEngine}=require('./fe-xades-engine-readiness.cjs');
 const fs=require('node:fs/promises');
 const path = require('node:path');
 const {randomBytes}=require('node:crypto');
@@ -234,6 +235,12 @@ ipcMain.handle('facturacr:verify-xades-xml-demo',async event=>{
   openFile:(filename,flags)=>fs.open(filename,flags)
  });}
  catch{return {success:false,error:'No se pudo abrir el XML de laboratorio seleccionado. Comprueba el archivo y sus permisos.'};}
+});
+// v0.6.82: diagnóstico local, no firma, no recibe datos ni certificados.
+ipcMain.handle('facturacr:check-xades-engine',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ try{return {success:true,report:await diagnoseXadesEngine()};}
+ catch{return {success:false,error:'No fue posible completar el diagnóstico local.'};}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
