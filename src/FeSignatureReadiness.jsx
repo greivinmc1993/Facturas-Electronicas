@@ -176,7 +176,7 @@ export default function FeSignatureReadiness({companyId}){
  };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.83 · Evaluación aislada del motor XAdESjs (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.84 · Adaptador experimental de XAdESjs (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -258,10 +258,10 @@ export default function FeSignatureReadiness({companyId}){
         <p className="hint">{xmlLocalVerification.note}</p>
       </div>}
       <div className="feSignatureVariantLab" aria-label="Diagnóstico de integración XAdESjs">
-        <div><strong>Compatibilidad del motor XAdESjs (v0.6.83)</strong><p className="hint">Comprueba las capacidades de Node/Electron y si la biblioteca especializada está integrada. Esta prueba no usa el certificado, no firma XML y nunca habilita emisión.</p></div>
+        <div><strong>Compatibilidad del motor XAdESjs (v0.6.84)</strong><p className="hint">Comprueba las capacidades de Node/Electron y si la biblioteca especializada está integrada. Esta prueba no usa el certificado, no firma XML y nunca habilita emisión.</p></div>
         <button type="button" className="secondary" onClick={diagnoseXadesEngine} disabled={engineChecking||!bridge?.checkXadesEngine}>{engineChecking?'Comprobando compatibilidad…':'Comprobar motor XAdESjs'}</button>
       </div>
-      <p className="hint">Evaluación aislada de XAdESjs en GitHub Actions: ejecuta el workflow manual «Evaluacion aislada XAdESjs (NO FISCAL)». La v0.6.83 comprueba Node 22 y 24, tres estructuras ficticias con política explícita y verificación externa. Descarga el artefacto «QA-XAdESjs-NO-FISCAL» desde Actions para consultar los resultados. Hasta aprobar esas pruebas, el motor especializado sigue pendiente y la emisión permanece bloqueada.</p>
+      <p className="hint">Evaluación aislada de XAdESjs en GitHub Actions: ejecuta el workflow manual «Evaluacion aislada XAdESjs (NO FISCAL)». En v0.6.84 se añade un adaptador experimental de XAdESjs para XML ficticios y un trabajo que genera un package-lock CANDIDATO en una carpeta temporal. Node 22 y Node 24 pasaron el ensayo aislado anterior; ahora vuelve a ejecutar el workflow y revisa los informes y la auditoría del candidato antes de incorporarlo al instalador. Este diagnóstico no firma facturas reales y la emisión permanece bloqueada.</p>
       {engineError&&<p role="alert" className="fePreparationError">{engineError}</p>}
       {engineStatus&&<div className="feSignatureExportResult" role="status">
         <strong>{engineStatus.specializedEngineInstalled?'Biblioteca localizada, pendiente de validación completa':'Integración XAdESjs pendiente (modo seguro)'}</strong>

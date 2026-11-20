@@ -91,10 +91,12 @@ def rejected(raw,variant):
     except Exception: return True
 
 def main():
-    if len(sys.argv)!=2: raise SystemExit('Uso: python qa-083-xadesjs-epes-independiente.py DIR_TEMP')
-    base=Path(sys.argv[1]); n=0
+    if len(sys.argv) not in (2,3): raise SystemExit('Uso: python qa-083-xadesjs-epes-independiente.py DIR_TEMP [083|084]')
+    base=Path(sys.argv[1]); pref=sys.argv[2] if len(sys.argv)==3 else '083'
+    if pref not in ('083','084'): raise SystemExit('Prefijo no autorizado')
+    n=0
     for variant in ('simple','servicio','mercaderia'):
-        raw=(base/f'xadesjs-083-{variant}-NO-FISCAL.xml').read_bytes()
+        raw=(base/f'xadesjs-{pref}-{variant}-NO-FISCAL.xml').read_bytes()
         check(raw,variant);n+=1
         assert rejected(raw.replace(b'<Monto>100.00</Monto>',b'<Monto>101.00</Monto>',1),variant)
         assert rejected(raw.replace(POLICY_B64.encode(),b'B'+POLICY_B64.encode()[1:],1),variant)

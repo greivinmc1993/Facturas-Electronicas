@@ -30,7 +30,7 @@ check('La prueba utiliza directorios efímeros y no toca la instalación habitua
  assert.ok(test.includes('fs.rmSync(tempRoot'));
 });
 check('Workflow construye ambas versiones y publica evidencias',()=>{
- for(const phrase of ['Expand-Archive','facturacr-previous','qa:version-upgrade','Actualización REAL','upload-artifact@v4']){
+ for(const phrase of ['Expand-Archive','facturacr-previous','qa:version-upgrade','Actualización REAL','upload-artifact@v6']){
   assert.ok(flow.includes(phrase),phrase);
  }
 });

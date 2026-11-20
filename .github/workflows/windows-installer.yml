@@ -21,9 +21,9 @@ jobs:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Configurar Node.js y caché npm
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
@@ -87,7 +87,7 @@ jobs:
           npm run qa:version-upgrade
       - name: Guardar evidencia del arranque de Electron
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FacturaCR-Electron-Smoke-${{ github.run_number }}
           path: release/qa-evidence/*
@@ -103,7 +103,7 @@ jobs:
             Get-FileHash $_.FullName -Algorithm SHA256 | Format-List
           }
       - name: Guardar instalador como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FacturaCR-Windows-NSIS-${{ github.run_number }}
           path: release/*.exe

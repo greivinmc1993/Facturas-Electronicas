@@ -1,3 +1,12 @@
+## v0.6.84 — Adaptador XAdESjs de laboratorio y candidato reproducible de dependencias (20/11/2026)
+
+- Se añadió `electron/fe-xades-specialized-lab.mjs`, adaptador ESM de laboratorio que recibe XAdESjs/XMLDSigjs/XML Core por inyección y firma/verifica únicamente las tres variantes **NO FISCALES** aprobadas. Rechaza entradas ajenas y realiza comprobaciones de política y mutaciones, sin leer `.p12`, SQLite ni datos comerciales. **Su ensayo con la biblioteca real se ejecutará en Actions**; localmente solo puede verificarse la seguridad de su interfaz porque npm está inaccesible.
+- `tests/qa-084-xadesjs-adapter-evaluation.mjs` permite ejercer el adaptador contra XAdESjs 3.1.0 en Node 22 y 24 y contrastar sus XML mediante el verificador Python independiente. El workflow mantiene los dos trabajos previos.
+- Nuevo tercer trabajo manual `production-lockfile-candidate`: genera **en un directorio temporal** una propuesta de `package.json` y `package-lock.json` con dependencias exactas, ejecuta `npm ci --ignore-scripts`, prueba el adaptador y genera un informe `npm audit`. El artefacto `QA-XAdESjs-candidato-lockfile-node-22` es **SOLO PARA REVISIÓN**: no reemplazar el lockfile de FacturaCR hasta auditar y validar el instalador Windows.
+- Actualizado `@xmldom/xmldom` de 0.9.10 a **0.9.12** en las evaluaciones aisladas para evitar vulnerabilidades documentadas en la versión anterior. Workflows modernizados a Actions v6 con runtime Node 24. Su funcionamiento remoto queda pendiente de comprobar tras publicar.
+- `package.json` y `package-lock.json` del **proyecto de producción** conservan las dependencias anteriores y solo actualizan el número de versión. No se integra todavía XAdESjs al instalador, no se habilita ninguna firma fiscal y no se generan ni envían facturas a Hacienda.
+- Se conservan ventas, inventario, roles, SQLite, respaldos y la interfaz de certificado. Nueva batería QA offline (adaptador, aislamiento y contrato del workflow), más regresión y 74 pruebas SQLite.
+
 ## v0.6.83 — Evaluación manual aislada XAdESjs con política explícita
 
 - Workflow ampliado a Node 22 y 24, dependencia XAdESjs/ XMLDSigjs/ XML Core 3.1.0 instalada exclusivamente fuera del proyecto, sin afectar producción.

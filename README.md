@@ -1,3 +1,17 @@
+## FacturaCR v0.6.84 — Preparación reproducible de XAdESjs, sin firma fiscal
+
+La evaluación de GitHub Actions de la v0.6.83 se ejecutó con éxito en Node 22 y 24, según las capturas de la ejecución que compartió el usuario. Eso **no equivale** a certificar firmas tributarias. Esta versión incorpora un adaptador aislado `electron/fe-xades-specialized-lab.mjs` que recibirá las bibliotecas especializadas por inyección durante el ensayo. Solo procesa tres XML estrictamente ficticios, genera claves RSA temporales, firma y verifica, y exige el rechazo de modificaciones del monto y la política. No accede al `.p12` real y aún no se conecta a la aplicación para emitir XML.
+
+**Cambio de seguridad:** el workflow de evaluación usa `@xmldom/xmldom@0.9.12` en vez de 0.9.10, y Actions v6 para evitar avisos por runtime Node 20. Revisar `npm audit` al ejecutarlo, porque actualizar un paquete no demuestra que no existan otras vulnerabilidades.
+
+**Tres trabajos manuales:** GitHub → Actions → **Evaluacion aislada XAdESjs (NO FISCAL)** → **Run workflow**. Comprobar los trabajos Node 22, Node 24 y **Candidato de lockfile XAdESjs**. El tercer trabajo generará un paquete `QA-XAdESjs-candidato-lockfile-node-22` con `package.candidato.json`, `package-lock.candidato.json`, `dependencias.txt`, `auditoria-npm.json` y las muestras XML sintéticas cuando los pasos terminen. Estos son **documentos de revisión, no archivos para copiar automáticamente al proyecto**. Solo incorporaremos ese lockfile después de auditarlo y ejecutar `npm ci`, compilación Vite, pruebas nativas y NSIS en Windows.
+
+**Alcance y límites:** la versión de producción conserva exactamente las dependencias anteriores; no se instalaron XAdESjs, XMLDSigjs ni XML Core porque el registro npm sigue devolviendo `EAI_AGAIN` en el entorno de elaboración. Por tanto, el adaptador queda implementado, pero **su ensayo real con los módulos especializados y la creación del candidato de lockfile quedan pendientes de GitHub Actions**. La firma XAdES-EPES de comprobantes reales, las verificaciones de cadena de confianza y XSD 4.4, y la emisión ante Hacienda continúan bloqueadas.
+
+**Instalación y GitHub:** primero crear y verificar un respaldo de SQLite fuera del proyecto. Desde PowerShell ejecutar `npm ci`, `npm test`, `npm run qa:real-server`, `npm run dist:win`; después de comprobar todo, ejecutar `git add -A`, `git commit -m "feat: v0.6.84 - adaptador XAdESjs y candidato de lockfile seguro"`, `git push origin main`. Conservar `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows/`.
+
+---
+
 ## v0.6.83 — Evaluación aislada de XAdESjs 3.1.0 con política explícita (NO FISCAL)
 
 Esta versión **no instala XAdESjs en producción** ni habilita firma o envío tributario. Amplía el workflow manual «Evaluacion aislada XAdESjs (NO FISCAL)» para evaluar Node 22 y Node 24 con las versiones controladas de `xadesjs`, `xmldsigjs` y `xml-core` 3.1.0 en un directorio temporal; `package-lock.json` de FacturaCR no recibe dependencias nuevas. La ejecución remota todavía debe confirmarse en GitHub Actions.
