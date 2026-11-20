@@ -1,3 +1,37 @@
+# FacturaCR v0.6.86 — Prevalidación del borrador FE 4.4 (NO FISCAL)
+
+La versión **0.6.86** incorpora prevalidación local automática del XML de borrador creado en Ventas. **No es validación XSD oficial ni autoriza emitir una factura.** Todos los XML conservan claves y consecutivos de ceros, no tienen firma y no se envían a Hacienda.
+
+## Qué cambia
+
+- `server/fe-xml-preflight.js`: revisa **solo los XML generados por nuestro borrador**, no archivos arbitrarios: espacio de nombres, orden elemental, número de líneas, CAByS (únicamente longitud), multiplicación cantidad × precio dentro de los residuos unitarios de cinco decimales, descuento, IVA, totales por línea y resumen. No divide productos, no redondea bases a colones enteros y no inventa ajustes fiscales.
+- `server/fe-xml-draft.js`: incorpora el informe `preflight` a la respuesta existente. Si se detecta una inconsistencia interna del XML, no permite descargar el borrador. La lista de errores indica **campo y número de línea**. No se cambian ventas históricas ni SQLite.
+- `src/main.jsx` / `src/style.css`: en la vista previa **Borrador FE 4.4 (prueba)** se muestra la prevalidación con el estado explícito **XSD sin validar / firma sin validar / emisión bloqueada**. No cambia el panel de certificados ni el motor XAdESjs de laboratorio.
+- `tests/qa-086-xsd-official.py`: herramienta independiente basada en `lxml` para validar un XML contra **un archivo XSD local suministrado expresamente**. No descarga esquemas de fuentes no verificadas ni los sustituye por uno inventado. Cuando el operador no ha aportado el XSD real, devuelve estado no validado.
+- `build/icon.png` se incluye de forma explícita en el ASAR de Electron para evitar el aviso de icono ausente durante el arranque del instalador.
+- `npm run qa:fe44-preflight`: pruebas estructurales y de interfaz. En QA Linux con Python se ejecuta `--self-test` del validador usando un esquema de ejemplo **NO OFICIAL**. Ese ensayo comprueba el mecanismo, no certifica el XML 4.4.
+
+## Validación XSD oficial: pendiente y separada
+
+Las estructuras 4.4 han recibido revisiones durante 2026. **Esta entrega NO incluye un XSD oficial verificado**, porque no pudimos obtener y cotejar el archivo vigente desde el portal de Hacienda en el entorno de compilación. El uso del validador exige descargar primero el XSD vigente desde el portal oficial de TRIBU-CR / Hacienda, incluyendo sus importaciones locales cuando las requiera:
+
+```powershell
+python -m pip install "lxml>=5,<7"
+python tests/qa-086-xsd-official.py --schema "C:\ruta\FacturaElectronica_V4.4.xsd" --xml "C:\ruta\FacturaCR_BORRADOR_FE44_venta_15.xml"
+```
+
+**Atención:** el borrador de FacturaCR sigue sin firma y con numeración ficticia; por ello **puede ser rechazado por un XSD completo**, aunque la prevalidación local sea correcta. La salida del script informa los errores y las líneas reales, sin asignar claves fiscales. No conviene manipular el XML para forzar un resultado verde. La validación oficial definitiva, RUT, CAByS, firma con certificado real y envío a Hacienda siguen pendientes.
+
+Fuentes para consultar esquemas vigentes: https://ovitribucr.hacienda.go.cr/comprobantes-electronicos y https://www.hacienda.go.cr/docs/ANEXOS_Y_ESTRUCTURAS_V4.4.pdf . Comprobar fecha y procedencia de cada XSD antes de utilizarlo.
+
+## QA, seguridad e instalación
+
+Se incorporan 10 comprobaciones del servidor, 5 controles de interfaz, 3 controles del icono y 3 ensayos internos del lector XMLSchema. El conjunto `npm test` incluye la regresión de las 74 pruebas SQLite. No se modifica el modelo comercial, inventario, respaldos ni permisos. Solo se añade prevalidación y se conserva el estado de borrador sin validez fiscal.
+
+Antes de reemplazar la aplicación, **crear y comprobar un respaldo independiente de SQLite**. Después ejecutar: `npm ci`, `npm test`, `npm run qa:fe44-preflight`, `npm run qa:real-server`, `npm run dist:win`. Publicar con `git add -A`, `git commit -m "feat: v0.6.86 - prevalidacion XML FE44 y diagnosticos"`, `git push origin main`. Se conservan `.gitignore`, `README.md`, `CHANGELOG.md` y `.github/workflows/`.
+
+---
+
 ### Corrección puntual v0.6.85 — módulos PKI requeridos en el instalador Windows
 
 - El diagnóstico `FacturaCR-Electron-Smoke-72` identificó que el ejecutable NSIS no encontraba `pkijs` al cargar `xmldsigjs` (no era un problema de SQLite ni de certificados).

@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'..');
 const read=p=>readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n');
 const main=read('electron/main.cjs'),preload=read('electron/preload.cjs'),ui=read('src/FeSignatureReadiness.jsx'),css=read('src/style.css'),mod=read('electron/fe-xades-crypto-lab.cjs');
 let count=0;function check(title,fn){fn();count++;console.log('OK v0.6.77 UI:',title)}
-check('La versión del panel coincide con 0.6.78',()=>assert(ui.includes('v0.6.85 · XAdESjs integrado en laboratorio (sin emisión)')));
+check('La versión del panel coincide con 0.6.78',()=>assert(ui.includes('v0.6.86 · XAdESjs integrado en laboratorio (sin emisión)')));
 check('El bridge del laboratorio solo ofrece una operación sin argumentos',()=>assert.match(preload,/runXadesCryptoLab:\(\)=>ipcRenderer\.invoke\('facturacr:xades-crypto-lab'\)/));
 check('IPC exige ventana y frame principal autorizados',()=>assert.match(main,/ipcMain\.handle\('facturacr:xades-crypto-lab',async event=>\{\s*if\(!authorizedCertificateFrame\(event\)\)/));
 check('No solicita claves ni XML externos para la prueba',()=>{

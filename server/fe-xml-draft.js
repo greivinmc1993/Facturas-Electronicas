@@ -1,6 +1,7 @@
 import {parseFive,fiveString,roundRatio} from './fiscal-precision.js';
+import {preflightFe44Draft} from './fe-xml-preflight.js';
 // FacturaCR 0.6.71: BORRADOR XML 4.4 exclusivamente informativo y de solo lectura.
-// La clave y el consecutivo son deliberadamente ficticios. NO validar, firmar ni enviar.
+// La clave y el consecutivo son ficticios. La prevalidación local NO sustituye XSD, firma ni envío.
 import {COMPANY_ACTIVITY_PATTERN,validateCompanyIdentification} from './company-identity.js';
 
 const XML_NAMESPACE='https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica';
@@ -144,7 +145,7 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
   warnings.push('Los CAByS de prueba no se verifican contra catálogo: queda pendiente su comprobación oficial.');
   warnings.push('Mercancía o servicio se toma de la ficha del producto, no de los primeros dígitos de un CAByS ficticio.');
   warnings.push('ProveedorSistemas utiliza por ahora la identificación del emisor; debe verificarse la identidad real del proveedor antes de emitir.');
-  warnings.push('Pendiente: validación contra XSD 4.4, RUT/CAByS reales, firma XAdES-EPES, numeración fiscal y envío.');
+  warnings.push('Pendiente: validación contra XSD oficial 4.4 vigente, RUT/CAByS reales, firma XAdES-EPES, numeración fiscal y envío.');
   if(issues.length)return {version:'4.4',mode:'draft-only',ready:false,issues,warnings,xml:null};
   // Si hay un desajuste entre bases y tributos históricos, se rechaza el borrador:
   // es inseguro cambiar la base o el precio acordado sin información histórica adicional.
@@ -200,7 +201,7 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
   ].join('\n'));
   const xml=[
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!-- FacturaCR 0.6.72 | BORRADOR DE PRUEBA: NO FIRMADO, NO AUTORIZADO, NO ENVIAR A HACIENDA -->',
+    '<!-- FacturaCR 0.6.86 | BORRADOR DE PRUEBA: NO FIRMADO, NO AUTORIZADO, NO ENVIAR A HACIENDA -->',
     `<FacturaElectronica xmlns="${XML_NAMESPACE}">`,
     tag('Clave','0'.repeat(50)),tag('ProveedorSistemas',company.identification),tag('CodigoActividadEmisor',activityCode),
     ...(COMPANY_ACTIVITY_PATTERN.test(String(client.activity_code||''))?[tag('CodigoActividadReceptor',client.activity_code)]:[]),
@@ -224,6 +225,8 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
     tag('TotalComprobante',five(fiscalSummary.total),2),'  </ResumenFactura>',
     '</FacturaElectronica>',''
   ].join('\n');
-  return {version:'4.4',mode:'draft-only',ready:true,issues:[],warnings,xml,
+  const preflight=preflightFe44Draft(xml,{expectedLines:detailed.length});
+  if(!preflight.ok)return {version:'4.4',mode:'draft-only',ready:false,issues:preflight.findings.filter(f=>f.severity==='error').map(f=>`Línea XML ${f.line??'?'} · ${f.field}: ${f.message}`),warnings,xml:null,preflight};
+  return {version:'4.4',mode:'draft-only',ready:true,issues:[],warnings,xml,preflight,
     totals:{subtotalCents:subtotal,discountCents:discount,taxCents:tax,totalCents:total},saleId:sale.id};
 }

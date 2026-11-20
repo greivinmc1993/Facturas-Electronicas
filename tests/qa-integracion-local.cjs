@@ -38,6 +38,7 @@ fs.copyFileSync(path.join(root,'server','backup-rehearsal.js'),path.join(staging
 fs.copyFileSync(path.join(root,'server','backup-health.js'),path.join(staging,'backup-health.js'));
 fs.copyFileSync(path.join(root,'server','fe-preparation.js'),path.join(staging,'fe-preparation.js'));
 fs.copyFileSync(path.join(root,'server','fe-xml-draft.js'),path.join(staging,'fe-xml-draft.js'));
+fs.copyFileSync(path.join(root,'server','fe-xml-preflight.js'),path.join(staging,'fe-xml-preflight.js'));
 fs.copyFileSync(path.join(root,'server','fiscal-precision.js'),path.join(staging,'fiscal-precision.js'));
 fs.copyFileSync(path.join(root,'server','hacienda-activity-lookup.js'),path.join(staging,'hacienda-activity-lookup.js'));
 fs.copyFileSync(path.join(root,'server','hacienda-cabys-lookup.js'),path.join(staging,'hacienda-cabys-lookup.js'));
@@ -70,7 +71,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.85')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.86')});
   await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
    const before=fs.statSync(dbPath).size;
    const r=await call('GET','/api/backups/automatic');

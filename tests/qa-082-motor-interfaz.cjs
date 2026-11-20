@@ -4,8 +4,8 @@ const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 const ui=read('src/FeSignatureReadiness.jsx'),main=read('electron/main.cjs'),preload=read('electron/preload.cjs');
 const packageJson=require('../package.json'),lock=require('../package-lock.json');
 const tests=[
- ()=>{assert.equal(packageJson.version,'0.6.85');assert.equal(lock.version,'0.6.85');assert.equal(lock.packages[''].version,'0.6.85');},
- ()=>{assert.match(ui,/v0\.6\.85/);assert.match(ui,/Comprobar motor XAdESjs/);assert.match(ui,/onClick=\{diagnoseXadesEngine\}/);},
+ ()=>{assert.equal(packageJson.version,'0.6.86');assert.equal(lock.version,'0.6.86');assert.equal(lock.packages[''].version,'0.6.86');},
+ ()=>{assert.match(ui,/v0\.6\.86/);assert.match(ui,/Comprobar motor XAdESjs/);assert.match(ui,/onClick=\{diagnoseXadesEngine\}/);},
  ()=>{assert.match(ui,/setEngineStatus\(null\)/);assert.match(ui,/generation\.current/);},
  ()=>{assert.match(ui,/Integración XAdESjs pendiente/);assert.match(ui,/no firma XML y nunca habilita emisión/);},
  ()=>{assert.match(preload,/checkXadesEngine:\(\)=>ipcRenderer\.invoke\('facturacr:check-xades-engine'\)/);},

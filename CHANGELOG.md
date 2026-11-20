@@ -1,3 +1,12 @@
+## v0.6.86 — Prevalidación local de borradores XML 4.4 (20/11/2026)
+
+- El generador de borradores incorpora `server/fe-xml-preflight.js` con controles de campos, línea, cantidades, precios, descuentos, impuestos y totales; evita descargar XML con inconsistencias internas.
+- El icono PNG se empaqueta explícitamente para evitar el aviso de imagen ausente en el inicio de Electron/NSIS.
+- Mensajes con campo/línea en interfaz y aviso visible: **XSD 4.4 sin validar, firma sin validar, emisión bloqueada**.
+- Comando `npm run qa:fe44-preflight` y validador independiente `tests/qa-086-xsd-official.py` que acepta XSD local y XML como argumentos; su autocontrol usa XSD sintético y NO sustituye el esquema oficial.
+- **Pendiente:** incorporar copia verificable del XSD 4.4 vigente de Hacienda, comprobar aceptación real de residuos de redondeo, validar XML completos y firma XAdES-EPES con certificado real. No se altera SQLite ni se habilita envío.
+- QA local: 10/10 pruebas del generador y 5/5 UI nuevas, 3/3 controles del icono, 3/3 controles del validador Python (esquema sintético NO oficial), `npm test` completo y 74/74 pruebas SQLite. Compilación Windows/NSIS y validación XSD real pendientes de ejecutar.
+
 ## v0.6.85 — Ajuste de empaquetado de peers PKI (NSIS)
 - Declarar `pkijs@4.0.1` y `asn1js@4.1.0` como dependencias de producción, con lockfile coherente y `asarUnpack` explícito.
 - Incorporar QA que inspecciona los módulos realmente incluidos en `release/win-unpacked/resources/app.asar` y `app.asar.unpacked`, antes de la prueba NSIS.

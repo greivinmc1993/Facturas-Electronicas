@@ -10,8 +10,8 @@ const verifier=read('electron/fe-xades-demo-verifier.cjs');
 let count=0;function test(description,fn){fn();count++;console.log('OK v0.6.81 interfaz:',description)}
 test('Nueva versión en interfaz y archivos de proyecto',()=>{
  const p=require('../package.json'),l=require('../package-lock.json');
- assert.equal(p.version,'0.6.85');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
- assert.match(ui,/v0\.6\.85/);
+ assert.equal(p.version,'0.6.86');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
+ assert.match(ui,/v0\.6\.86/);
 });
 test('Verificación del XML guardado tiene botón real y respuesta visible',()=>{
  assert.match(ui,/Verificar XML ficticio guardado/);

@@ -7,8 +7,8 @@ const main=read('electron/main.cjs'),preload=read('electron/preload.cjs'),ui=rea
 let n=0;function check(name,fn){fn();n++;console.log('OK UI XMLDSig 0.6.78:',name)}
 check('Nueva versión y metadatos 0.6.78',()=>{
  const p=require('../package.json'),l=require('../package-lock.json');
- assert.equal(p.version,'0.6.85');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
- assert.match(ui,/v0\.6\.85 · XAdESjs integrado en laboratorio/);
+ assert.equal(p.version,'0.6.86');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
+ assert.match(ui,/v0\.6\.86 · XAdESjs integrado en laboratorio/);
 });
 check('IPC expone únicamente operación sin argumentos',()=>{
  assert.match(preload,/runXadesXmlLab:\(\)=>ipcRenderer\.invoke\('facturacr:xades-xml-lab'\)/);

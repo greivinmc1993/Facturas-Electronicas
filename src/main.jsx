@@ -565,6 +565,12 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
      <div className="feDraftHeader"><div><p className="companiesOverline">Prueba local · XML 4.4</p><h3>Borrador de factura electrónica 4.4</h3></div><span className="fePreparationStage">Sin validez fiscal</span></div>
      <p className="feDraftDisclaimer">Este XML NO está firmado, no tiene clave ni consecutivo auténticos, no ha sido validado contra el XSD oficial y NO se envía a Hacienda. No entregarlo como factura electrónica.</p>
      {!xmlDraft.ready?<div role="alert" className="feDraftIssues"><strong>Revisa las comprobaciones antes de descargar el borrador:</strong><ul>{(xmlDraft.issues||[]).map((issue,i)=><li key={i}>{issue}</li>)}</ul></div>:<><div className="feDraftTotals">Venta #{details.id} · Total ₡{saleMoney(details.total_cents)} · CRC · {xmlDraft.version}</div><textarea className="feDraftXml" readOnly spellCheck={false} aria-label="Código XML de prueba" value={xmlDraft.xml||''}/></>}
+     {xmlDraft.preflight&&<section className="feDraftPreflight" aria-label="Prevalidación local XML 4.4">
+       <strong>{xmlDraft.preflight.ok?'Prevalidación estructural local: sin diferencias detectadas':'Prevalidación local: se encontraron diferencias'}</strong>
+       <p>Esta comprobación revisa únicamente el borrador generado por FacturaCR. <b>No equivale a validar contra el XSD oficial de Hacienda.</b> La firma, la clave y el consecutivo fiscales siguen pendientes.</p>
+       {(xmlDraft.preflight.findings||[]).filter(f=>f.severity==='error').length>0&&<ul>{xmlDraft.preflight.findings.filter(f=>f.severity==='error').map((f,i)=><li key={i}>{f.field} · línea {f.line??'sin identificar'}: {f.message}</li>)}</ul>}
+       <p className="feDraftSchemaStatus">XSD 4.4: sin validar · Firma digital: sin validar · Emisión: bloqueada</p>
+     </section>}
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>
      <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>setXmlDraft(null)}>Cerrar</button></div>
     </div>

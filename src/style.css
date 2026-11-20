@@ -1635,3 +1635,12 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 
 /* v0.6.81: el verificador de XML ficticio usa las tarjetas adaptables del laboratorio. */
 .feSignatureVariantLab button:focus-visible{outline:3px solid #0e8175;outline-offset:3px}
+
+/* v0.6.86: prevalidación local del borrador; nunca representa autorización de Hacienda. */
+.feDraftPreflight{border:1px solid #c8d8df;background:#f1f7f9;color:#173e50;border-radius:12px;padding:14px 16px;margin:12px 0;line-height:1.5}
+.feDraftPreflight strong{display:block;margin-bottom:6px}
+.feDraftPreflight p{margin:5px 0 8px;overflow-wrap:anywhere}
+.feDraftPreflight ul{margin:5px 0 8px;padding-left:20px}
+.feDraftPreflight li{margin:4px 0}
+.feDraftSchemaStatus{font-weight:700;color:#8d451a}
+@media(max-width:620px){.feDraftPreflight{padding:12px}}
