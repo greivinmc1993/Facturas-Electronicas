@@ -43,14 +43,22 @@ async function smoke(stage){
  const json=path.join(tempRoot,stage+'.json');
  const png=path.join(tempRoot,stage+'.png');
  const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${userData}`,`--qa-result=${json}`,`--qa-screenshot=${png}`],{
-   windowsHide:false,cwd:root,stdio:'ignore',env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:qaOwnerPassword}
+   windowsHide:false,cwd:root,stdio:['ignore','pipe','pipe'],
+   env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:qaOwnerPassword,ELECTRON_ENABLE_LOGGING:'true'}
  });
  let exited=false;
- child.once('exit',()=>{exited=true});
+ let exitStatus='todavía ejecutándose';
+ let diagnostic='';
+ const capture=chunk=>{diagnostic=(diagnostic+String(chunk)).slice(-48000)};
+ child.stdout.on('data',capture);
+ child.stderr.on('data',capture);
+ child.once('error',err=>{exited=true;exitStatus='error al iniciar: '+err.message});
+ child.once('exit',(code,signal)=>{exited=true;exitStatus=`código=${code}, señal=${signal}`});
  const deadline=Date.now()+90000;
  try{
   while(Date.now()<deadline&&!fs.existsSync(json)&&!exited)await pause(400);
-  assert.ok(fs.existsSync(json),`No se generó el informe de arranque: ${stage}`);
+  assert.ok(fs.existsSync(json),`No se generó el informe de arranque: ${stage}; ${exitStatus}. `+
+    `Diagnóstico Electron: ${diagnostic.split(qaOwnerPassword).join('[CLAVE_QA_OCULTA]').slice(-3000)||'sin salida del proceso'}`);
   const data=JSON.parse(fs.readFileSync(json,'utf8'));
   assert.equal(data.success,true,JSON.stringify(data));
   assert.equal(data.health?.ok,true);
@@ -66,6 +74,11 @@ async function smoke(stage){
  }finally{
   // Conservar evidencia incluso cuando falla una aserción de la interfaz.
   try{
+   // No registrar contraseñas, incluso si algún módulo las incluyó por error
+   // en su salida. El log se conserva para detectar fallos antes del informe.
+   const redacted=diagnostic.split(qaOwnerPassword).join('[CLAVE_QA_OCULTA]');
+   fs.writeFileSync(path.join(evidence,'upgrade-'+stage+'-electron.log'),
+     `Estado del proceso: ${exitStatus}\n${redacted||'(sin mensajes de Electron)'}\n`);
    if(fs.existsSync(json))fs.copyFileSync(json,path.join(evidence,'upgrade-'+stage+'.json'));
    if(fs.existsSync(png))fs.copyFileSync(png,path.join(evidence,'upgrade-'+stage+'.png'));
   }catch(e){console.error('No se pudo guardar la evidencia del arranque:',e.message)}

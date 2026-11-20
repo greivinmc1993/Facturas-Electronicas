@@ -54,14 +54,23 @@ function mark(name,details={}){report.steps.push({name,ok:true,...details});cons
 async function smoke(stage,expected){
  const resultFile=path.join(tempRoot,stage+'.json');
  const shot=path.join(tempRoot,stage+'.png');
- const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${dataDir}`,`--qa-result=${resultFile}`,`--qa-screenshot=${shot}`],{cwd:root,windowsHide:false,stdio:'ignore',
-   env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:ownerPassword}});
+ const child=spawn(exe,['--qa-smoke',`--qa-data-dir=${dataDir}`,`--qa-result=${resultFile}`,`--qa-screenshot=${shot}`],{
+   cwd:root,windowsHide:false,stdio:['ignore','pipe','pipe'],
+   env:{...process.env,FACTURACR_QA_OWNER_PASSWORD:ownerPassword,ELECTRON_ENABLE_LOGGING:'true'}
+ });
  let exited=false;
- child.once('exit',()=>{exited=true});
+ let exitStatus='todavía ejecutándose';
+ let diagnostic='';
+ const capture=chunk=>{diagnostic=(diagnostic+String(chunk)).slice(-48000)};
+ child.stdout.on('data',capture);
+ child.stderr.on('data',capture);
+ child.once('error',err=>{exited=true;exitStatus='error al iniciar: '+err.message});
+ child.once('exit',(code,signal)=>{exited=true;exitStatus=`código=${code}, señal=${signal}`});
  try{
   const deadline=Date.now()+110000;
   while(Date.now()<deadline&&!fs.existsSync(resultFile)&&!exited)await sleep(350);
-  assert.ok(fs.existsSync(resultFile),`El programa no generó resultado en ${stage}`);
+  assert.ok(fs.existsSync(resultFile),`El programa no generó resultado en ${stage}; ${exitStatus}. `+
+    `Diagnóstico Electron: ${diagnostic.split(ownerPassword).join('[CLAVE_QA_OCULTA]').slice(-3000)||'sin salida del proceso'}`);
   const result=JSON.parse(fs.readFileSync(resultFile,'utf8'));
   assert.equal(result.success,true,JSON.stringify(result));
   assert.equal(result.health?.ok,true);
@@ -71,6 +80,16 @@ async function smoke(stage,expected){
   if(fs.existsSync(shot))fs.copyFileSync(shot,path.join(evidence,'cross-version-'+stage+'.png'));
   mark('arranque-'+stage,{version:expected});
  }finally{
+  // Guardar siempre evidencia del ejecutable, incluso si falla antes de
+  // generar el JSON. Evitar dejar la clave efímera de QA en los logs.
+  try{
+   fs.mkdirSync(evidence,{recursive:true});
+   fs.writeFileSync(path.join(evidence,'cross-version-'+stage+'-electron.log'),
+     `Estado del proceso: ${exitStatus}\n`+
+       diagnostic.split(ownerPassword).join('[CLAVE_QA_OCULTA]')+'\n');
+   if(fs.existsSync(resultFile))fs.copyFileSync(resultFile,path.join(evidence,'cross-version-'+stage+'.json'));
+   if(fs.existsSync(shot))fs.copyFileSync(shot,path.join(evidence,'cross-version-'+stage+'.png'));
+  }catch(error){console.error('No se pudo conservar log de Electron:',error.message)}
   const deadline=Date.now()+12000;
   while(!exited&&Date.now()<deadline)await sleep(200);
   if(!exited){child.kill();await sleep(600)}

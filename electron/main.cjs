@@ -377,20 +377,18 @@ app.whenReady().then(async () => {
   } catch(err) {
     console.error('No se pudo iniciar FacturaCR:',err);
     if(qaSmoke){
-      // QA empaquetado REAL: prueba XAdESjs desde preload y el proceso principal.
- // Nunca toca el .p12 ni procesa datos de ventas; falla si faltan módulos ASAR.
- const lab=await mainWindow.webContents.executeJavaScript(
-   `window.facturacrSignature.runIntegratedXadesLab()`,true);
- if(lab?.success!==true||lab.report?.verifiedCount!==3||
-    lab.report?.mutationsRejected!==6||lab.report?.canIssue!==false||
-    lab.report?.usesRealCertificate!==false)
-   throw Error('El laboratorio XAdESjs empaquetado no superó sus pruebas criptográficas: '+JSON.stringify(lab));
- const shot=qaArg('--qa-screenshot');
-      if(shot&&path.isAbsolute(shot)&&mainWindow&&!mainWindow.isDestroyed())try{
-        await fs.mkdir(path.dirname(shot),{recursive:true});
-        await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
-      }catch(e){qaErrors.push('Captura de fallo: '+e.message)}
-      await writeSmokeResult({success:false,error:String(err.stack||err)});process.exitCode=1
+      // Un error de arranque NO debe ejecutar más pruebas ni impedir el
+      // informe de fallo. El laboratorio XAdESjs se ejecuta solo en la
+      // ruta de éxito, dentro de runPackagedSmoke().
+      const shot=qaArg('--qa-screenshot');
+      if(shot&&path.isAbsolute(shot)&&mainWindow&&!mainWindow.isDestroyed()){
+        try{
+          await fs.mkdir(path.dirname(shot),{recursive:true});
+          await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
+        }catch(captureError){qaErrors.push('Captura de fallo: '+captureError.message)}
+      }
+      await writeSmokeResult({success:false,error:String(err.stack||err)});
+      process.exitCode=1;
     }
     app.quit();
   }

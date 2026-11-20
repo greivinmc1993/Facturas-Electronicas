@@ -17,17 +17,27 @@ const evidence=path.join(root,'release','qa-evidence');
 fs.mkdirSync(data,{recursive:true});
 let child;
 let timer;
+let diagnostic='';
+let executableStatus='todavía ejecutándose';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function main(){
   console.log('Iniciando Electron empaquetado con datos temporales.');
   child=spawn(exe,['--qa-smoke',`--qa-data-dir=${data}`,`--qa-result=${result}`,`--qa-screenshot=${screenshot}`],{
-    cwd:root,windowsHide:false,stdio:'ignore'
+    cwd:root,windowsHide:false,stdio:['ignore','pipe','pipe'],
+    env:{...process.env,ELECTRON_ENABLE_LOGGING:'true'}
   });
+  const capture=chunk=>{diagnostic=(diagnostic+String(chunk)).slice(-48000)};
+  child.stdout.on('data',capture);
+  child.stderr.on('data',capture);
+  child.on('error',error=>{executableStatus='error: '+error.message});
   const deadline=Date.now()+90000;
   let finished;
-  const exitPromise=new Promise(resolve=>child.once('exit',(code,signal)=>{finished={code,signal};resolve(finished)}));
+  const exitPromise=new Promise(resolve=>{
+    child.once('exit',(code,signal)=>{finished={code,signal};executableStatus=`código=${code}, señal=${signal}`;resolve(finished)});
+    child.once('error',error=>{finished={error:error.message};executableStatus='error: '+error.message;resolve(finished)});
+  });
   while(Date.now()<deadline && !fs.existsSync(result) && !finished) await pause(500);
-  if(!fs.existsSync(result))throw Error(`Electron no generó resultado QA en 90s. ${JSON.stringify(finished||{})}`);
+  if(!fs.existsSync(result))throw Error(`Electron no generó resultado QA en 90s. ${JSON.stringify(finished||{})}; ${executableStatus}; ${diagnostic.slice(-3000)}`);
   const report=JSON.parse(fs.readFileSync(result,'utf8'));
   assert.equal(report.success,true,JSON.stringify(report));
   assert.equal(report.health.ok,true);
@@ -46,6 +56,7 @@ main().catch(error=>{
   process.exitCode=1;
   try{
     fs.mkdirSync(evidence,{recursive:true});
+    fs.writeFileSync(path.join(evidence,'smoke-electron.log'),diagnostic||'(sin salida de Electron)');
     if(fs.existsSync(result))fs.copyFileSync(result,path.join(evidence,'smoke-result.json'));
     if(fs.existsSync(screenshot))fs.copyFileSync(screenshot,path.join(evidence,'smoke-pantalla.png'));
   }catch(e){console.error('Error al guardar evidencia:',e.message)}

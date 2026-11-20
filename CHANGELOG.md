@@ -1,3 +1,11 @@
+## v0.6.85 — Corrección puntual de QA Windows (informe de primera instalación, 20/11/2026)
+
+- Solucionado un error del bloque de captura de fallos en `electron/main.cjs`: cuando fallaba el arranque empaquetado, dicho bloque intentaba volver a ejecutar XAdESjs y podía arrojar otra excepción **antes** de escribir el JSON de diagnóstico. Ahora registra la excepción original, intenta obtener captura cuando la ventana existe y siempre intenta generar el informe con `success: false` antes de cerrar.
+- Los controles de `qa:packaged`, `qa:install-upgrade` y `qa:version-upgrade` ahora capturan la salida estándar y de errores de Electron y conservan evidencia `*-electron.log` en `release/qa-evidence`. Si el proceso no emite JSON, la excepción incluirá el estado de salida y un extracto del diagnóstico, en vez de mostrar únicamente «No se generó el informe». Se oculta la contraseña de QA en los logs de instalación/actualización.
+- Nueva prueba `tests/qa-085-installer-startup-report.cjs` incorporada a `npm test`: impide reintroducir el ensayo de firma dentro de la ruta de error y comprueba la presencia de registros de diagnóstico en las tres pruebas del ejecutable.
+- Se conserva **v0.6.85** porque es una corrección de QA, sin migraciones SQLite, sin cambios en ventas, permisos, impuestos, XAdESjs ni activación de firma/envío real.
+- **QA local:** `npm test` completo, 74/74 integración SQLite, prueba de contrato de arranque 4/4 y sintaxis JS aprobadas. **QA Windows real y NSIS: pendiente de ejecutar nuevamente en GitHub Actions.** La captura original no basta para determinar qué causó el fallo inicial del ejecutable instalado; los nuevos informes permitirán diagnosticarlo si reaparece.
+
 ## v0.6.85 — Integración controlada de XAdESjs y prueba en ejecutable Electron (20/11/2026)
 
 - Se promocionó el lockfile **candidato** validado en GitHub Actions (v0.6.84) a los manifiestos reales de FacturaCR: versiones exactas `xadesjs`, `xmldsigjs`, `xml-core` 3.1.0, `@xmldom/xmldom` 0.9.12 y `xpath` 0.0.35. Se conservó la configuración restante de la aplicación; no hay dependencias nativas nuevas en el motor XAdESjs.

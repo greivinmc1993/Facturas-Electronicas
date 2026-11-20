@@ -1,3 +1,13 @@
+## Corrección de QA Windows v0.6.85 — informe de arranque al instalar
+
+Si GitHub Actions falla en **«Instalar, reinstalar y desinstalar sin perder datos SQLite»** con `No se generó el informe de arranque: primera-instalacion`, la copia anterior tenía un fallo adicional en el manejo de errores de arranque: ejecutaba el laboratorio XAdESjs desde `catch` y podía impedir la escritura del informe. Se corrigió esta ruta para registrar la excepción original; no se puede afirmar aún que esté corregida la causa inicial de Windows sin ejecutar de nuevo el workflow.
+
+El workflow **QA Windows e instalador** guarda evidencia en el artefacto `FacturaCR-Electron-Smoke-N`. Buscar `release/qa-evidence/upgrade-primera-instalacion.json` cuando exista y `upgrade-primera-instalacion-electron.log` incluso si el proceso termina antes de generar JSON. Si la prueba vuelve a fallar, revisar el error original de ese log. Los ensayos usan directorios SQLite temporales y no abren la base personal del usuario.
+
+**Instalación y GitHub:** verificar respaldo SQLite antes de sustituir la aplicación; ejecutar `npm ci`, `npm test`, `npm run qa:xades-engine`, `npm run qa:real-server`, `npm run dist:win`; después de confirmar QA, `git add -A`, `git commit -m "fix: v0.6.85 - informe de errores y diagnostico instalador Windows"`, `git push origin main`. Se mantienen los workflows, `README.md`, `.gitignore` y `CHANGELOG.md`.
+
+---
+
 ## FacturaCR v0.6.85 — Motor XAdESjs integrado SOLO en laboratorio (20/11/2026)
 
 **Novedad real:** se incorporaron las dependencias especializadas al proyecto principal a partir del artefacto auditado de GitHub Actions v0.6.84: `xadesjs@3.1.0`, `xmldsigjs@3.1.0`, `xml-core@3.1.0`, `@xmldom/xmldom@0.9.12` y `xpath@0.0.35`. `package.json` y `package-lock.json` coinciden, y las integridades y direcciones de los paquetes quedaron registradas en el lockfile. El candidato pasó 3 firmas y 6 alteraciones rechazadas en el entorno Node 22 de Actions; su auditoría **solo de dependencias de producción** informó 0 vulnerabilidades en esa ejecución. **Todavía no se ha ejecutado un `npm ci` nuevo con scripts nativos en esta versión ni una auditoría completa con devDependencies desde el entorno de elaboración, debido a `EAI_AGAIN`**. La compatibilidad con la compilación e instalador de Windows **debe comprobarse** en Actions y en la PC antes de usar esta versión para trabajo diario.
