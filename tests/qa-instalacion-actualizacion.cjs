@@ -112,6 +112,18 @@ async function main(){
   sha256Source:sourceHash,sha256Installed:installedHash});
  assert.equal(installedHash,sourceHash,
   'El archivo app.asar instalado difiere del que pasó el ensayo win-unpacked');
+ // Un ASAR idéntico no comprueba los módulos que electron-builder separa en
+ // app.asar.unpacked. La instalación anterior falló por el peer pkijs ausente.
+ for(const name of ['xadesjs','xmldsigjs','pkijs','asn1js']){
+  const relative=path.join('node_modules',name,'package.json');
+  const sourcePeer=path.join(release,'win-unpacked','resources','app.asar.unpacked',relative);
+  const installedPeer=path.join(installDir,'resources','app.asar.unpacked',relative);
+  assert.ok(fs.existsSync(sourcePeer),'Falta dependencia desempaquetada de origen: '+name);
+  assert.ok(fs.existsSync(installedPeer),'NSIS no instaló dependencia desempaquetada: '+name);
+  assert.equal(await hashAsar(installedPeer),await hashAsar(sourcePeer),
+    'NSIS modificó el manifiesto de la dependencia: '+name);
+  report.checks.push({step:'integridad-dependencia-instalada-'+name,ok:true});
+ }
  await smoke('primera-instalacion');
  assert.ok(fs.existsSync(dbFile),'No apareció la base SQLite temporal');
  const Database=require('better-sqlite3');

@@ -67,6 +67,8 @@ jobs:
         run: npm run build
       - name: Crear instalador NSIS Windows sin publicar
         run: npx electron-builder --win nsis --publish never
+      - name: Verificar módulos XAdESjs y peers dentro del ASAR Windows
+        run: npm run qa:packaged-deps
       - name: Arrancar ejecutable empaquetado y verificar interfaz
         run: npm run qa:packaged
       # electron-builder recompila better-sqlite3 para la ABI de Electron.

@@ -1,3 +1,8 @@
+## v0.6.85 — Ajuste de empaquetado de peers PKI (NSIS)
+- Declarar `pkijs@4.0.1` y `asn1js@4.1.0` como dependencias de producción, con lockfile coherente y `asarUnpack` explícito.
+- Incorporar QA que inspecciona los módulos realmente incluidos en `release/win-unpacked/resources/app.asar` y `app.asar.unpacked`, antes de la prueba NSIS.
+- Mantener los ensayos criptográficos activos y SQLite intacto; no habilitar emisión fiscal.
+
 ## v0.6.85 — Diagnóstico del fallo XAdESjs en instalación NSIS (20/11/2026)
 
 - **Evidencia real:** el ZIP `FacturaCR-Electron-Smoke-71` confirma que el ejecutable `win-unpacked` aprobó 3 firmas y 6 alteraciones rechazadas, pero el instalador NSIS falla al ejecutar el mismo ensayo tras instalar. La instalación silenciosa sí pasó; las comprobaciones de reinstalación y persistencia SQLite no se alcanzaron. El log anterior ocultaba la excepción ESM/críptográfica original tras un error genérico.

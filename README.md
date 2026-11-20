@@ -1,3 +1,11 @@
+### Corrección puntual v0.6.85 — módulos PKI requeridos en el instalador Windows
+
+- El diagnóstico `FacturaCR-Electron-Smoke-72` identificó que el ejecutable NSIS no encontraba `pkijs` al cargar `xmldsigjs` (no era un problema de SQLite ni de certificados).
+- `pkijs@4.0.1` y `asn1js@4.1.0` ahora son **dependencias directas de producción**, no solamente paquetes instalados por dependencias *peer*. El `package-lock.json` se regeneró con `npm install --package-lock-only --offline` y versiones fijadas.
+- Ambos paquetes se incluyen en `build.asarUnpack`. La nueva prueba `npm run qa:packaged-deps` inspecciona `app.asar` y `app.asar.unpacked` en Windows antes de intentar la instalación NSIS.
+- Mantener el laboratorio XAdESjs exclusivamente **NO FISCAL** y exigir `3/3` firmas y `6/6` mutaciones rechazadas. No se accede al `.p12`, ni se habilita emisión.
+- Verificar en CI con `npm ci`, `npm test`, `npm run qa:xades-engine`, `npm run dist:win` y `npm run qa:packaged-deps`; el ensayo NSIS es obligatorio antes de declarar resuelto el fallo.
+
 ## Actualización de diagnóstico Windows v0.6.85 — Laboratorio XAdESjs en NSIS
 
 Se examinó el artefacto `FacturaCR-Electron-Smoke-71`: el ejecutable `win-unpacked` aprobó el laboratorio, mientras que la primera instalación NSIS falló en el ensayo XAdESjs **después de instalarse**. Todavía no se sabe si el origen es la carga ESM/ASAR o una excepción criptográfica específica porque el proceso anterior ocultaba la causa original. **No se debe confundir este error con daño de SQLite.**

@@ -32,7 +32,8 @@ test('Dependencias ESM y archivos propios ubicados fuera de ASAR',()=>{
  for(const needed of ['electron/fe-xades-*-lab.mjs','node_modules/xadesjs/**/*',
   'node_modules/xmldsigjs/**/*','node_modules/xml-core/**/*',
   'node_modules/@xmldom/xmldom/**/*','node_modules/xpath/**/*',
-  'node_modules/better-sqlite3/**/*']) assert(globs.includes(needed),needed);
+  'node_modules/better-sqlite3/**/*','node_modules/pkijs/**/*',
+  'node_modules/asn1js/**/*']) assert(globs.includes(needed),needed);
 });
 test('Prueba NSIS verifica identidad ASAR',()=>{
  const up=read('tests/qa-instalacion-actualizacion.cjs');
