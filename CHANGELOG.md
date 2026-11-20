@@ -1,3 +1,11 @@
+## v0.6.83 — Evaluación manual aislada XAdESjs con política explícita
+
+- Workflow ampliado a Node 22 y 24, dependencia XAdESjs/ XMLDSigjs/ XML Core 3.1.0 instalada exclusivamente fuera del proyecto, sin afectar producción.
+- Nuevo ensayo criptográfico XAdESjs 3.1.0 sobre tres XML ficticios, referencia `SignaturePolicyIdentifier` explícita con digest documental de ejemplo y rechazo de alteraciones de monto y política.
+- Nuevo verificador Python independiente de firma RSA-SHA256, digestos C14N y política del laboratorio; artefactos de resultados descargables durante 14 días.
+- Interfaz actualizada para explicar cómo ejecutar y revisar Actions. **No se ha ejecutado remotamente la prueba desde esta entrega; no se declara aprobado el motor especializado**. Firma fiscal y envío a Hacienda bloqueados.
+- Dependencias de producción intactas, sin cambios SQLite, ventas, inventarios ni certificado real.
+
 ## v0.6.82 — Diagnóstico de motor XMLDSig/XAdESjs y QA aislado (sin emisión)
 
 - Añadido en Empresas → Preparación FE 4.4 el control **Comprobar motor XAdESjs**: evalúa Node.js/Electron, WebCrypto RSA-SHA256 y presencia de las dependencias de firma especializadas, sin pedir certificados, contraseñas ni datos de ventas. Si no están integradas, informa "pendiente"; **no habilita firma fiscal**.

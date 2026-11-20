@@ -8,22 +8,52 @@ permissions:
 
 jobs:
   engine-evaluation:
-    name: Node 22 + XAdESjs 3.x en carpeta temporal
+    name: XAdESjs 3.1.0 en Node ${{ matrix.node }} (no fiscal)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Preparar entorno aislado sin modificar dependencias del proyecto
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preparar directorios aislados y recoger versiones
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/xades-eval"
-          npm install --prefix "$RUNNER_TEMP/xades-eval" --no-save --ignore-scripts --no-audit --no-fund \
+          mkdir -p "$RUNNER_TEMP/xades-eval/results"
+          node --version > "$RUNNER_TEMP/xades-eval/results/node-version.txt"
+          npm --version >> "$RUNNER_TEMP/xades-eval/results/node-version.txt"
+          cp tests/qa-082-xadesjs-evaluation.mjs "$RUNNER_TEMP/xades-eval/probe-082.mjs"
+          cp tests/qa-083-xadesjs-epes-evaluation.mjs "$RUNNER_TEMP/xades-eval/probe-083.mjs"
+      - name: Instalar versiones controladas en carpeta temporal (nunca en producción)
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/xades-eval" --save-exact --ignore-scripts --no-audit --no-fund \
             xadesjs@3.1.0 xmldsigjs@3.1.0 xml-core@3.1.0 @xmldom/xmldom@0.9.10 xpath@0.0.35
-          cp tests/qa-082-xadesjs-evaluation.mjs "$RUNNER_TEMP/xades-eval/probe.mjs"
-      - name: Ensayar firma y verificación sin certificados fiscales
-        run: node "$RUNNER_TEMP/xades-eval/probe.mjs"
-      - name: Comprobar que package-lock de producción permanece intacto
+          npm ls --prefix "$RUNNER_TEMP/xades-eval" --depth=0 > "$RUNNER_TEMP/xades-eval/results/dependencias.txt"
+      - name: Ensayo heredado de firma básica (v0.6.82)
+        run: node "$RUNNER_TEMP/xades-eval/probe-082.mjs"
+      - name: Tres XML ficticios con política EPES explícita y mutaciones
+        env:
+          FACTURACR_XADES_REPORT_DIR: ${{ runner.temp }}/xades-eval/results
+        run: node "$RUNNER_TEMP/xades-eval/probe-083.mjs"
+      - name: Instalar verificador independiente en entorno temporal
+        run: python -m pip install --disable-pip-version-check 'lxml>=5,<7' 'cryptography>=42,<47'
+      - name: Verificar las tres firmas con Python, sin reutilizar el firmador
+        run: python tests/qa-083-xadesjs-epes-independiente.py "$RUNNER_TEMP/xades-eval/results"
+      - name: Asegurar que producción y lockfile permanecen intactos
         run: git diff --exit-code -- package.json package-lock.json
+      - name: Publicar informe de evaluación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: QA-XAdESjs-NO-FISCAL-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/xades-eval/results/
+          if-no-files-found: warn
+          retention-days: 14

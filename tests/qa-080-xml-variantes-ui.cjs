@@ -7,8 +7,8 @@ const preload=read('electron/preload.cjs');const css=read('src/style.css');const
 let n=0;function check(name,fn){fn();n++;console.log('OK UI 0.6.80:',name)}
 check('Versión alineada con metadatos',()=>{
  const p=require('../package.json'),l=require('../package-lock.json');
- assert.equal(p.version,'0.6.82');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
- assert.match(ui,/v0\.6\.82/);
+ assert.equal(p.version,'0.6.83');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version);
+ assert.match(ui,/v0\.6\.83/);
 });
 check('Se presenta botón independiente de prueba sintética',()=>{
  assert.match(ui,/Probar 3 variantes de XML/);assert.match(ui,/Tres estructuras XML ficticias|tres estructuras XML ficticias|tres estructuras XML sintéticas|tres estructuras XML/);

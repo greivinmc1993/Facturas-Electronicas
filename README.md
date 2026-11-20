@@ -1,3 +1,15 @@
+## v0.6.83 — Evaluación aislada de XAdESjs 3.1.0 con política explícita (NO FISCAL)
+
+Esta versión **no instala XAdESjs en producción** ni habilita firma o envío tributario. Amplía el workflow manual «Evaluacion aislada XAdESjs (NO FISCAL)» para evaluar Node 22 y Node 24 con las versiones controladas de `xadesjs`, `xmldsigjs` y `xml-core` 3.1.0 en un directorio temporal; `package-lock.json` de FacturaCR no recibe dependencias nuevas. La ejecución remota todavía debe confirmarse en GitHub Actions.
+
+El nuevo ensayo `tests/qa-083-xadesjs-epes-evaluation.mjs` solicita una firma XMLDSig de **tres estructuras de laboratorio** con RSA-SHA256 y `SignaturePolicyIdentifier` explícito para la política de ejemplo de Hacienda. La opción `digestValue` del API evita confundir el hash del texto de la URL con la huella binaria del documento de política. Reabre cada XML con la biblioteca y exige que al alterar monto o política se rechace la firma.
+
+El verificador independiente `tests/qa-083-xadesjs-epes-independiente.py` comprobará —si el workflow obtiene dependencias correctamente— canonicalización, dos referencias SHA-256, valor de política y firma RSA usando `lxml` y `cryptography`. Las muestras son sintéticas y **no contienen certificados ni claves reales**; no se valida cadena de confianza, conformidad XAdES-EPES integral, XSD 4.4 ni Hacienda. Un informe JSON y tres XML ficticios se publicarán como artefactos de Actions durante 14 días. **Estos resultados no activan la emisión**, incluso si todo pasa.
+
+**Para ejecutar:** GitHub → Actions → «Evaluacion aislada XAdESjs (NO FISCAL)» → Run workflow. Revisar los jobs Node 22/24 y descargar `QA-XAdESjs-NO-FISCAL-node-22/24`. Antes de reemplazar el proyecto, respaldar y verificar SQLite; ejecutar `npm ci`, `npm test`, `npm run qa:real-server`, `npm run dist:win`, y luego `git add -A`, `git commit -m "feat: v0.6.83 - evaluacion XAdESjs aislada y verificador independiente"`, `git push origin main`. Se conservan `README.md`, `.gitignore`, `CHANGELOG.md` y los workflows.
+
+---
+
 ## v0.6.82 — Diagnóstico de motor XMLDSig/XAdESjs y QA aislado (sin emisión)
 
 - Añadido en Empresas → Preparación FE 4.4 el control **Comprobar motor XAdESjs**: evalúa Node.js/Electron, WebCrypto RSA-SHA256 y presencia de las dependencias de firma especializadas, sin pedir certificados, contraseñas ni datos de ventas. Si no están integradas, informa "pendiente"; **no habilita firma fiscal**.

@@ -28,5 +28,5 @@ const {compatibleNode,cryptoSelfTest,diagnoseXadesEngine,REQUIRED}=require('../e
  check(()=>assert.equal(mocked.usesRealCertificate,false));
  const old=await diagnoseXadesEngine({nodeVersion:'18.0.0',resolvePackage:()=>{throw Error('ausente')}});
  check(()=>assert.equal(old.nodeCompatible,false));
- console.log(`QA v0.6.82 compatibilidad de firma: ${tests}/${tests} aprobadas`);
+ console.log(`QA v0.6.83 compatibilidad de firma: ${tests}/${tests} aprobadas`);
 })().catch(e=>{console.error(e);process.exitCode=1});
