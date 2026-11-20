@@ -18,10 +18,24 @@ async function loadSpecializedLibraries(){
  */
 export async function runIntegratedSyntheticSuite({loadLibraries=loadSpecializedLibraries,
  runTrial=runSpecializedSyntheticTrial}={}){
- const dependencies=await loadLibraries();
+ let dependencies;
+ try{dependencies=await loadLibraries();}
+ catch(error){
+  const failure=new Error('Carga de bibliotecas XMLDSig/XAdESjs: '+String(error?.message??error),{cause:error});
+  failure.code='FACTURACR_XADES_DEPENDENCIES';
+  failure.labStage='load-specialized-libraries';
+  throw failure;
+ }
  const results=[];
  for(const variant of Object.keys(XML_VARIANTS)){
-  const trial=await runTrial(variant,dependencies);
+  let trial;
+  try{trial=await runTrial(variant,dependencies);}
+  catch(error){
+   const failure=new Error(`Ensayo XAdESjs ${variant}: ${String(error?.message??error)}`,{cause:error});
+   failure.code='FACTURACR_XADES_VARIANT';
+   failure.labStage=variant;
+   throw failure;
+  }
   if(trial?.variant!==variant||trial?.signed!==true||trial?.references!==2||
       trial?.mutationsRejected!==2||trial?.nonFiscal!==true||
       !/^[a-f0-9]{64}$/.test(trial?.sha256??'')){

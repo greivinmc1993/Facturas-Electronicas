@@ -1,3 +1,13 @@
+## Actualización de diagnóstico Windows v0.6.85 — Laboratorio XAdESjs en NSIS
+
+Se examinó el artefacto `FacturaCR-Electron-Smoke-71`: el ejecutable `win-unpacked` aprobó el laboratorio, mientras que la primera instalación NSIS falló en el ensayo XAdESjs **después de instalarse**. Todavía no se sabe si el origen es la carga ESM/ASAR o una excepción criptográfica específica porque el proceso anterior ocultaba la causa original. **No se debe confundir este error con daño de SQLite.**
+
+Este ajuste prepara los módulos especializados fuera de ASAR, preserva en el QA la etapa y el error original (sin mostrarlos en el renderer comercial) y compara el SHA-256 de ambos archivos `app.asar`. El laboratorio empaquetado permanece obligatorio. Para comprobar el arreglo, ejecutar `npm ci`, `npm test`, `npm run qa:xades-engine`, `npm run qa:real-server`, `npm run dist:win`, hacer respaldo verificado de SQLite y publicar con `git add -A`, `git commit -m "fix: v0.6.85 - acceso ASAR y diagnostico XAdESjs instalado"`, `git push origin main`. En **QA Windows e instalador** comprobar especialmente el paso `Instalar, reinstalar y desinstalar sin perder datos SQLite`. Si vuelve a fallar, descargar el artefacto `FacturaCR-Electron-Smoke-N` y adjuntar `upgrade-primera-instalacion.json`, `upgrade-primera-instalacion-electron.log` y `upgrade-install-report.json`.
+
+Se preservan `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows/`. Este ajuste no habilita emisión ni uso del `.p12` para firmar.
+
+---
+
 ## Corrección de QA Windows v0.6.85 — `npm test` con saltos CRLF
 
 **Incidencia:** el workflow «QA Windows e instalador» fallaba en «Ejecutar regresión de cálculos e integración SQLite» con `Falta manejo del error de arranque Electron` (`tests/qa-085-installer-startup-report.cjs`, línea 10). **No había comenzado la compilación ni la instalación NSIS.** La comprobación buscaba un bloque de texto con finales de línea `LF`, mientras el checkout de Windows podía utilizar `CRLF`.

@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {spawn}=require('node:child_process');
-const {randomBytes}=require('node:crypto');
+const {randomBytes,createHash}=require('node:crypto');
 const root=path.resolve(__dirname,'..');
 const release=path.join(root,'release');
 const evidence=path.join(release,'qa-evidence');
@@ -94,6 +94,24 @@ async function main(){
  await run(installer,['/S',`/D=${installDir}`]);
  assert.ok(fs.existsSync(exe),'No apareció FacturaCR.exe dentro de la instalación temporal');
  report.checks.push({step:'instalacion-silenciosa',ok:true});
+ // El ejecutable de win-unpacked ya pasó QA, pero el instalado podría diferir.
+ // Comprobar igualdad byte a byte del ASAR antes de invocar su laboratorio ESM.
+ const sourceAsar=path.join(release,'win-unpacked','resources','app.asar');
+ const installedAsar=path.join(installDir,'resources','app.asar');
+ assert.ok(fs.existsSync(sourceAsar)&&fs.existsSync(installedAsar),
+  'No se encontró app.asar para comparar ejecutable extraído e instalado');
+ const hashAsar=async file=>new Promise((resolve,reject)=>{
+  const hash=createHash('sha256');
+  const input=fs.createReadStream(file);
+  input.on('error',reject); input.on('data',chunk=>hash.update(chunk));
+  input.on('end',()=>resolve(hash.digest('hex')));
+ });
+ const sourceHash=await hashAsar(sourceAsar);
+ const installedHash=await hashAsar(installedAsar);
+ report.checks.push({step:'integridad-asar-instalado',ok:sourceHash===installedHash,
+  sha256Source:sourceHash,sha256Installed:installedHash});
+ assert.equal(installedHash,sourceHash,
+  'El archivo app.asar instalado difiere del que pasó el ensayo win-unpacked');
  await smoke('primera-instalacion');
  assert.ok(fs.existsSync(dbFile),'No apareció la base SQLite temporal');
  const Database=require('better-sqlite3');

@@ -262,8 +262,24 @@ ipcMain.handle('facturacr:xades-integrated-lab',async event=>{
   const {runIntegratedSyntheticSuite}=await import('./fe-xades-integrated-lab.mjs');
   const report=await runIntegratedSyntheticSuite();
   return {success:true,report};
- }catch{
-  return {success:false,error:'No pudo completarse el ensayo XAdESjs de laboratorio. Comprueba las dependencias instaladas y vuelve a ejecutar QA.'};
+ }catch(error){
+  // No se exponen stack traces ni rutas al renderer comercial. Durante --qa-smoke
+  // sí se conserva la causa original para distinguir módulos ESM/ASAR de criptografía.
+  const message='No pudo completarse el ensayo XAdESjs de laboratorio. Comprueba las dependencias instaladas y vuelve a ejecutar QA.';
+  if(qaSmoke){
+   const cause=error?.cause;
+   const diagnostic={code:String(error?.code||'XADES_LAB_UNEXPECTED').slice(0,80),
+    stage:String(error?.labStage||'desconocido').slice(0,80),
+    name:String(error?.name||'Error').slice(0,80),
+    message:String(error?.message||error).slice(0,900),
+    cause: cause?String(cause.message||cause).slice(0,900):null,
+    electron:process.versions.electron,node:process.versions.node,
+    packaged:app.isPackaged};
+   console.error('QA XAdESjs instalado - diagnóstico del fallo:',JSON.stringify(diagnostic));
+   return {success:false,error:message,qaDiagnostic:diagnostic};
+  }
+  console.error('Fallo del laboratorio XAdESjs:',error?.code||error?.name||'error');
+  return {success:false,error:message};
  }finally{integratedXadesRunning=false;}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
