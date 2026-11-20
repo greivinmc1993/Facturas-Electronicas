@@ -1,3 +1,13 @@
+## Corrección de QA Windows v0.6.85 — `npm test` con saltos CRLF
+
+**Incidencia:** el workflow «QA Windows e instalador» fallaba en «Ejecutar regresión de cálculos e integración SQLite» con `Falta manejo del error de arranque Electron` (`tests/qa-085-installer-startup-report.cjs`, línea 10). **No había comenzado la compilación ni la instalación NSIS.** La comprobación buscaba un bloque de texto con finales de línea `LF`, mientras el checkout de Windows podía utilizar `CRLF`.
+
+**Ajuste:** la prueba normaliza `LF` y `CRLF` y comprueba ambas variantes sin reducir las aserciones de seguridad. Reproducido el fallo anterior con `CRLF` y verificado el arreglo. `npm test` pasó tanto en el proyecto original como en una copia de 180 archivos de texto convertidos a `CRLF`, con 74/74 verificaciones SQLite. **La ejecución real del instalador Windows continúa pendiente.**
+
+**Qué sigue:** sustituir el código del proyecto por esta corrección (mantener la base SQLite respaldada), ejecutar `npm ci`, `npm test`, `npm run qa:xades-engine`, `npm run qa:real-server`, `npm run dist:win`; después `git add -A`, `git commit -m "fix: v0.6.85 - QA Windows compatible LF y CRLF"`, `git push origin main`. Revisar en Actions la nueva ejecución «QA Windows e instalador». Si falla en el arranque empaquetado, ahora sí estarán disponibles los informes del paso alcanzado, cuando se generen.
+
+---
+
 ## Corrección de QA Windows v0.6.85 — informe de arranque al instalar
 
 Si GitHub Actions falla en **«Instalar, reinstalar y desinstalar sin perder datos SQLite»** con `No se generó el informe de arranque: primera-instalacion`, la copia anterior tenía un fallo adicional en el manejo de errores de arranque: ejecutaba el laboratorio XAdESjs desde `catch` y podía impedir la escritura del informe. Se corrigió esta ruta para registrar la excepción original; no se puede afirmar aún que esté corregida la causa inicial de Windows sin ejecutar de nuevo el workflow.

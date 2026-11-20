@@ -1,3 +1,10 @@
+## v0.6.85 — Corrección de prueba LF/CRLF para GitHub Actions Windows (20/11/2026)
+
+- **Causa reproducida:** `tests/qa-085-installer-startup-report.cjs` buscaba el `catch` de `electron/main.cjs` con saltos de línea `LF` literales. GitHub Actions en Windows puede obtener `CRLF`, haciendo fallar `npm test` con `Falta manejo del error de arranque Electron`, aunque el `catch` exista.
+- **Corrección:** normalizar los finales de línea de los archivos leídos antes de comprobar el bloque de errores y validar explícitamente el caso `CRLF`. No se ha alterado el código del arranque de Electron ni se ha desactivado ningún control de seguridad.
+- **QA ejecutada:** reproducción del fallo original al convertir `electron/main.cjs` a `CRLF`; nueva prueba superada en `LF` y `CRLF` (5/5); `npm test` completo aprobado con archivos originales y con un checkout de 180 archivos de texto convertidos a `CRLF`; integración local SQLite 74/74 aprobada. **QA Windows real, NSIS y arranque empaquetado siguen pendientes de la nueva ejecución de Actions.**
+- El workflow anterior terminaba antes de compilar el instalador, por lo que la ausencia de `release/qa-evidence/*` era esperable y no demostraba un fallo de instalación. Sin cambios SQLite, ventas, usuarios, certificados o permisos. Se mantiene v0.6.85.
+
 ## v0.6.85 — Corrección puntual de QA Windows (informe de primera instalación, 20/11/2026)
 
 - Solucionado un error del bloque de captura de fallos en `electron/main.cjs`: cuando fallaba el arranque empaquetado, dicho bloque intentaba volver a ejecutar XAdESjs y podía arrojar otra excepción **antes** de escribir el JSON de diagnóstico. Ahora registra la excepción original, intenta obtener captura cuando la ventana existe y siempre intenta generar el informe con `success: false` antes de cerrar.
