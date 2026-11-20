@@ -31,12 +31,15 @@ export default function FeSignatureReadiness({companyId}){
  const [engineChecking,setEngineChecking]=useState(false);
  const [engineStatus,setEngineStatus]=useState(null);
  const [engineError,setEngineError]=useState('');
+ const [integratedChecking,setIntegratedChecking]=useState(false);
+ const [integratedReport,setIntegratedReport]=useState(null);
+ const [integratedError,setIntegratedError]=useState('');
  const generation=useRef(0);
  const selectedToken=useRef(null);
  useEffect(()=>{
   generation.current++;
   selectedToken.current=null;
-  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlLocalVerifying(false);setEngineChecking(false);setEngineStatus(null);setEngineError('');
+  setSecret('');setSelection(null);setResult(null);setError('');setSelecting(false);setChecking(false);setShowSecret(false);setPolicyReport(null);setPolicyError('');setPolicyChecking(false);setLabReport(null);setLabError('');setLabChecking(false);setXmlReport(null);setXmlError('');setXmlExport(null);setXmlExportError('');setXmlChecking(false);setXmlExporting(false);setVariantsReport(null);setVariantsError('');setVariantsChecking(false);setXmlLocalVerification(null);setXmlLocalVerificationError('');setXmlLocalVerifying(false);setEngineChecking(false);setEngineStatus(null);setEngineError('');setIntegratedChecking(false);setIntegratedReport(null);setIntegratedError('');
   return ()=>{
    generation.current++;
    const token=selectedToken.current;
@@ -174,9 +177,22 @@ export default function FeSignatureReadiness({companyId}){
   }catch(err){if(id===generation.current)setEngineError(err.message||'No se pudo revisar el motor.');}
   finally{if(id===generation.current)setEngineChecking(false);}
  };
+ const runIntegratedXadesLab=async()=>{
+  if(integratedChecking||typeof bridge?.runIntegratedXadesLab!=='function')return;
+  const id=generation.current;
+  setIntegratedChecking(true);setIntegratedError('');setIntegratedReport(null);
+  try{
+   const response=await bridge.runIntegratedXadesLab();
+   if(id!==generation.current)return;
+   if(!response?.success||response.report?.verifiedCount!==3||response.report?.mutationsRejected!==6||response.report?.nonFiscal!==true)
+    throw Error(response?.error||'No se verificaron los tres XML de laboratorio con XAdESjs.');
+   setIntegratedReport(response.report);
+  }catch(err){if(id===generation.current)setIntegratedError(err.message||'Falló el laboratorio de XAdESjs.');}
+  finally{if(id===generation.current)setIntegratedChecking(false);}
+ };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.84 · Adaptador experimental de XAdESjs (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.85 · XAdESjs integrado en laboratorio (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -258,13 +274,19 @@ export default function FeSignatureReadiness({companyId}){
         <p className="hint">{xmlLocalVerification.note}</p>
       </div>}
       <div className="feSignatureVariantLab" aria-label="Diagnóstico de integración XAdESjs">
-        <div><strong>Compatibilidad del motor XAdESjs (v0.6.84)</strong><p className="hint">Comprueba las capacidades de Node/Electron y si la biblioteca especializada está integrada. Esta prueba no usa el certificado, no firma XML y nunca habilita emisión.</p></div>
+        <div><strong>Compatibilidad del motor XAdESjs (v0.6.85)</strong><p className="hint">Comprueba las capacidades de Node/Electron y si la biblioteca especializada está integrada. Esta prueba no usa el certificado, no firma XML y nunca habilita emisión.</p></div>
         <button type="button" className="secondary" onClick={diagnoseXadesEngine} disabled={engineChecking||!bridge?.checkXadesEngine}>{engineChecking?'Comprobando compatibilidad…':'Comprobar motor XAdESjs'}</button>
       </div>
-      <p className="hint">Evaluación aislada de XAdESjs en GitHub Actions: ejecuta el workflow manual «Evaluacion aislada XAdESjs (NO FISCAL)». En v0.6.84 se añade un adaptador experimental de XAdESjs para XML ficticios y un trabajo que genera un package-lock CANDIDATO en una carpeta temporal. Node 22 y Node 24 pasaron el ensayo aislado anterior; ahora vuelve a ejecutar el workflow y revisa los informes y la auditoría del candidato antes de incorporarlo al instalador. Este diagnóstico no firma facturas reales y la emisión permanece bloqueada.</p>
+      <p className="hint">v0.6.85 incorpora XAdESjs 3.1.0 y dependencias controladas. La comprobación siguiente genera únicamente XML ficticios: no utiliza el certificado .p12, no recibe XML externos y no autoriza emisión. La prueba de instalación y empaquetado debe completarse con GitHub Actions y Windows.</p>
+      <div className="feSignatureVariantLab" aria-label="Ensayo integrado especializado XAdESjs no fiscal">
+        <div><strong>Ensayo integrado de XAdESjs (solo demostración)</strong><p className="hint">Firma y comprueba tres XML sintéticos con la biblioteca instalada en FacturaCR. No utiliza tu certificado real ni guarda claves. Puedes ejecutarlo sin introducir la contraseña .p12.</p></div>
+        <button type="button" className="secondary" onClick={runIntegratedXadesLab} disabled={integratedChecking||!bridge?.runIntegratedXadesLab}>{integratedChecking?'Verificando tres firmas…':'Probar motor integrado XAdESjs'}</button>
+      </div>
+      {integratedError&&<p role="alert" className="fePreparationError">{integratedError}</p>}
+      {integratedReport&&<div className="feSignatureExportResult" role="status"><strong>{integratedReport.verifiedCount}/3 firmas XAdESjs ficticias verificadas</strong><p className="feSignatureCheckOk">✓ {integratedReport.mutationsRejected}/6 alteraciones rechazadas</p><p className="hint">{integratedReport.note}</p></div>}
       {engineError&&<p role="alert" className="fePreparationError">{engineError}</p>}
       {engineStatus&&<div className="feSignatureExportResult" role="status">
-        <strong>{engineStatus.specializedEngineInstalled?'Biblioteca localizada, pendiente de validación completa':'Integración XAdESjs pendiente (modo seguro)'}</strong>
+        <strong>{engineStatus.specializedEngineInstalled?'Biblioteca instalada (modo laboratorio; no habilita emisión)':'Integración XAdESjs pendiente (modo seguro)'}</strong>
         <p>Node/Electron: {engineStatus.nodeVersion} — {engineStatus.nodeCompatible?'compatible para evaluación':'requiere versión compatible'}</p>
         <p>WebCrypto RSA-SHA256: {engineStatus.cryptoOk?'prueba satisfactoria':'no disponible'}</p>
         <p>Paquetes especializados: {engineStatus.specializedEngineInstalled?'detectados':'todavía no integrados'}</p>

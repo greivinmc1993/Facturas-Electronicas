@@ -14,7 +14,7 @@ const ui=read('src/FeSignatureReadiness.jsx');
 const pkg=require('../package.json');
 const lock=require('../package-lock.json');
 const tests=[
- ()=>{assert.equal(pkg.version,'0.6.84');assert.equal(lock.version,'0.6.84');assert.equal(lock.packages[''].version,'0.6.84');},
+ ()=>{assert.equal(pkg.version,'0.6.85');assert.equal(lock.version,'0.6.85');assert.equal(lock.packages[''].version,'0.6.85');},
  ()=>assert.match(workflow,/workflow_dispatch:/),
  ()=>assert.match(workflow,/node: \['22', '24'\]/),
  ()=>assert.match(workflow,/xadesjs@3\.1\.0 xmldsigjs@3\.1\.0 xml-core@3\.1\.0/),
@@ -24,13 +24,13 @@ const tests=[
  ()=>assert.match(workflow,/qa-083-xadesjs-epes-independiente\.py/),
  ()=>assert.match(workflow,/actions\/upload-artifact@v6/),
  ()=>assert.match(workflow,/git diff --exit-code -- package\.json package-lock\.json/),
- ()=>{for(const name of ['xadesjs','xmldsigjs','xml-core'])assert.equal(Object.hasOwn(pkg.dependencies||{},name),false);},
+ ()=>{for(const name of ['xadesjs','xmldsigjs','xml-core'])assert.equal(pkg.dependencies[name],'3.1.0');},
  ()=>{assert.match(probe,/digestValue:POLICY_DIGEST_B64/);assert.match(probe,/SignaturePolicyId/);assert.match(probe,/SignaturePolicyImplied/);},
  ()=>{assert.match(probe,/webcrypto\.subtle\.generateKey/);assert.match(probe,/mutant/);assert.match(probe,/keyValue: keys\.publicKey/);},
  ()=>{assert.match(external,/resolve_entities=False/);assert.match(external,/no_network=True/);assert.match(external,/key\.verify/);},
  ()=>{assert.match(external,/SignaturePolicyImplied/);assert.match(external,/SignaturePolicyId/);},
- ()=>{assert.match(ui,/v0\.6\.84/);assert.match(ui,/Evaluación aislada de XAdESjs en GitHub Actions/);},
+ ()=>{assert.match(ui,/v0\.6\.85/);assert.match(ui,/Ensayo integrado de XAdESjs/);},
  ()=>assert.doesNotMatch(read('electron/preload.cjs'),/signFiscalXml|sendFiscalToHacienda/),
 ];
 for(const t of tests)t();
-console.log(`QA v0.6.83 contrato aislado de XAdESjs: ${tests.length}/${tests.length} aprobadas (sin instalar bibliotecas).`);
+console.log(`QA v0.6.83 contrato de evaluación y transición de XAdESjs: ${tests.length}/${tests.length} aprobadas (firma fiscal bloqueada).`);

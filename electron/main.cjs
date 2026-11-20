@@ -54,6 +54,7 @@ async function runPackagedSmoke(){
      preloadSignature:typeof window.facturacrSignature?.inspectP12==='function'&&
        typeof window.facturacrSignature?.chooseP12==='function'&&
        typeof window.facturacrSignature?.clearP12==='function',
+     preloadIntegratedXades:typeof window.facturacrSignature?.runIntegratedXadesLab==='function',
      preloadBackupPicker:typeof window.facturacrBackups?.chooseFolder==='function'
    };
  })()`;
@@ -120,7 +121,7 @@ async function runPackagedSmoke(){
  await mainWindow.loadURL(`http://127.0.0.1:${server.port}/`);
  const dom=await waitFor(d=>d.rootPresent&&d.visibleCharacters>100&&d.navButtons>=4&&d.hasCompanyNavigation,
    'El menú comercial no apareció después de autenticarse');
- if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups||!dom.preloadBackupPicker||!dom.preloadSignature)
+ if(!dom.preloadPrinter||!dom.preloadReports||!dom.preloadBackups||!dom.preloadBackupPicker||!dom.preloadSignature||!dom.preloadIntegratedXades)
    throw Error('La interfaz autenticada perdió las APIs preload: '+JSON.stringify(dom));
  const status=await request('GET','/api/auth/status');
  if(status.status!==200||status.body.authenticated!==true||status.body.user?.isOwner!==true)
@@ -131,12 +132,20 @@ async function runPackagedSmoke(){
  const health=await request('GET','/api/health');
  if(health.status!==200||health.body?.ok!==true||health.body.version!==app.getVersion())
    throw Error('Servidor interno no respondió correctamente: '+JSON.stringify(health));
+ // QA empaquetado REAL: prueba XAdESjs desde preload y el proceso principal.
+ // Nunca toca el .p12 ni procesa datos de ventas; falla si faltan módulos ASAR.
+ const lab=await mainWindow.webContents.executeJavaScript(
+   `window.facturacrSignature.runIntegratedXadesLab()`,true);
+ if(lab?.success!==true||lab.report?.verifiedCount!==3||
+    lab.report?.mutationsRejected!==6||lab.report?.canIssue!==false||
+    lab.report?.usesRealCertificate!==false)
+   throw Error('El laboratorio XAdESjs empaquetado no superó sus pruebas criptográficas: '+JSON.stringify(lab));
  const shot=qaArg('--qa-screenshot');
  if(shot&&path.isAbsolute(shot)){
    await fs.mkdir(path.dirname(shot),{recursive:true});
    await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
  }
- return {success:true,dom,health:health.body,
+ return {success:true,dom,health:health.body,integratedXadesProof:{verifiedCount:lab.report.verifiedCount,mutationsRejected:lab.report.mutationsRejected,nonFiscal:true},
    security:{initialOwnerSetup:needsSetup,existingOwnerLogin:!needsSetup,
      blockedBeforeSetup:needsSetup,blockedBeforeLogin:true,
      authenticatedOwner:true,commercialScreenAfterLogin:true},screenshot:shot||null};
@@ -241,6 +250,21 @@ ipcMain.handle('facturacr:check-xades-engine',async event=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{return {success:true,report:await diagnoseXadesEngine()};}
  catch{return {success:false,error:'No fue posible completar el diagnóstico local.'};}
+});
+// v0.6.85: la carga ESM de XAdESjs es tardía y se usa solo con XML sintético.
+// El IPC NO admite XML, rutas, .p12, contraseñas ni datos del renderer.
+let integratedXadesRunning=false;
+ipcMain.handle('facturacr:xades-integrated-lab',async event=>{
+ if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
+ if(integratedXadesRunning)return {success:false,error:'Ya existe un ensayo XAdESjs en curso.'};
+ integratedXadesRunning=true;
+ try{
+  const {runIntegratedSyntheticSuite}=await import('./fe-xades-integrated-lab.mjs');
+  const report=await runIntegratedSyntheticSuite();
+  return {success:true,report};
+ }catch{
+  return {success:false,error:'No pudo completarse el ensayo XAdESjs de laboratorio. Comprueba las dependencias instaladas y vuelve a ejecutar QA.'};
+ }finally{integratedXadesRunning=false;}
 });
 ipcMain.handle('facturacr:list-printers',async event=>{if(event.sender!==mainWindow?.webContents)throw Error('Ventana no autorizada');return mainWindow.webContents.getPrintersAsync()});
 ipcMain.handle('facturacr:print-ticket',async(event,html,settings={})=>{
@@ -353,7 +377,15 @@ app.whenReady().then(async () => {
   } catch(err) {
     console.error('No se pudo iniciar FacturaCR:',err);
     if(qaSmoke){
-      const shot=qaArg('--qa-screenshot');
+      // QA empaquetado REAL: prueba XAdESjs desde preload y el proceso principal.
+ // Nunca toca el .p12 ni procesa datos de ventas; falla si faltan módulos ASAR.
+ const lab=await mainWindow.webContents.executeJavaScript(
+   `window.facturacrSignature.runIntegratedXadesLab()`,true);
+ if(lab?.success!==true||lab.report?.verifiedCount!==3||
+    lab.report?.mutationsRejected!==6||lab.report?.canIssue!==false||
+    lab.report?.usesRealCertificate!==false)
+   throw Error('El laboratorio XAdESjs empaquetado no superó sus pruebas criptográficas: '+JSON.stringify(lab));
+ const shot=qaArg('--qa-screenshot');
       if(shot&&path.isAbsolute(shot)&&mainWindow&&!mainWindow.isDestroyed())try{
         await fs.mkdir(path.dirname(shot),{recursive:true});
         await fs.writeFile(shot,(await mainWindow.webContents.capturePage()).toPNG());
