@@ -2160,3 +2160,10 @@ La aplicación Electron abre únicamente las direcciones oficiales de CABYS perm
 ### v0.6.88 — Recuperación local implementada
 
 El sistema ahora utiliza exclusivamente tres códigos FCR2 de un solo uso por persona y un kit extraordinario de dos partes para el propietario. Consulta el procedimiento actualizado al **inicio del README**. La recuperación mediante correo y SMTP fue retirada de la aplicación. **Próxima prioridad:** XSD oficiales FE/TE 4.4 y las validaciones de Hacienda.
+
+
+### Corrección v0.6.93 · Cotejo CPF en certificado
+
+El certificado de persona física puede identificar al titular como `CPF-0P-XXXX-XXXX`, mientras que la ficha fiscal de FacturaCR guarda la cédula física con 9 dígitos (`PXXXXXXXX`). El cotejo local ahora convierte **exclusivamente** ese formato CPF para evitar diferencias falsas por el cero de relleno de la provincia. El cotejo no equipara automáticamente una persona física con una empresa jurídica, ni verifica representación, revocación, cadena de confianza o permisos para emitir.
+
+**Cómo probar:** `npm run qa:certificate-company`. Con un certificado propio, revisar en **Empresas → Preparación FE 4.4 → Certificado digital** el resultado después de confirmar la identificación de la empresa; nunca compartir archivo `.p12` ni contraseña para diagnóstico. Si persiste «Identificaciones diferentes», revisar el tipo y número fiscal real de la empresa, y si el firmante representa a una persona jurídica.

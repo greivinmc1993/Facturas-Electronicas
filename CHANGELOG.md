@@ -1290,3 +1290,10 @@ Fuente normativa: Anexo técnico de comprobantes electrónicos 4.4, Ministerio d
 
 - Dirección exacta (otras señas) reubicada debajo de Provincia, Cantón, Distrito y Código postal en ambas ventanas de empresa.
 - Sin cambios en validación, modelo de datos ni lógica fiscal. Prueba QA dedicada para evitar regresiones.
+
+
+### v0.6.93 · Ajuste de identidad CPF con cero de relleno
+
+- Corrige el cotejo orientativo entre `serialNumber=CPF-0P-XXXX-XXXX` y cédula física de 9 dígitos, sin suprimir ceros de otros identificadores.
+- Agrega 4 controles de regresión a `qa:certificate-company`: coincidencia CPF, diferencia real, persona jurídica y preservación de ceros no CPF.
+- No modifica PKCS#12, SQLite, contraseñas, reglas de autorización, XML ni habilita firma o envío a Hacienda.

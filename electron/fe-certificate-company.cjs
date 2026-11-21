@@ -23,8 +23,13 @@ function parseExplicitIdentifiers(subject){
   const m=/^\s*([^=]{1,65})\s*=\s*(.*?)\s*$/.exec(entry);
   if(!m||!IDENTIFIER_KEYS.has(m[1].trim().toLowerCase()))continue;
   let raw=m[2].trim();
-  // Algunos emisores usan prefijos textuales explícitos para el número.
-  raw=raw.replace(/^(?:(?:CPF|CEDULA|CÉDULA|ID|IDENTIFICACION|IDENTIFICACIÓN|CR)\s*[:#-]\s*)/i,'');
+  // Las políticas costarricenses presentan la cédula física como
+  // CPF-0P-XXXX-XXXX (10 dígitos), aunque la ficha fiscal usa PXXXXXXXX
+  // (9 dígitos). Reducir SOLO el cero de relleno de provincia en CPF.
+  // Nunca suprimir ceros arbitrarios de una cédula jurídica, DIMEX o NITE.
+  const cpf=/^CPF-0([1-9])-(\d{4})-(\d{4})$/i.exec(raw);
+  if(cpf)raw=cpf[1]+cpf[2]+cpf[3];
+  else raw=raw.replace(/^(?:(?:CPF|CEDULA|CÉDULA|ID|IDENTIFICACION|IDENTIFICACIÓN|CR)\s*[:#-]\s*)/i,'');
   const id=normalizeIdentification(raw);
   if(id)found.push(id);
  }

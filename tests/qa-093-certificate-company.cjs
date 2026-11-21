@@ -12,6 +12,20 @@ check('Identificación explícita coincide con separadores de cédula',()=>{
  const r=compare('CN=QA empresa\nserialNumber=3-101-123456\nO=LAB','3101123456');
  assert.equal(r.status,'MATCH');assert.equal(r.canIssue,false);assert.equal(r.canSign,false);assert.equal(r.verifiedOwnership,false);
 });
+check('CPF-0P-XXXX-XXXX oficial coincide con la cédula física de 9 dígitos',()=>{
+ const r=compare('CN=QA FICTICIO\nserialNumber=CPF-01-2345-6789\nO=LAB','123456789');
+ assert.equal(r.status,'MATCH');assert.equal(r.canSign,false);assert.equal(r.canIssue,false);
+});
+check('CPF físico no coincide con otro contribuyente',()=>{
+ assert.equal(compare('serialNumber=CPF-01-2345-6789','223456789').status,'MISMATCH');
+});
+check('CPF físico no coincide con una identificación jurídica de 10 dígitos',()=>{
+ assert.equal(compare('serialNumber=CPF-01-2345-6789','3101123456').status,'MISMATCH');
+});
+check('No se elimina el cero inicial de identificaciones no CPF',()=>{
+ assert.equal(compare('serialNumber=0123456789','123456789').status,'MISMATCH');
+ assert.equal(compare('serialNumber=0123456789','0123456789').status,'MATCH');
+});
 check('Diferencia de identificaciones no se oculta',()=>assert.equal(compare('serialNumber=3101000000','3101123456').status,'MISMATCH'));
 check('No infiere identificación de CN, nombre comercial u organización',()=>{
  assert.equal(compare('CN=Empresa 3101123456\nO=3101123456','3101123456').status,'INDETERMINATE');
