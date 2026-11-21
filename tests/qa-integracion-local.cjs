@@ -238,6 +238,15 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const r=await call('POST',`/api/companies/${a}/products`,{kind:'producto',description:'Producto QA',cabys:'1234567890123',product_code:'SKU700',price:'700',cost:'300',currency:'CRC',tax_code:'08',price_includes_tax:'1',unit:'Unid',stock:'10',min_stock:'2',track_stock:'1',alert_enabled:'1'});
    assert.equal(r.status,201,JSON.stringify(r.body));prodId=r.body.id;
   });
+  await check('v0.6.88: sin caja abierta no se registra ninguna venta',async()=>{
+   const before=read(),count=before.prepare('SELECT COUNT(*) AS n FROM sales WHERE company_id=?').get(a).n;before.close();
+   const denied=await call('POST',`/api/companies/${a}/sales`,{sale_type:'contado',document_mode:'GENERICA',discount:0,
+    lines:[{product_id:prodId,quantity:1}],payments:[{method:'Efectivo',amount:700}]});
+   assert.equal(denied.status,400);assert.match(denied.body.error,/abrir una caja/i);
+   const after=read();assert.equal(after.prepare('SELECT COUNT(*) AS n FROM sales WHERE company_id=?').get(a).n,count);after.close();
+   const opened=await call('POST',`/api/companies/${a}/cash/open`,{opening_amount:'0',note:'Reapertura para pruebas de ventas'});
+   assert.equal(opened.status,201,JSON.stringify(opened.body));
+  });
   await check('Valoración de existencias por empresa, costo CRC y filtros',async()=>{
    let r=await call('GET',`/api/companies/${a}/inventory/valuation`);
    assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.summary.products,1);

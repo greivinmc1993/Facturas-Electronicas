@@ -167,6 +167,10 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   );
   CREATE INDEX IF NOT EXISTS idx_sales_company_date ON sales(company_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_sales_client ON sales(company_id,client_id);`);
+  // Migración aditiva: nunca asignar inventores a ventas históricas sin identidad conocida.
+  addColumn('sales','created_by_user_id','INTEGER REFERENCES access_users(id) ON DELETE SET NULL');
+  addColumn('sales','cash_session_id','INTEGER REFERENCES cash_sessions(id) ON DELETE SET NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sales_company_operator ON sales(company_id,created_by_user_id,id DESC)');
   // Costo histórico de la venta: NULL en registros anteriores o sin costo confiable.
   addColumn('sale_lines','unit_cost_cents','INTEGER');
   // Precisión fiscal v2: columnas aditivas, NULL en históricos. No recalcular ventas pasadas.
@@ -1054,8 +1058,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
     try{
       const companyId=saleCompany(req),q=String(req.query.q||'').trim().slice(0,120);
       const rows=db.prepare(`SELECT s.*,CASE WHEN s.document_mode='TE' THEN 'Tiquete electrónico' WHEN s.document_mode='GENERICA' THEN 'Genérica' ELSE c.name END AS client_name FROM sales s LEFT JOIN clients c ON c.id=s.client_id
-       WHERE s.company_id=? AND (?='' OR CAST(s.id AS TEXT) LIKE ? OR c.name LIKE ? OR s.created_at LIKE ?)
-       ORDER BY s.id DESC LIMIT 500`).all(companyId,q,`%${q}%`,`%${q}%`,`%${q}%`);
+       WHERE s.company_id=? AND (?=0 OR s.created_by_user_id=?) AND (?='' OR CAST(s.id AS TEXT) LIKE ? OR c.name LIKE ? OR s.created_at LIKE ?)
+       ORDER BY s.id DESC LIMIT 500`).all(companyId,req.salesOwnOnly?1:0,req.authUser?.id||0,q,`%${q}%`,`%${q}%`,`%${q}%`);
       res.json(rows);
     }catch(e){res.status(400).json({error:e.message})}
   });
@@ -1257,7 +1261,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   app.get('/api/companies/:companyId/sales/:saleId',(req,res)=>{
     try{
       const companyId=saleCompany(req),id=Number(req.params.saleId);
-      const sale=db.prepare('SELECT * FROM sales WHERE id=? AND company_id=?').get(id,companyId);
+      const sale=db.prepare('SELECT * FROM sales WHERE id=? AND company_id=? AND (?=0 OR created_by_user_id=?)').get(id,companyId,req.salesOwnOnly?1:0,req.authUser?.id||0);
       if(!sale)return res.status(404).json({error:'Venta no encontrada.'});
       const client=sale.client_id?db.prepare('SELECT name,trade_name,identification_type,identification,email,phone,address,province,canton,district FROM clients WHERE id=? AND company_id=?').get(sale.client_id,companyId):null;
       res.json({...sale,client,lines:db.prepare('SELECT * FROM sale_lines WHERE sale_id=? ORDER BY id').all(id),payments:db.prepare('SELECT * FROM sale_payments WHERE sale_id=? ORDER BY id').all(id)});
@@ -1311,6 +1315,11 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       const unique=new Set(body.lines.map(l=>String(l.product_id)));
       if(unique.size!==body.lines.length)throw Error('Hay artículos duplicados en el carrito. Agrupa las cantidades.');
       const result=db.transaction(()=>{
+        // Verificar dentro de la transacción para no aceptar ventas si se cerró la caja.
+        const activeCash=db.prepare("SELECT id,opened_by_user_id FROM cash_sessions WHERE company_id=? AND status='abierta'").get(companyId);
+        if(!activeCash)throw Error('Debes abrir una caja antes de registrar ventas. Ve a Caja y gastos.');
+        const cashierRole=!req.authUser?.is_owner&&db.prepare('SELECT role FROM access_company_roles WHERE user_id=? AND company_id=?').get(req.authUser?.id,companyId)?.role==='cashier';
+        if(cashierRole&&Number(activeCash.opened_by_user_id)!==Number(req.authUser.id))throw Error('La caja abierta pertenece a otro usuario. Abre tu propia caja cuando termine su turno.');
         const lines=body.lines.map(row=>{
           const productId=Number(row.product_id),quantity=Number(row.quantity);
           if(!Number.isSafeInteger(productId)||!Number.isSafeInteger(quantity)||quantity<1||quantity>100000)throw Error('Artículo o cantidad inválidos.');
@@ -1353,8 +1362,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
              VALUES (?,?,?,?,?,?,?,?,?)`).run(companyId,p.id,'salida',line.quantity,-line.quantity,before,after,'Venta POS','Descuento automático de inventario');
           }
         }
-        const id=Number(db.prepare(`INSERT INTO sales(company_id,client_id,sale_type,document_mode,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents)
-          VALUES (?,?,?,?,?,?,?,?,?,?)`).run(companyId,clientId,saleType,documentMode,subtotal,discount,tax,total,paid,total-paid).lastInsertRowid);
+        const id=Number(db.prepare(`INSERT INTO sales(company_id,client_id,sale_type,document_mode,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents,created_by_user_id,cash_session_id)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(companyId,clientId,saleType,documentMode,subtotal,discount,tax,total,paid,total-paid,req.authUser.id,activeCash.id).lastInsertRowid);
         const addLine=db.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents,unit_cost_cents,fiscal_unit_price_5,fiscal_subtotal_5,fiscal_discount_5,fiscal_base_5,fiscal_tax_5,fiscal_total_5,fiscal_input_price_5,fiscal_includes_tax,fiscal_calculation_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
         // Captura el costo al vender, no el costo actual del catálogo. No estimar históricos.
         for(const l of detailed){

@@ -6,6 +6,6 @@ assert.match(ui,/<input type="radio" name="posDocumentMode" value="FE"/);
 assert.match(ui,/<input type="radio" name="posDocumentMode" value="TE"/);
 assert.match(ui,/<input type="radio" name="posDocumentMode" value="GENERICA"/);
 assert.match(ui,/documentMode==='FE'&&<div className="posClientPicker">/);
-assert.match(ui,/disabled=\{draftReadyCompany!==companyId/);
+assert.match(ui,/disabled=\{!cashReady\|\|draftReadyCompany!==companyId/);
 assert.match(ui,/\(documentMode==='FE'&&!clientId\)/);
 console.log('OK UI: selector FE/TE/GENERICA, buscador condicional y bloqueo FE sin cliente (7/7)');

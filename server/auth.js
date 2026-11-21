@@ -100,9 +100,9 @@ export function registerAuth(app,getDb,options={}){
     if(method==='GET'&&/^\/companies\/\d+\/products\/cabys-search$/.test(p))return 'inventory.manage';
     if(/^\/companies\/\d+\/fe\/preparation$/.test(p))return ['GET','PUT'].includes(method)?'tax.configure':null;
     if(/^\/companies\/\d+\/sales\/draft(?:\/beacon)?$/.test(p))return ['GET','PUT','DELETE','POST'].includes(method)?'sales.create':null;
-    if(/^\/companies\/\d+\/sales$/.test(p))return method==='POST'?'sales.create':method==='GET'?'sales.read_all':null;
+    if(/^\/companies\/\d+\/sales$/.test(p))return method==='POST'?'sales.create':method==='GET'?'sales.read_own':null;
     if(/^\/companies\/\d+\/sales\/\d+\/fe\/xml-draft$/.test(p)&&method==='GET')return 'sales.read_all';
-    if(/^\/companies\/\d+\/sales\/\d+$/.test(p)&&method==='GET')return 'sales.read_all';
+    if(/^\/companies\/\d+\/sales\/\d+$/.test(p)&&method==='GET')return 'sales.read_own';
     if(/^\/companies\/\d+\/products$/.test(p))return method==='GET'?'inventory.read':method==='POST'?'inventory.manage':null;
     if(/^\/companies\/\d+\/clients$/.test(p))return method==='GET'?'clients.manage':method==='POST'?'clients.manage':null;
     if(/^\/companies\/\d+\/quotations(?:\/\d+)?$/.test(p))return method==='GET'?'quotations.manage':method==='POST'||method==='PUT'?'quotations.manage':method==='DELETE'?'quotations.delete':null;
@@ -126,7 +126,8 @@ export function registerAuth(app,getDb,options={}){
     if(/^\/companies\/\d+\/cash\/close$/.test(p)&&method==='POST')return 'cash.close_own';
     if(/^\/companies\/\d+\/cash\/expenses$/.test(p)&&method==='POST')return 'cash.expenses.create';
     if(/^\/companies\/\d+\/cash\/export\.(csv|html)$/.test(p)&&method==='GET')return 'cash.read_all';
-    if(/^\/companies\/\d+\/(?:quote-settings|ticket-settings)$/.test(p))return method==='GET'?'sales.create':null;
+    if(/^\/companies\/\d+\/ticket-settings$/.test(p))return ['GET','PUT'].includes(method)?'sales.create':null;
+    if(/^\/companies\/\d+\/quote-settings$/.test(p))return method==='GET'?'sales.create':null;
     return null;
   }
   const auth=(req,res)=>{const a=credentials(req);if(!a)return res.status(401).json({error:'Inicia sesión para continuar.',code:'AUTH_REQUIRED'});return a;};
@@ -545,7 +546,9 @@ export function registerAuth(app,getDb,options={}){
       if(!permission)return res.status(403).json({error:'Operación reservada al propietario.'});
       if(permission!=='companies.list'){
         const match=path.match(/^\/companies\/(\d+)(?:\/|$)/);
-        if(!match||!(can(a.user,Number(match[1]),permission)||['inventory.receive','inventory.count'].includes(permission)&&can(a.user,Number(match[1]),'inventory.adjust')))return res.status(403).json({error:'No tienes autorización en esta empresa.'});
+        if(!match||!(can(a.user,Number(match[1]),permission)||permission==='sales.read_own'&&can(a.user,Number(match[1]),'sales.read_all')||['inventory.receive','inventory.count'].includes(permission)&&can(a.user,Number(match[1]),'inventory.adjust')))return res.status(403).json({error:'No tienes autorización en esta empresa.'});
+        // Lectura de ventas: cajeros ven solo sus propias ventas; supervisor/admin pueden ver todas.
+        if(permission==='sales.read_own')req.salesOwnOnly=!can(a.user,Number(match[1]),'sales.read_all');
       }
     }
     req.authUser=a.user;

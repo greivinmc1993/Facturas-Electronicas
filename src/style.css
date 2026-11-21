@@ -1810,3 +1810,10 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .cashClosureFolderSettings button,.cashArchiveButtons button{box-sizing:border-box;min-height:39px!important;padding:8px 13px!important;line-height:1.25!important;transform:none!important;transition:background-color .15s ease,color .15s ease,border-color .15s ease!important}
 .cashClosureFolderSettings button:hover,.cashArchiveButtons button:hover{transform:none!important}
 @media(max-width:700px){.cashClosureFolderSettings .cashArchiveButtons{justify-content:stretch;width:100%}.cashClosureFolderSettings button{flex:1 1 130px}}
+
+/* v0.6.88: prevenir ventas con caja cerrada u ocupada, sin ocultar el carrito. */
+.posCashRequired{border:1px solid #c99f4a;border-radius:12px;background:rgba(201,159,74,.12);padding:16px 18px;margin:16px 0;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.posCashRequired strong{font-weight:750;color:inherit}.posCashRequired p{margin:0;flex-basis:100%;line-height:1.45}
+.posCashRequired button{margin-left:auto}
+
+.posChangeActions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;align-items:stretch}.posChangeActions button{flex:1 1 190px;min-width:0}

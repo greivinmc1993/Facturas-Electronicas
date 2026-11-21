@@ -79,33 +79,50 @@ async function main(){
     body:JSON.stringify({username:'qa_propietario',password:'ClavePropietarioQA67890'})});
   assert.equal(valid.status,200);
  });
- await test('HTTP real permite rotar código de recuperación solo con la contraseña del propietario',async()=>{
+ // La v0.6.88 entrega tres códigos personales FCR2, no el antiguo FCR1 único.
+ // Los secretos viven solo en esta prueba y no se imprimen en registros de CI.
+ let recoveryCodes=[];
+ await test('HTTP real rota tres códigos FCR2 con autenticación y contraseña actual',async()=>{
   const status=await request('GET','/api/auth/recovery/status');
   assert.equal(status.status,200);assert.equal(status.body.configured,true);
+  assert.equal(status.body.remaining,3);assert.equal(status.body.total,3);
   const unauthorized=await fetch(base+'/api/auth/recovery/rotate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'ClavePropietarioQA67890'})});
   assert.equal(unauthorized.status,401);
   const wrong=await request('POST','/api/auth/recovery/rotate',{password:'IncorrectaSegura12345'});
   assert.equal(wrong.status,403);
   const r=await request('POST','/api/auth/recovery/rotate',{password:'ClavePropietarioQA67890'});
-  assert.equal(r.status,200,JSON.stringify(r.body));
-  assert.match(r.body.recoveryCode,/^FCR1-(?:[A-F0-9]{8}-){5}[A-F0-9]{8}$/);
-  server.qaRecoveryCode=r.body.recoveryCode;
+  assert.equal(r.status,200,JSON.stringify({status:r.status,error:r.body.error}));
+  assert.equal(r.body.ok,true);assert.equal(r.body.remaining,3);
+  assert.equal(r.headers.get('cache-control'),'no-store');
+  assert.ok(Array.isArray(r.body.recoveryCodes));
+  assert.equal(r.body.recoveryCodes.length,3);
+  for(const code of r.body.recoveryCodes){
+   assert.match(code,/^FCR2-(?:[A-F0-9]{8}-){5}[A-F0-9]{8}$/);
+  }
+  assert.equal(new Set(r.body.recoveryCodes).size,3);
+  assert.equal(r.body.recoveryCode,undefined); // La API ya no entrega un código FCR1.
+  recoveryCodes=r.body.recoveryCodes;
  });
- await test('HTTP real recupera propietario, consume código y revoca sesiones previas',async()=>{
+ await test('HTTP real consume un código FCR2, impide reutilizarlo y revoca sesiones',async()=>{
   const old=sessionCookie;
-  const reset=await fetch(base+'/api/auth/recovery/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'qa_propietario',recoveryCode:server.qaRecoveryCode,newPassword:'ClaveRecuperadaQA12345'})});
+  const reset=await fetch(base+'/api/auth/recovery/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'qa_propietario',recoveryCode:recoveryCodes[0],newPassword:'ClaveRecuperadaQA12345'})});
   assert.equal(reset.status,200);
-  const result=await reset.json();assert.notEqual(result.recoveryCode,server.qaRecoveryCode);
+  const result=await reset.json();
+  assert.equal(result.ok,true);assert.equal(result.remaining,2);
+  assert.equal(result.recoveryCode,undefined);
+  assert.equal(result.recoveryCodes,undefined); // Recuperar con un código no revela los otros dos.
   assert.equal((await request('GET','/api/auth/status')).body.authenticated,false);
-  const used=await request('POST','/api/auth/recovery/reset',{username:'qa_propietario',recoveryCode:server.qaRecoveryCode,newPassword:'OtraClaveQA12345'});
+  const used=await request('POST','/api/auth/recovery/reset',{username:'qa_propietario',recoveryCode:recoveryCodes[0],newPassword:'OtraClaveQA12345'});
   assert.equal(used.status,403);
   const oldSession=await fetch(base+'/api/auth/status',{headers:{cookie:old}}).then(r=>r.json());
   assert.equal(oldSession.authenticated,false);
   const r=await request('POST','/api/auth/login',{username:'qa_propietario',password:'ClaveRecuperadaQA12345'});
   assert.equal(r.status,200);sessionCookie=(r.headers.get('set-cookie')||'').split(';',1)[0];
   assert.match(sessionCookie,/^facturacr_session=/);
-  assert.equal((await request('GET','/api/auth/recovery/status')).body.configured,true);
-  delete server.qaRecoveryCode;
+  const state=await request('GET','/api/auth/recovery/status');
+  assert.equal(state.status,200);assert.equal(state.body.configured,true);
+  assert.equal(state.body.remaining,2);assert.equal(state.body.total,3);
+  recoveryCodes=[];
  });
  await test('SQLite nativo crea empresa y la recupera por HTTP',async()=>{
   const r=await request('POST','/api/companies',{legal_name:'Comercio temporal QA',identification:'123456789'});
@@ -273,6 +290,76 @@ async function main(){
   response=await fetch(`${base}${endpoint}export.html?${query}`,{headers:authorizedHeaders()});
   assert.equal(response.status,200);const html=await response.text();
   assert.ok(html.includes('Detalle completo de ventas filtradas'));assert.ok(html.includes('Servicio QA')===false||html.includes('Reporte comercial'));
+ });
+ // Regresión real: cada cajero puede vender, consultar y reimprimir SUS ventas,
+ // pero no utilizar la caja ni consultar las ventas de otro usuario.
+ await test('Cajeros: caja obligatoria, venta persistida, historial propio y tiquete accesible',async()=>{
+  const Database=require('better-sqlite3');
+  const db=new Database(path.join(dir,'facturacr.sqlite'));
+  let productId;
+  try{productId=Number(db.prepare("INSERT INTO products(company_id,kind,description,price,currency,tax_rate) VALUES(1,'servicio','Servicio turno QA',1000,'CRC',0)").run().lastInsertRowid)}
+  finally{db.close()}
+  const newSale={sale_type:'contado',document_mode:'GENERICA',discount:'0',lines:[{product_id:productId,quantity:1}],payments:[{method:'Efectivo',amount:'1000'}]};
+  const closed=await request('POST','/api/companies/1/sales',newSale);
+  assert.equal(closed.status,400,JSON.stringify(closed.body));
+  assert.match(closed.body.error,/abrir una caja/i);
+  const operators=[];
+  for(const [username,password] of [['qa_cajero_a','CajeroQAAcceso123'],['qa_cajero_b','CajeroQAOtro1234']]){
+   const created=await request('POST','/api/auth/users',{username,displayName:username.replaceAll('_',' '),password,companyId:1,role:'cashier'});
+   assert.equal(created.status,201,JSON.stringify(created.body));
+   const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,password})});
+   assert.equal(login.status,200);
+   const cookie=(login.headers.get('set-cookie')||'').split(';',1)[0];
+   assert.match(cookie,/^facturacr_session=/);
+   const change=await fetch(base+'/api/auth/password-change',{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({oldPassword:password,newPassword:password+'Nueva'})});
+   assert.equal(change.status,200,await change.text());
+   operators.push({userId:created.body.id,cookie});
+  }
+  const as=async(operator,method,url,body)=>{
+   const options={method,headers:{cookie:operator.cookie}};
+   if(body!==undefined){options.headers['content-type']='application/json';options.body=JSON.stringify(body)}
+   const response=await fetch(base+url,options);
+   return {status:response.status,body:await response.json()};
+  };
+  const [a,b]=operators;
+  const ownerCash=await request('POST','/api/companies/1/cash/open',{opening_amount:'0'});
+  assert.equal(ownerCash.status,201,JSON.stringify(ownerCash.body));
+  const otherTurn=await as(a,'POST','/api/companies/1/sales',newSale);
+  assert.equal(otherTurn.status,400,JSON.stringify(otherTurn.body));
+  assert.match(otherTurn.body.error,/otro usuario/i);
+  const ownerClosed=await request('POST','/api/companies/1/cash/close',{counted_amount:'0'});
+  assert.equal(ownerClosed.status,200,JSON.stringify(ownerClosed.body));
+  const aCash=await as(a,'POST','/api/companies/1/cash/open',{opening_amount:'0'});
+  assert.equal(aCash.status,201,JSON.stringify(aCash.body));
+  const createdSale=await as(a,'POST','/api/companies/1/sales',newSale);
+  assert.equal(createdSale.status,201,JSON.stringify(createdSale.body));
+  const saleId=createdSale.body.id;
+  const myHistory=await as(a,'GET','/api/companies/1/sales');
+  assert.equal(myHistory.status,200,JSON.stringify(myHistory.body));
+  assert.ok(myHistory.body.some(row=>row.id===saleId));
+  const myDetail=await as(a,'GET',`/api/companies/1/sales/${saleId}`);
+  assert.equal(myDetail.status,200,JSON.stringify(myDetail.body));
+  assert.equal(myDetail.body.lines.length,1);
+  assert.equal(myDetail.body.payments[0].method,'Efectivo');
+  const bHistory=await as(b,'GET','/api/companies/1/sales');
+  assert.equal(bHistory.status,200,JSON.stringify(bHistory.body));
+  assert.equal(bHistory.body.some(row=>row.id===saleId),false);
+  const bDetail=await as(b,'GET',`/api/companies/1/sales/${saleId}`);
+  assert.equal(bDetail.status,404);
+  const bSale=await as(b,'POST','/api/companies/1/sales',newSale);
+  assert.equal(bSale.status,400,JSON.stringify(bSale.body));
+  const settings=await as(a,'PUT','/api/companies/1/ticket-settings',{logo:'',autoPrint:true});
+  assert.equal(settings.status,200,JSON.stringify(settings.body));
+  const ownerHistory=await request('GET','/api/companies/1/sales');
+  assert.equal(ownerHistory.status,200);
+  assert.ok(ownerHistory.body.some(row=>row.id===saleId));
+  const checkDb=new Database(path.join(dir,'facturacr.sqlite'),{readonly:true});
+  try{
+   const saved=checkDb.prepare('SELECT created_by_user_id,cash_session_id FROM sales WHERE id=?').get(saleId);
+   assert.equal(saved.created_by_user_id,a.userId);
+   assert.equal(Number(saved.cash_session_id),Number(aCash.body.id));
+   assert.equal(checkDb.pragma('integrity_check',{simple:true}),'ok');
+  }finally{checkDb.close()}
  });
  console.log(`QA servidor REAL: ${checks}/${checks} pruebas aprobadas`);
 }

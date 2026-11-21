@@ -4,7 +4,7 @@
 export const DEFAULT_IDLE_LOCK_MINUTES = 15;
 export const ACCESS_ROLES = Object.freeze(['owner', 'company_admin', 'supervisor', 'cashier']);
 export const ACCESS_PERMISSIONS = Object.freeze([
-  'sales.create','sales.read_all','sales.void','sales.payments.create',
+  'sales.create','sales.read_all','sales.read_own','sales.void','sales.payments.create',
   'clients.manage','clients.delete','quotations.manage','quotations.delete',
   'inventory.read','inventory.manage','inventory.delete','inventory.adjust','inventory.receive','inventory.count','inventory.costs.read','inventory.kardex.read',
   'cash.open','cash.close_own','cash.expenses.create','cash.read_all','cash.reopen',
@@ -19,14 +19,14 @@ export const DEFAULT_ROLE_PERMISSIONS = Object.freeze({
     'backups.manage','backups.restore','audit.read'
   ].includes(p)),
   supervisor: [
-    'sales.create','sales.read_all','sales.void','sales.payments.create',
+    'sales.create','sales.read_all','sales.read_own','sales.void','sales.payments.create',
     'clients.manage','quotations.manage','quotations.delete',
     'inventory.read','inventory.manage','inventory.adjust','inventory.costs.read','inventory.kardex.read',
     'cash.open','cash.close_own','cash.expenses.create','cash.read_all',
     'reports.operational','reports.financial'
   ],
   cashier: [
-    'sales.create','sales.payments.create','clients.manage','quotations.manage',
+    'sales.create','sales.read_own','sales.payments.create','clients.manage','quotations.manage',
     'inventory.read','inventory.receive','inventory.count','cash.open','cash.close_own'
   ]
 });

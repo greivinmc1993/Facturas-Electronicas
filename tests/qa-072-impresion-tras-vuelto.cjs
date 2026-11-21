@@ -16,7 +16,7 @@ const section=(start,end)=>{
   return ui.slice(from,to);
 };
 const submitSource=section(" const submit=()=>runCommercialAction('venta',async()=>{",'\n const finish=e=>{');
-const closeSource=section(' const closeChangeReceipt=()=>{','\n const methods=');
+const closeSource=section(' const closeChangeReceipt=(shouldPrint=true)=>{','\n // Actualiza caja al entrar');
 const effectSource=section(' useEffect(()=>{\n  if(changeReceipt!==null||deferredChangePrintRef.current==null)return;','\n const closeChangeReceipt=');
 
 async function runCase({vuelto,autoPrint}){
@@ -30,6 +30,7 @@ async function runCase({vuelto,autoPrint}){
     changeCents:vuelto, tenderCents:12000, cashApplied:10000,
     ticketSettings:{autoPrint}, draftWriteQueue:{current:Promise.resolve()},
     api:async(endpoint,opt)=>{
+      if(endpoint==='/api/companies/1/cash')return {active:{id:12},otherCashOpen:false};
       if(endpoint==='/api/companies/1/sales' && opt?.method==='POST'){
         saved.push('venta');return {id:saleId,total_cents:10000,balance_cents:0};
       }
@@ -40,7 +41,7 @@ async function runCase({vuelto,autoPrint}){
     },
     setCart:()=>{},setPayments:()=>{},setDiscount:()=>{},setCashTendered:()=>{},
     setClientId:()=>{},setClientQuery:()=>{},setDocumentMode:()=>{},setSaleType:()=>{},
-    setChangeReceipt:value=>{receipt=value},setNotice:value=>notices.push(value),
+    setChangeReceipt:value=>{receipt=value},setCashStatus:()=>{},setNotice:value=>notices.push(value),isCashier:false,
     saleMoney:value=>String(value),
     load:async()=>records.push('historial'), canReadHistory:true, loadCredits:async()=>records.push('creditos'),
     runCommercialAction:async(_label,action)=>action(),
@@ -60,16 +61,20 @@ async function runCase({vuelto,autoPrint}){
     let currentReceipt=receipt;
     const closeScope={changeReceipt:currentReceipt,deferredChangePrintRef:ref,setChangeReceipt:value=>{currentReceipt=value}};
     const close=vm.runInNewContext(`(function(){${closeSource};return closeChangeReceipt})()`,closeScope);
-    vm.runInNewContext(effectSource,{changeReceipt:currentReceipt,deferredChangePrintRef:ref,openTicket:scope.openTicket,useEffect:fn=>fn()});
+    const frames=[];
+    const context=()=>({changeReceipt:currentReceipt,deferredChangePrintRef:ref,openTicket:scope.openTicket,useEffect:fn=>fn(),requestAnimationFrame:fn=>{frames.push(fn);return frames.length},cancelAnimationFrame:()=>{}});
+    vm.runInNewContext(effectSource,context());
     assert.equal(printed.length,0,'Un render con el popup abierto no imprime');
     close();
     assert.equal(currentReceipt,null,'El botón cierra el popup');
     assert.equal(printed.length,0,'El cierre solo prepara la impresión para después del render');
-    const runEffect=()=>vm.runInNewContext(effectSource,{changeReceipt:currentReceipt,deferredChangePrintRef:ref,openTicket:scope.openTicket,useEffect:fn=>fn()});
+    const runEffect=()=>vm.runInNewContext(effectSource,context());
     runEffect();
-    assert.equal(printed.length,autoPrint?1:0,'El cierre inicia exactamente la impresión configurada');
+    assert.equal(printed.length,0,'Impresión espera el siguiente fotograma');
+    frames.forEach(fn=>fn());
+    assert.equal(printed.length,1,'Confirmar el vuelto imprime una vez, incluso sin ajuste automático');
     runEffect();
-    assert.equal(printed.length,autoPrint?1:0,'Re-renderizar no debe imprimir dos veces');
+    assert.equal(printed.length,1,'Re-renderizar no debe imprimir dos veces');
   }else if(autoPrint){
     assert.equal(printed[0].id,saleId);
     assert.equal(printed[0].print,true);
@@ -78,8 +83,8 @@ async function runCase({vuelto,autoPrint}){
 }
 (async()=>{
   assert.match(ui,/if\(ticketSettings\.autoPrint&&changeToReturn<=0\)await openTicket\(result\.id,true\)/,'La impresión inmediata exige ausencia de vuelto');
-  assert.match(ui,/onClick=\{closeChangeReceipt\}>Vuelto entregado · Cerrar/,'El botón utiliza el cierre diferido');
-  assert.match(ui,/changeReceipt\.printAfterClose&&<p className=\"posChangePrintHint\">/,'La ayuda visual solo aparece si va a imprimirse al cerrar');
+  assert.match(ui,/onClick=\{\(\)=>closeChangeReceipt\(true\)\}>Vuelto entregado · Imprimir tiquete/,'Confirmar vuelto imprime tras cerrar');
+  assert.match(ui,/onClick=\{\(\)=>closeChangeReceipt\(false\)\}>Cerrar sin imprimir/,'La opción sin impresión es explícita');
   assert.match(ui,/onClick=\{\(\)=>openTicket\(s\.id\)\}>Tiquete/,'Historial mantiene acceso a vista previa');
   assert.match(ui,/onClick=\{\(\)=>openTicket\(details\.id,true\)\}>Imprimir/,'Se conserva reimpresión manual');
   for(const [name,params] of [

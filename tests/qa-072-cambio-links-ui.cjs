@@ -6,7 +6,7 @@ t('Electron permite exclusivamente dos páginas y abre navegador externo',()=>{a
 t('No habilita navegación arbitraria en ventanas externas',()=>{assert.match(electron,/return \{action:'deny'\}/);assert.match(electron,/will-navigate/);});
 t('Vuelto se muestra después de éxito del servidor',()=>{assert.ok(ui.indexOf('setChangeReceipt({saleId:result.id')>ui.indexOf('const result=await api(`/api/companies/${companyId}/sales`'));});
 t('No se muestra popup si no existe vuelto',()=>assert.match(ui,/if\(changeToReturn>0\)setChangeReceipt/));
-t('Popup incluye cantidad y confirmación independiente',()=>{for(const x of ['role="alertdialog"','posChangeAmount','ENTREGAR VUELTO','Vuelto entregado · Cerrar'])assert.ok(ui.includes(x),x);});
+t('Popup incluye cantidad y confirmación independiente',()=>{for(const x of ['role="alertdialog"','posChangeAmount','ENTREGAR VUELTO','Vuelto entregado · Imprimir tiquete'])assert.ok(ui.includes(x),x);});
 t('CSS del popup centrado, destacado y responsive',()=>{for(const x of ['.posChangeOverlay','.posChangeDialog','.posChangeAmount','@media(max-width:520px)'])assert.ok(css.includes(x),x);});
 t('Modo precio con IVA/sin IVA seleccionable por producto',()=>{assert.match(ui,/Cómo se ingresa el precio/);assert.match(ui,/Precio base sin IVA · agregar impuesto/);});
 t('No se fuerza la modalidad de precio al guardar o editar',()=>{assert.doesNotMatch(ui,/price_includes_tax:'1'\}\:form/);assert.doesNotMatch(ui,/k==='price_includes_tax'\?'1'/);});

@@ -1,3 +1,13 @@
+## v0.6.88 — Corrección operativa multiusuario, caja e impresión (21/11/2026)
+
+- Corregido permiso de lectura de ventas de cajeros (`sales.read_own`): historial y tiquetes propios; las ventas ajenas permanecen privadas.
+- Nuevas ventas vinculadas a usuario y sesión de caja; migración aditiva, sin alterar ventas existentes.
+- Bloqueo de ventas sin caja abierta en frontend y backend; los cajeros no pueden usar la caja de otro usuario.
+- Tras entregar vuelto, el diálogo se cierra y se imprime el tiquete; opción explícita de cerrar sin imprimir.
+- La pantalla de caja recibe la identidad del rol, y el cajero puede guardar ajustes de impresión.
+- Corrige QA HTTP real a los tres códigos FCR2 e incorpora regresión nativa de dos cajeros.
+- `npm test` local aprobado; HTTP nativo con better-sqlite3, Electron, impresora física y NSIS pendientes en Windows.
+
 ## v0.6.88 — PDF de cierre de caja en SQLite Y Windows, por usuario y mes (20/11/2026)
 
 - **Doble guardado:** al confirmar el cierre, primero se conserva el PDF inmutable en SQLite y luego se guarda una **copia con idénticos bytes** en la carpeta `Documentos/FacturaCR/Cierres de caja/Empresa_N/AAAA/MM-Mes/`.
