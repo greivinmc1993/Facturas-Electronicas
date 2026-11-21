@@ -1,3 +1,4 @@
+import {summarizeSyntheticXadesLab,signaturePreparationStatus} from './fe-xades-laboratory-status.mjs';
 import {fiscalSale,toCents,parseFive,fiveString} from '../server/fiscal-precision.js';
 import {csvExcelBlob,decodeCatalogCsv,csvSafeCell} from './csv-export.js';
 import {saleClientLabel,saleModeLabel,saleLocalDate,saleLocalDateTime} from './sales-history-display.mjs';
@@ -168,6 +169,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
  const [details,setDetails]=useState(null),[annulReason,setAnnulReason]=useState('');
  const [xmlDraft,setXmlDraft]=useState(null),[xmlDraftBusy,setXmlDraftBusy]=useState(false);
  const [xsdResult,setXsdResult]=useState(null),[xsdBusy,setXsdBusy]=useState(false);
+ const [signLabResult,setSignLabResult]=useState(null),[signLabBusy,setSignLabBusy]=useState(false);
  const [abonoAmount,setAbonoAmount]=useState(''),[abonoMethod,setAbonoMethod]=useState('Efectivo');
  const [creditSales,setCreditSales]=useState([]),[creditPayments,setCreditPayments]=useState([]),[creditFilter,setCreditFilter]=useState('todas'),[creditSearch,setCreditSearch]=useState(''),[creditTab,setCreditTab]=useState('ventas');
  const [ticketSettings,setTicketSettings]=useState(ticketDefaults),[ticketDraft,setTicketDraft]=useState(ticketDefaults),[ticketSavedMessage,setTicketSavedMessage]=useState(''),[ticketPreview,setTicketPreview]=useState(''),[ticketConfigOpen,setTicketConfigOpen]=useState(false);
@@ -348,7 +350,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
    setProducts(Array.isArray(p)?p:[]);setClients(Array.isArray(c)?c:[]);setSales(Array.isArray(h)?h:[]);
   }catch(e){setNotice(e.message)}
  };
- useEffect(()=>{setCart([]);setClientId('');setClientQuery('');setDocumentMode('GENERICA');setSaleType('contado');setDetails(null);setXmlDraft(null);setCreditSales([]);setCreditPayments([]);setNotice('');load();if(canReadHistory&&!isCashier)loadCredits()},[companyId,canReadHistory,isCashier]);
+ useEffect(()=>{setCart([]);setClientId('');setClientQuery('');setDocumentMode('GENERICA');setSaleType('contado');setDetails(null);setXmlDraft(null);setSignLabResult(null);setCreditSales([]);setCreditPayments([]);setNotice('');load();if(canReadHistory&&!isCashier)loadCredits()},[companyId,canReadHistory,isCashier]);
  // El borrador queda en SQLite por empresa y por usuario; nunca se restaura sin revisión.
  useEffect(()=>{
    let cancelled=false;const epoch=++draftEpoch.current;
@@ -465,7 +467,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
  };
  const showSale=async id=>{try{setXmlDraft(null);setDetails(await api(`/api/companies/${companyId}/sales/${id}`))}catch(e){setNotice(e.message)}};
  const previewFeXml=async (saleId,documentType='FE')=>{
-  setXmlDraftBusy(true);setXmlDraft(null);setXsdResult(null);
+  setXmlDraftBusy(true);setXmlDraft(null);setXsdResult(null);setSignLabResult(null);
   try{
    const response=await fetch(`/api/companies/${companyId}/sales/${saleId}/fe/xml-draft?documentType=${documentType==='TE'?'TE':'FE'}`,{credentials:'same-origin'});
    const data=await response.json();
@@ -486,6 +488,20 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
   }catch(error){setXsdResult({status:'CANNOT_VALIDATE',error:error.message||'No se pudo realizar la prueba XSD.'})}
   finally{setXsdBusy(false)}
  };
+ const runPreparationSignatureLab=async()=>{
+  if(!xmlDraft?.ready||signLabBusy||xsdBusy)return;
+  setSignLabBusy(true);setSignLabResult(null);
+  try{
+   if(typeof window.facturacrSignature?.runIntegratedXadesLab!=='function'){
+    setSignLabResult(summarizeSyntheticXadesLab(null));return;
+   }
+   // NO enviar xmlDraft, clave, empresa, certificado ni contraseña al IPC.
+   const report=await window.facturacrSignature.runIntegratedXadesLab();
+   setSignLabResult(summarizeSyntheticXadesLab(report));
+  }catch{setSignLabResult(summarizeSyntheticXadesLab(null));}
+  finally{setSignLabBusy(false);}
+ };
+ const signatureSteps=signaturePreparationStatus({draftReady:xmlDraft?.ready===true,xsdResult,labResult:signLabResult});
  const downloadFeXml=()=>{
   if(!xmlDraft?.ready||!xmlDraft.xml||!details)return;
   const blob=new Blob([xmlDraft.xml],{type:'application/xml;charset=utf-8'});
@@ -662,7 +678,21 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
        {xsdResult.errors?.length>0&&<ol>{xsdResult.errors.map((problem,i)=><li key={i}>Línea {problem.line||'?'}{problem.field?` · ${problem.field}`:''}: {problem.message}</li>)}</ol>}
       </div>}
      </section>
-     <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>{setXmlDraft(null);setXsdResult(null)}}>Cerrar</button></div>
+     <section className="feXadesPreparation" aria-label="Preparación técnica de firma XAdES-EPES">
+      <div className="feXadesPreparationHeading"><h4>Preparación de firma XAdES-EPES · laboratorio seguro</h4><span className="fePreparationStage">Sin emisión fiscal</span></div>
+      <p>Este botón ensaya el motor XAdESjs sobre <b>tres documentos ficticios</b>. No recibe el XML mostrado, ni el certificado o la contraseña del usuario; no firma ni envía la venta.</p>
+      <button type="button" className="secondary" disabled={!xmlDraft.ready||signLabBusy||xsdBusy} onClick={runPreparationSignatureLab}>{signLabBusy?'Ejecutando ensayo criptográfico…':'Probar motor XAdESjs con XML ficticios'}</button>
+      {signLabResult&&<div className="feXadesLabResult" role="status"><strong>{signLabResult.status==='LAB_VERIFIED'?'Ensayo criptográfico de laboratorio aprobado':'Ensayo de laboratorio sin aprobar'}</strong><p>{signLabResult.message}</p>{signLabResult.status==='LAB_VERIFIED'&&<p>3/3 firmas ficticias comprobadas · 2 referencias por firma · 6/6 alteraciones rechazadas.</p>}</div>}
+      <div className="feXadesChecks" aria-label="Comprobaciones pendientes para firma fiscal">
+       <div><span>{signatureSteps.localPreSign?'✓':'○'}</span> Estructura del borrador: XSD local solo señala firma pendiente {signatureSteps.localPreSign?'(diagnóstico, no homologación)':'(sin confirmar)'}</div>
+       <div><span>{signatureSteps.engine?'✓':'○'}</span> Motor XAdESjs de laboratorio {signatureSteps.engine?'probado con archivos ficticios':'pendiente de ensayo'}</div>
+       <div><span>○</span> Certificado real, titular y cadena de confianza: no comprobados aquí</div>
+       <div><span>○</span> Política oficial, numeración fiscal y XSD oficial: pendientes</div>
+       <div><span>○</span> Firma criptográfica del XML real y validación Hacienda: pendientes</div>
+      </div>
+      <p className="feXadesNoIssue"><b>Firma fiscal: bloqueada · Envío: bloqueado.</b> Un ensayo aprobado no sustituye firmar y verificar el comprobante con certificado habilitado.</p>
+     </section>
+     <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>{setXmlDraft(null);setXsdResult(null);setSignLabResult(null)}}>Cerrar</button></div>
     </div>
   </div>}
   {ticketPreview&&<div className="ticketOverlay" role="dialog" aria-modal="true" aria-label="Vista previa de tiquete"><div className="ticketModal"><h3>Vista previa del tiquete</h3><iframe title="Tiquete" sandbox="allow-same-origin" srcDoc={ticketPreview}/><div className="actions"><button type="button" onClick={async()=>{try{if(!window.facturacrPrinter)throw Error('La impresión requiere la aplicación de escritorio.');await printHtml(ticketPreview)}catch(e){setNotice(e.message)}}}>Imprimir con Windows</button><button type="button" className="secondary" onClick={()=>setTicketPreview('')}>Cerrar</button></div></div></div>}

@@ -1,4 +1,27 @@
+## FacturaCR v0.6.92 · Preparación de firma XAdES-EPES (laboratorio, NO fiscal)
+
+- En el modal de borrador FE/TE 4.4 hay un nuevo bloque **«Preparación de firma XAdES-EPES · laboratorio seguro»**. El botón **«Probar motor XAdESjs con XML ficticios»** ejecuta el laboratorio existente con tres XML sintéticos, verifica dos referencias por firma y que seis alteraciones sean rechazadas.
+- **El laboratorio no recibe ni firma el borrador real**, ni recibe el archivo `.p12`, contraseña, claves, empresa o cliente. No se presenta como comprobante firmado ni puede habilitar emisión.
+- La lista de condiciones distingue: XSD local solo con firma pendiente, ensayo de motor XAdESjs, certificado/cadena de confianza, política oficial, numeración real y aceptación Hacienda. El ensayo nunca marca como resueltas las condiciones fiscales.
+- No se modifica SQLite, la API de ventas, los XML 4.4 almacenados ni los cálculos tributarios. Se preserva el validador XSD de v0.6.91 y la corrección UTF-8 de MSYS2.
+
+**Cómo probar v0.6.92 (Windows):**
+
+1. Respaldar SQLite y reemplazar únicamente los archivos de proyecto; mantener la base de datos comercial.
+2. Ejecutar `npm ci`, `npm run qa:xades:preparation`, `npm run qa:xades-engine`, `npm test`, `npm run qa:real-server`.
+3. Abrir **FacturaCR de escritorio** → empresa de prueba → historial de ventas → venta FE/TE → borrador XML 4.4.
+4. En la sección XSD usar la carpeta local de esquemas (si procede). En **Preparación de firma** pulsar **Probar motor XAdESjs con XML ficticios**.
+5. Debe mostrar **3/3 documentos ficticios verificados, 6/6 alteraciones rechazadas**, con **Firma fiscal: bloqueada · Envío: bloqueado**. No debe generar un XML fiscal firmado.
+6. Probar deshabilitando las dependencias o ejecutando en navegador: debe indicar que no se pudo completar, sin marcar «aprobado».
+7. Compilar `npm run dist:win` y comprobar aplicación instalada con el motor integrado: pendiente hasta ejecutar en Windows.
+
+**QA nuevo:** `npm run qa:xades:preparation`. **Limitaciones:** no se ha firmado un borrador FE/TE con un certificado de contribuyente, no se ha validado un documento firmado real con XSD oficial, no se comprobaron revocación ni identidad del firmante y no se envió nada a Hacienda.
+
+---
+
 # FacturaCR v0.6.91 — Diagnóstico XSD previo a la firma FE/TE
+
+**Corrección adicional (Windows / MSYS2):** el diagnóstico del validador ejecuta Python con salida UTF-8 explícita (`PYTHONIOENCODING=utf-8`, `PYTHONUTF8=1`) para que `único`, `validación` y otros textos con tildes aparezcan correctamente. La prueba `npm run qa:xsd:pre-sign-desktop` incluye ahora una regresión de codificación. La validación fiscal y sus criterios no cambian.
 
 **Objetivo:** distinguir un borrador XML 4.4 sin firma que solo presenta la ausencia de `ds:Signature` de otro que contiene **errores estructurales adicionales**. La aplicación nunca inventa, inserta ni simula una firma para lograr la validación.
 

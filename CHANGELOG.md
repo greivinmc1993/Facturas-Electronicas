@@ -1,3 +1,15 @@
+## v0.6.92 — Preparación XAdES-EPES verificable desde FE/TE (sin firma fiscal)
+- Nuevo panel y ensayo XAdESjs de documentos sintéticos desde la pantalla FE/TE; nunca envía XML comercial ni secretos a Electron.
+- Resumen estricto de evidencia del laboratorio y condiciones fiscales pendientes. La emisión continúa bloqueada.
+- QA del contrato de preparación, escenarios positivos y fallos, integración en Actions, metadatos versión actualizados.
+- Sin migración SQLite ni alteración de ventas.
+
+## v0.6.91 — corrección de codificación UTF-8 en diagnóstico XSD (Windows)
+
+- Se fuerza la salida UTF-8 al ejecutar Python/lxml desde Electron (incluido MSYS2 en Windows) para evitar caracteres sustituidos `�` en los mensajes con tildes.
+- Se añade regresión de codificación a QA de escritorio y comprobación de sintaxis.
+- Sin cambios en el XML, XSD, cálculos fiscales, base de datos, usuarios ni emisión.
+
 ## [0.6.91] — Diagnóstico estructural previo a firma XML FE/TE (21/11/2026)
 
 - Distingue mediante el XSD local si el único problema detectado en un borrador FE/TE es `ds:Signature` faltante al final de la raíz, si existen **otros errores XSD** o si el esquema acepta el XML sin firma.

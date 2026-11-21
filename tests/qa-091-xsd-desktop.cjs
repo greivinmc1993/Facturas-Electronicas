@@ -28,7 +28,7 @@ const response=status=>JSON.stringify({reports:[{documentType:'FE',validWithSupp
  assert.match(py,/signature_present = any\(child\.tag == signature_tag/);
  assert.match(py,/only_missing_signature = \(len\(errors\) == 1/);
  assert.match(py,/valid = schema.validate\(xml_doc\)/);
- assert.equal(pkg.version,'0.6.91');
+ assert.equal(pkg.version,'0.6.92');
  assert.match(JSON.stringify(pkg.scripts),/qa:xsd:pre-sign/);
- console.log('QA v0.6.91 puente + interfaz previo a firma: 13/13 comprobaciones locales; sin XSD oficiales.');
+ console.log('QA v0.6.92 puente + interfaz previo a firma: 13/13 comprobaciones locales; sin XSD oficiales.');
 })().catch(e=>{console.error(e);process.exitCode=1});

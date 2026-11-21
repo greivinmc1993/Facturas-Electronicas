@@ -42,7 +42,9 @@ async function validateDraftLocally({xml,documentType,schemaDir,pythonScript,run
   let stdout='',exitCode=2,lastError=null;
   for(const [binary,binaryArgs] of runners){
    try{
-    const result=await run(binary,binaryArgs,{timeout:TIMEOUT_MS,maxBuffer:MAX_REPORT_BYTES,windowsHide:true,shell:false});
+    // Windows/MSYS2 puede emitir stdout en CP1252 cuando Python hereda la consola.
+    // Node interpreta stdout como UTF-8: forzarlo en el proceso hijo evita los caracteres �.
+    const result=await run(binary,binaryArgs,{timeout:TIMEOUT_MS,maxBuffer:MAX_REPORT_BYTES,windowsHide:true,shell:false,encoding:'utf8',env:{...process.env,PYTHONIOENCODING:'utf-8',PYTHONUTF8:'1'}});
     stdout=result.stdout;exitCode=0;lastError=null;break;
    }catch(error){
     if(error.code==='ENOENT'){lastError=error;continue}

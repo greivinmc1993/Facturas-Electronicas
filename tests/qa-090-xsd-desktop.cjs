@@ -62,6 +62,6 @@ async function run(){
   assert.ok(pkg.build.asarUnpack.includes('tests/qa-087-xsd-pareja.py'));
   assert.match(JSON.stringify(pkg.scripts),/qa:xsd:desktop-real/);
  });
- console.log(`QA XSD escritorio (v0.6.91): ${checks}/${checks} controles aprobados con respuestas simuladas; sin XSD oficiales.`);
+ console.log(`QA XSD escritorio (v0.6.92): ${checks}/${checks} controles aprobados con respuestas simuladas; sin XSD oficiales.`);
 }
 run().catch(err=>{console.error(err);process.exitCode=1});

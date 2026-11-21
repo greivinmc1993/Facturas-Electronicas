@@ -9,7 +9,7 @@ const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const pkg=require('../package.json'),lock=require('../package-lock.json');
 const tests=[];
 const check=(name,fn)=>tests.push([name,fn]);
-check('Versión alineada',()=>{assert.equal(pkg.version,'0.6.91');assert.equal(lock.version,pkg.version);assert.equal(lock.packages[''].version,pkg.version)});
+check('Versión alineada',()=>{assert.equal(pkg.version,'0.6.92');assert.equal(lock.version,pkg.version);assert.equal(lock.packages[''].version,pkg.version)});
 check('Dependencias directas fijadas',()=>{for(const k of ['xadesjs','xmldsigjs','xml-core'])assert.equal(pkg.dependencies[k],'3.1.0');assert.equal(pkg.dependencies['@xmldom/xmldom'],'0.9.12');assert.equal(pkg.dependencies.xpath,'0.0.35')});
 check('Lockfile refleja dependencias',()=>{for(const [k,v] of Object.entries(pkg.dependencies)){assert.equal(lock.packages[''].dependencies[k],v);assert(lock.packages['node_modules/'+k])}});
 check('Integridad de paquetes especializados',()=>{for(const k of ['xadesjs','xmldsigjs','xml-core','@xmldom/xmldom','xpath']){const e=lock.packages['node_modules/'+k];assert(e.integrity?.startsWith('sha512-'));assert(e.resolved?.startsWith('https://registry.npmjs.org/'));}});
