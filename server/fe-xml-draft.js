@@ -1,10 +1,11 @@
 import {parseFive,fiveString,roundRatio} from './fiscal-precision.js';
 import {preflightFe44Draft} from './fe-xml-preflight.js';
-// FacturaCR 0.6.71: BORRADOR XML 4.4 exclusivamente informativo y de solo lectura.
+// FacturaCR v0.6.87: FE/TE de ensayo XML 4.4 exclusivamente informativos y de solo lectura.
 // La clave y el consecutivo son ficticios. La prevalidación local NO sustituye XSD, firma ni envío.
 import {COMPANY_ACTIVITY_PATTERN,validateCompanyIdentification} from './company-identity.js';
 
 const XML_NAMESPACE='https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica';
+const TE_NAMESPACE='https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/tiqueteElectronico';
 const VALID_TAX_RATES=new Map([[0,null],[1,'02'],[2,'03'],[4,'04'],[13,'08']]);
 const PAYMENT_CODES=new Map([['Efectivo','01'],['Tarjeta','02'],['Cheque','03'],['Transferencia bancaria','04'],['SINPE Móvil','06'],['Otros','99']]);
 // El cálculo usa 5 decimales y aritmética entera: nunca se redondea el IVA al colón
@@ -36,7 +37,9 @@ function validateReceptor(client,issues){
   requireText(issues,client.identification,'Cliente: identificación sin formato válido.',v=>!!v.trim());
   if(client.identification_type&&client.identification){try{validateCompanyIdentification(client.identification_type,client.identification)}catch{issues.push('Cliente: la identificación no corresponde al tipo de documento.')}}
 }
-export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],generatedAt=new Date()}={}){
+export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],generatedAt=new Date(),documentType='FE'}={}){
+  if(!['FE','TE'].includes(documentType))throw Error('Tipo de borrador no admitido.');
+  const isTicket=documentType==='TE';
   const issues=[],warnings=[];
   if(!company||!sale||!Array.isArray(lines))throw Error('No hay datos suficientes para construir el borrador.');
   if(sale.status!=='activa')issues.push('Venta: no se generan borradores de ventas anuladas.');
@@ -54,7 +57,9 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
   const activityCode=String(f.activity_code??'').trim();
   if(!COMPANY_ACTIVITY_PATTERN.test(activityCode))issues.push('Actividad económica: indica el código inscrito en el RUT con formato 4019.0 (XXXX.X) o un código histórico de seis dígitos.');
   if(!/^[1-7]$/.test(String(f.province||''))||!/^[0-9]{2}$/.test(String(f.canton||''))||!/^[0-9]{2}$/.test(String(f.district||'')))issues.push('Empresa: falta provincia, cantón o distrito de la ficha fiscal.');
-  validateReceptor(client,issues);
+  if(isTicket){
+    if(client)issues.push('Tiquete: esta opción es exclusivamente para ventas de contado sin cliente identificado. Utiliza factura electrónica para el receptor registrado.');
+  }else validateReceptor(client,issues);
   if(!lines.length||lines.length>100)issues.push('Venta: se requieren entre 1 y 100 líneas de detalle.');
   // Los medios de pago deben venir de sale_payments; no se infieren por la condición contado.
   if(!Array.isArray(payments))payments=[];
@@ -140,13 +145,14 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
       issues.push('Venta: las sumas históricas de líneas no coinciden con los totales registrados.');
   }
   if(!Number.isFinite(new Date(generatedAt).getTime()))issues.push('Fecha de vista previa inválida.');
+  if(isTicket)warnings.push('Tiquete electrónico: exclusivo para consumidor final. No sirve como justificante de gastos o créditos fiscales. Este es solo un borrador sin validez.');
   warnings.push('La clave y el consecutivo son ceros ficticios: NO utilizarlos para emitir ni para validar ante Hacienda.');
   warnings.push('Actividad económica: solo se comprobó el formato; no se ha confirmado que esté vigente e inscrita para esta empresa en el RUT de Hacienda.');
   warnings.push('Los CAByS de prueba no se verifican contra catálogo: queda pendiente su comprobación oficial.');
   warnings.push('Mercancía o servicio se toma de la ficha del producto, no de los primeros dígitos de un CAByS ficticio.');
   warnings.push('ProveedorSistemas utiliza por ahora la identificación del emisor; debe verificarse la identidad real del proveedor antes de emitir.');
   warnings.push('Pendiente: validación contra XSD oficial 4.4 vigente, RUT/CAByS reales, firma XAdES-EPES, numeración fiscal y envío.');
-  if(issues.length)return {version:'4.4',mode:'draft-only',ready:false,issues,warnings,xml:null};
+  if(issues.length)return {version:'4.4',documentType,mode:'draft-only',ready:false,issues,warnings,xml:null};
   // Si hay un desajuste entre bases y tributos históricos, se rechaza el borrador:
   // es inseguro cambiar la base o el precio acordado sin información histórica adicional.
   const escLines=detailed.map((l,i)=>{
@@ -201,19 +207,19 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
   ].join('\n'));
   const xml=[
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!-- FacturaCR 0.6.86 | BORRADOR DE PRUEBA: NO FIRMADO, NO AUTORIZADO, NO ENVIAR A HACIENDA -->',
-    `<FacturaElectronica xmlns="${XML_NAMESPACE}">`,
+    `<!-- FacturaCR 0.6.87 | BORRADOR DE PRUEBA ${isTicket?'TIQUETE':'FACTURA'}: NO FIRMADO, NO AUTORIZADO, NO ENVIAR A HACIENDA -->`,
+    `<${isTicket?'TiqueteElectronico':'FacturaElectronica'} xmlns="${isTicket?TE_NAMESPACE:XML_NAMESPACE}">`,
     tag('Clave','0'.repeat(50)),tag('ProveedorSistemas',company.identification),tag('CodigoActividadEmisor',activityCode),
-    ...(COMPANY_ACTIVITY_PATTERN.test(String(client.activity_code||''))?[tag('CodigoActividadReceptor',client.activity_code)]:[]),
+    ...(!isTicket&&COMPANY_ACTIVITY_PATTERN.test(String(client?.activity_code||''))?[tag('CodigoActividadReceptor',client.activity_code)]:[]),
     tag('NumeroConsecutivo','0'.repeat(20)),tag('FechaEmision',timestampCR(new Date(generatedAt))),
     '  <Emisor>',tag('Nombre',company.legal_name,2),'    <Identificacion>',tag('Tipo',f.identification_type,3),tag('Numero',company.identification,3),'    </Identificacion>',
     ...(company.trade_name?.trim()?[tag('NombreComercial',company.trade_name.trim(),2)]:[]),
     '    <Ubicacion>',tag('Provincia',f.province,3),tag('Canton',f.canton,3),tag('Distrito',f.district,3),tag('OtrasSenas',company.address,3),'    </Ubicacion>',
     tag('CorreoElectronico',company.email,2),'  </Emisor>',
-    '  <Receptor>',tag('Nombre',client.name,2),'    <Identificacion>',tag('Tipo',client.identification_type,3),tag('Numero',client.identification,3),'    </Identificacion>',
+    ...(!isTicket?['  <Receptor>',tag('Nombre',client.name,2),'    <Identificacion>',tag('Tipo',client.identification_type,3),tag('Numero',client.identification,3),'    </Identificacion>',
     ...(/^[1-7]$/.test(String(client.province||''))&&/^\d{2}$/.test(String(client.canton||''))&&/^\d{2}$/.test(String(client.district||''))&&String(client.address||'').trim().length>=5?[
       '    <Ubicacion>',tag('Provincia',client.province,3),tag('Canton',client.canton,3),tag('Distrito',client.district,3),tag('OtrasSenas',client.address,3),'    </Ubicacion>']:[]),
-    ...(client.email?[tag('CorreoElectronico',client.email,2)]:[]),'  </Receptor>',
+    ...(client.email?[tag('CorreoElectronico',client.email,2)]:[]),'  </Receptor>']:[]),
     tag('CondicionVenta','01'),
     '  <DetalleServicio>',...escLines,'  </DetalleServicio>',
     '  <ResumenFactura>','    <CodigoTipoMoneda>',tag('CodigoMoneda','CRC',3),tag('TipoCambio','1.00000',3),'    </CodigoTipoMoneda>',
@@ -223,10 +229,13 @@ export function createFeXmlDraft({company,fiscal,sale,client,lines,payments=[],g
     tag('TotalVenta',five(fiscalSummary.subtotal),2),tag('TotalDescuentos',five(fiscalSummary.discount),2),tag('TotalVentaNeta',five(fiscalSummary.subtotal-fiscalSummary.discount),2),
     ...breakdownXml,tag('TotalImpuesto',five(fiscalSummary.tax),2),...paymentXml,
     tag('TotalComprobante',five(fiscalSummary.total),2),'  </ResumenFactura>',
-    '</FacturaElectronica>',''
+    `</${isTicket?'TiqueteElectronico':'FacturaElectronica'}>`,''
   ].join('\n');
-  const preflight=preflightFe44Draft(xml,{expectedLines:detailed.length});
-  if(!preflight.ok)return {version:'4.4',mode:'draft-only',ready:false,issues:preflight.findings.filter(f=>f.severity==='error').map(f=>`Línea XML ${f.line??'?'} · ${f.field}: ${f.message}`),warnings,xml:null,preflight};
-  return {version:'4.4',mode:'draft-only',ready:true,issues:[],warnings,xml,preflight,
+  const preflight=preflightFe44Draft(xml,{expectedLines:detailed.length,documentType});
+  if(!preflight.ok)return {version:'4.4',documentType,mode:'draft-only',ready:false,issues:preflight.findings.filter(f=>f.severity==='error').map(f=>`Línea XML ${f.line??'?'} · ${f.field}: ${f.message}`),warnings,xml:null,preflight};
+  return {version:'4.4',documentType,mode:'draft-only',ready:true,issues:[],warnings,xml,preflight,
     totals:{subtotalCents:subtotal,discountCents:discount,taxCents:tax,totalCents:total},saleId:sale.id};
 }
+
+// Documento de ensayo TE 4.4. Reutiliza el motor de cálculo; nunca genera clave fiscal ni firma.
+export function createTeXmlDraft(options={}){return createFeXmlDraft({...options,documentType:'TE'});}

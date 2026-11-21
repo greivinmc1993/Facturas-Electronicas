@@ -1,3 +1,85 @@
+## v0.6.87 — Ajuste adicional de Ventas: modalidades FE / TE / genérica y historiales contraídos (20-11-2026)
+
+- **Tipo de cliente y comprobante en Punto de venta:** se elige explícitamente **Cliente con datos · Factura electrónica**, **Sin datos · Tiquete electrónico**, o **Genérica · Factura interna**. El modo inicial es genérico; ninguna modalidad envía documentos a Hacienda en esta etapa.
+- **Factura electrónica (FE):** solo aquí aparece **«Buscar cliente por nombre o cédula»**, con selector de un receptor registrado. No se puede confirmar FE sin cliente. La venta a crédito exige esta modalidad y cliente.
+- **Tiquete electrónico (TE):** reserva la modalidad `TE`, registra venta de contado sin `client_id`, y permite generar posteriormente el borrador `TiqueteElectronico` 4.4 usando datos existentes del emisor, artículos, impuestos y medios de pago; **no inventa identificadores, no asigna numeración fiscal ni transmite XML**.
+- **Factura genérica:** modo `GENERICA`, solo registro de venta e impresión del comprobante comercial interno. **No genera XML FE/TE**: la API lo bloquea incluso ante una solicitud manual.
+- **Historial de ventas e historial de ventas a crédito:** empiezan contraídos y se expanden mediante sus botones existentes.
+- **Persistencia:** columna aditiva `sales.document_mode` sin reclasificar ni recalcular registros históricos (NULL para antiguos). La recuperación de un carrito guarda/restaura la modalidad; al cambiar desde FE a TE o genérica se borra el cliente seleccionado.
+- **Compatibilidad:** se conservan las pruebas antiguas de borradores FE/TE para ventas históricas sin modalidad (NULL), los datos fiscales, la precisión, la impresión posterior al vuelto y la seguridad de usuarios.
+- **QA:** `npm test` aprobado; 76/76 pruebas de integración local y pruebas nuevas de modalidades. La validación XSD oficial, la firma fiscal y el envío a Hacienda siguen pendientes. Ejecutar `npm ci`, `npm run qa:real-server`, `npm run dist:win` y los workflows de GitHub Actions en Windows antes de reemplazar una instalación existente. **Crear y verificar respaldo SQLite antes de actualizar.**
+
+# FacturaCR v0.6.87 — Borradores FE/TE 4.4 y ruta de validación XSD (NO FISCAL)
+
+## 1. Cambio principal: tiquete electrónico para consumidores finales sin datos
+
+- La venta **de contado sin cliente registrado** permite desde **Ventas → Historial → Detalle de venta** seleccionar **«Borrador TE 4.4 · consumidor final»**.
+- El sistema genera un archivo `FacturaCR_BORRADOR_TE44_venta_<n>.xml` con raíz `TiqueteElectronico` y namespace de versión 4.4, **sin** las etiquetas `Receptor` ni `CodigoActividadReceptor`. No inventa cédulas, nombres ni direcciones del comprador.
+- La venta con cliente identificado mantiene el botón **«Borrador FE 4.4 (prueba)»** y la identificación del receptor. El botón de TE se deshabilita en ventas con cliente o de crédito, para evitar convertir una factura identificada en un tiquete anónimo por error. Los botones FE/TE están agrupados de forma simétrica y separados del tiquete comercial impreso.
+- Ambos tipos reutilizan el mismo motor de cálculos exactos y fotografía fiscal de la venta; siguen conservando **una línea por producto**, impuestos y pagos históricos. La selección solo genera una **vista previa de lectura**: no altera SQLite, el tipo de venta ni el inventario, y no genera un documento electrónico emitido.
+- **Tiquete electrónico ≠ tiquete comercial impreso**: el botón «Vista previa del tiquete» corresponde al recibo comercial/impresión de caja. El borrador TE es un XML **NO FISCAL**, sin clave/consecutivo auténticos, sin XSD validado ni firma; no se envía a Hacienda. Los tiquetes electrónicos reales solo corresponden a operaciones con **consumidores finales** y **no respaldan créditos fiscales ni gastos tributarios**.
+
+## 2. Prevalidación FE/TE y validación XSD
+
+- `server/fe-xml-draft.js` admite `documentType=FE|TE`; con `TE` omite receptor y utiliza el elemento principal y namespace de tiquete. `server/fe-xml-preflight.js` comprueba ambos tipos, las relaciones aritméticas y que TE no haya recibido datos de receptor. La ruta `GET /api/companies/:companyId/sales/:saleId/fe/xml-draft?documentType=TE` conserva autorización por empresa y nunca escribe datos.
+- `tests/qa-087-xsd-pareja.py` verifica **dos XML distintos** contra **dos archivos XSD locales** proporcionados por quien opera el sistema. Confirma namespace y raíz correspondiente a FE/TE y muestra errores con líneas, `SHA-256` de cada XSD y el resultado. El nombre del archivo no demuestra procedencia ni vigencia del esquema.
+- **NO hay XSD oficial verificado incorporado en este ZIP.** Se debe obtener la revisión vigente de ambos esquemas en el portal oficial de Hacienda/TRIBU-CR, incluyendo sus importaciones, antes de considerar la validación como fiscal. La autoprueba usa archivos XSD **sintéticos**, NO las estructuras oficiales.
+- Comandos: `npm run qa:fe44-preflight` y `npm run qa:xsd:selftest`. Para usar esquemas descargados y verificados manualmente:
+
+```powershell
+python -m pip install "lxml>=5,<7"
+python tests/qa-087-xsd-pareja.py --schema-dir "C:\esquemas-hacienda-v4.4" --fe-xml "C:\pruebas\factura.xml" --te-xml "C:\pruebas\tiquete.xml"
+```
+
+Los archivos `FacturaElectronica_V4.4.xsd` y `TiqueteElectronico_V4.4.xsd` deben provenir de la publicación vigente de Hacienda. La validación con XSD auténtico sigue **PENDIENTE**; tampoco se debe interpretar un XML con ceros fiscales como documento emitible.
+
+## 3. Lista de trabajos pendientes (mantener visible en cada avance)
+
+| Prioridad | Pendiente | Motivo / criterio de cierre |
+|---|---|---|
+| Alta | Obtener, fijar y verificar los XSD oficiales FE y TE 4.4 (revisión vigente) | Comprobar fecha, origen, hash SHA-256, dependencias y resultado detallado FE/TE |
+| Alta | Completar tiquete electrónico real en Ventas | Selección fiscal explícita FE/TE, consecutivos y claves reales separados por tipo, persistencia inmutable y representación impresa; **todavía solo hay borradores** |
+| Alta | Comprobación del emisor, RUT/actividades y CAByS | Verificar actividad `6619.0`, CABYS `2449001000000` y otros códigos con catálogos actuales, sin inventar datos |
+| Alta | Validación del IVA, descuentos, cantidades y redondeos | Confirmar aceptación del residuo unitario de cinco decimales (por ejemplo ₡0,00005) ante Hacienda; no dividir líneas ni alterar IVA |
+| Alta | Firma real XAdES-EPES | Integrar certificado por empresa con comprobaciones de confianza, revocación, política y verificador independiente, sin almacenar su contraseña |
+| Alta | Integración de autenticación, envío y respuesta de Hacienda | Idempotencia, estados recibido/aceptado/rechazado y reintentos, sin marcar como emitido lo que no fue aceptado |
+| Media | Notas de crédito/débito y trazabilidad | Referenciar importes fiscales originales, respetar histórico y registrar auditoría |
+| Media | Impresión final, controles de interfaz y QA | Mantener impresión **después** de cerrar vuelto; pruebas Windows/NSIS, SQLite/backup, usuarios y permisos |
+
+## 4. Seguridad, QA y compatibilidad
+
+- Sin migraciones SQLite ni cambios en ventas históricas, usuarios, respaldos, existencias o pagos. El nuevo endpoint es de solo lectura y respeta el aislamiento por empresa.
+- Pruebas de TE: 17/17; interfaz: 9/9; XSD con esquemas sintéticos: 6/6; integración SQLite real mediante adaptadores: 75/75. Las pruebas de integración no equivalen al arranque con Express/SQLite nativos en Windows.
+- Conservar `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows`; no agregar informes por versión sueltos.
+
+## 5. Verificación de la interfaz
+
+Registra una venta de contado **sin cliente seleccionado**, ábrela en el historial y pulsa «Borrador TE 4.4 · consumidor final». Comprueba que no exista `Receptor`, que se mantengan los importes y que aparezca **Sin validez fiscal**. Después abre una venta con cliente identificado: debe poder mostrar FE, pero no convertirla a TE anónimo. El tiquete de caja sigue siendo independiente.
+
+## 6. Instalación y GitHub
+
+Antes de reemplazar una instalación, **crear y verificar un respaldo independiente de la base SQLite**. Luego:
+
+```powershell
+npm ci
+npm test
+npm run qa:fe44-preflight
+npm run qa:xsd:selftest
+npm run qa:xades-engine
+npm run qa:real-server
+npm run dist:win
+```
+
+Después de comprobar todas las pruebas y el instalador Windows:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.87 - borrador de tiquete electronico y prevalidacion FE TE 4.4"
+git push origin main
+```
+
+---
+
 # FacturaCR v0.6.86 — Prevalidación del borrador FE 4.4 (NO FISCAL)
 
 La versión **0.6.86** incorpora prevalidación local automática del XML de borrador creado en Ventas. **No es validación XSD oficial ni autoriza emitir una factura.** Todos los XML conservan claves y consecutivos de ceros, no tienen firma y no se envían a Hacienda.

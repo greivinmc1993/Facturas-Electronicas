@@ -1,3 +1,21 @@
+## [0.6.87] — Ajuste adicional: modalidades de cliente en Ventas y secciones contraídas
+
+- Selector FE/TE/GENERICA con búsqueda de clientes condicionada a FE; genérica por defecto, sin XML ni emisión.
+- Tiquetes TE solo para contado anónimo y con datos fiscales del emisor/productos ya registrados; factura FE exige cliente registrado, crédito únicamente FE.
+- Guardado persistente del modo en SQLite y carrito recuperable sin cambiar ventas anteriores; ruta de API fiscal bloqueada para modo genérico.
+- Historial de ventas y de crédito cerrados inicialmente; recibo comercial genérico identificado como documento interno.
+- QA de ventas FE/TE/genérica, restricciones de API y regresiones (76/76 integración). Instalador Windows y validación XSD oficial siguen pendientes.
+
+## v0.6.87 — Borradores FE y TE 4.4 para consumidor final (20/11/2026)
+
+- Nuevo borrador XML **TiqueteElectronico** para ventas de contado **sin cliente** con namespace 4.4 y receptor omitido; factura electrónica con cliente identificado se conserva.
+- UI en Ventas/Historial distingue **borrador TE** de tiquete comercial impreso; TE deshabilitado en ventas con cliente o a crédito.
+- Una sola ruta GET con `documentType=FE|TE`; aislamiento por empresa, control del tipo y ninguna modificación SQLite. Totales y fiscalidad compartidos entre ambos borradores, sin dividir líneas.
+- Prevalidación diferenciada por raíz/namespace y receptor; ambos tipos muestran `NOT_VALIDATED` para XSD y firma.
+- Nuevo validador local FE+TE en `tests/qa-087-xsd-pareja.py` con pruebas sintéticas y reporte de errores/líneas/hash. **Los XSD oficiales siguen pendientes de obtener y cotejar.**
+- QA nuevo: 17/17 generador TE, 9/9 interfaz, 6/6 validador XSD sintético y 75/75 integración SQLite. `npm test` completo aprobado localmente; `npm ci`/Vite/NSIS/Windows pendientes de esta entrega.
+- Lista de pendientes fiscales y comerciales consolidada en README. No emisión ni claves/consecutivos auténticos, no firma ni envío a Hacienda. Sin migraciones ni modificaciones a ventas históricas.
+
 ## v0.6.86 — Prevalidación local de borradores XML 4.4 (20/11/2026)
 
 - El generador de borradores incorpora `server/fe-xml-preflight.js` con controles de campos, línea, cantidades, precios, descuentos, impuestos y totales; evita descargar XML con inconsistencias internas.

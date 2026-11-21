@@ -18,7 +18,9 @@ export function registerSaleDraftRoutes(app,getDb){
    if(!d||typeof d!=='object'||!Array.isArray(d.lines)||d.lines.length>200||!['contado','credito'].includes(d.saleType)||typeof d.discount!=='string'||String(JSON.stringify(d)).length>90000)return res.status(400).json({error:'Borrador inválido.'});
    if(!d.lines.length){getDb().prepare('DELETE FROM sale_drafts WHERE user_id=? AND company_id=?').run(req.authUser.id,id);return res.json({ok:true,empty:true});}
    if(!d.lines.every(l=>Number.isSafeInteger(l.id)&&l.id>0&&Number.isSafeInteger(l.quantity)&&l.quantity>0&&l.quantity<=100000))return res.status(400).json({error:'Cantidades del borrador inválidas.'});
-   const stored={version:1,lines:d.lines.map(l=>({id:l.id,quantity:l.quantity})),clientId:String(d.clientId||'').slice(0,50),saleType:d.saleType,discount:d.discount.slice(0,40),cashTendered:String(d.cashTendered||'').slice(0,40),payments:Array.isArray(d.payments)?d.payments.slice(0,10).map(p=>({method:String(p.method||'').slice(0,60),amount:String(p.amount||'').slice(0,40)})):[]};
+   const documentMode=['FE','TE','GENERICA'].includes(d.documentMode)?d.documentMode:(d.clientId?'FE':'GENERICA');
+   if(documentMode!=='FE'&&d.saleType==='credito')return res.status(400).json({error:'Un borrador de crédito requiere factura electrónica.'});
+   const stored={version:2,documentMode,lines:d.lines.map(l=>({id:l.id,quantity:l.quantity})),clientId:documentMode==='FE'?String(d.clientId||'').slice(0,50):'',saleType:d.saleType,discount:d.discount.slice(0,40),cashTendered:String(d.cashTendered||'').slice(0,40),payments:Array.isArray(d.payments)?d.payments.slice(0,10).map(p=>({method:String(p.method||'').slice(0,60),amount:String(p.amount||'').slice(0,40)})):[]};
    getDb().prepare('INSERT INTO sale_drafts(user_id,company_id,draft_json) VALUES (?,?,?) ON CONFLICT(user_id,company_id) DO UPDATE SET draft_json=excluded.draft_json,updated_at=CURRENT_TIMESTAMP').run(req.authUser.id,id,JSON.stringify(stored));
    res.json({ok:true});
  };

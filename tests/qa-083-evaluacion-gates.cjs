@@ -14,7 +14,7 @@ const ui=read('src/FeSignatureReadiness.jsx');
 const pkg=require('../package.json');
 const lock=require('../package-lock.json');
 const tests=[
- ()=>{assert.equal(pkg.version,'0.6.86');assert.equal(lock.version,'0.6.86');assert.equal(lock.packages[''].version,'0.6.86');},
+ ()=>{assert.equal(pkg.version,'0.6.87');assert.equal(lock.version,'0.6.87');assert.equal(lock.packages[''].version,'0.6.87');},
  ()=>assert.match(workflow,/workflow_dispatch:/),
  ()=>assert.match(workflow,/node: \['22', '24'\]/),
  ()=>assert.match(workflow,/xadesjs@3\.1\.0 xmldsigjs@3\.1\.0 xml-core@3\.1\.0/),
@@ -29,7 +29,7 @@ const tests=[
  ()=>{assert.match(probe,/webcrypto\.subtle\.generateKey/);assert.match(probe,/mutant/);assert.match(probe,/keyValue: keys\.publicKey/);},
  ()=>{assert.match(external,/resolve_entities=False/);assert.match(external,/no_network=True/);assert.match(external,/key\.verify/);},
  ()=>{assert.match(external,/SignaturePolicyImplied/);assert.match(external,/SignaturePolicyId/);},
- ()=>{assert.match(ui,/v0\.6\.86/);assert.match(ui,/Ensayo integrado de XAdESjs/);},
+ ()=>{assert.match(ui,/v0\.6\.87/);assert.match(ui,/Ensayo integrado de XAdESjs/);},
  ()=>assert.doesNotMatch(read('electron/preload.cjs'),/signFiscalXml|sendFiscalToHacienda/),
 ];
 for(const t of tests)t();

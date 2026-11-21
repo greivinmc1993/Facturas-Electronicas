@@ -180,6 +180,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   addColumn('sales','fe_consecutivo',"TEXT NOT NULL DEFAULT ''");
   addColumn('sales','fe_clave',"TEXT NOT NULL DEFAULT ''");
   addColumn('sales','fe_estado',"TEXT NOT NULL DEFAULT ''");
+  // NULL en históricos: no reclasificar ventas existentes; la modalidad se fija en ventas nuevas.
+  addColumn('sales','document_mode','TEXT');
   // Preferencias de impresión guardadas en SQLite para incluirlas en los respaldos.
   db.exec(`CREATE TABLE IF NOT EXISTS company_ticket_settings (
     company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
@@ -1276,7 +1278,12 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
         LEFT JOIN products p ON p.id=sl.product_id AND p.company_id=?
         WHERE sl.sale_id=? ORDER BY sl.id`).all(companyId,saleId);
       const payments=db.prepare('SELECT method,amount_cents FROM sale_payments WHERE sale_id=? ORDER BY id').all(saleId);
-      const result=createFeXmlDraft({company,fiscal,sale,client,lines,payments});
+      const documentType=String(req.query.documentType||'FE').toUpperCase();
+      if(!['FE','TE'].includes(documentType))return res.status(400).json({error:'Tipo de borrador no admitido.'});
+      if(sale.document_mode==='GENERICA')return res.status(409).json({error:'Venta genérica interna: no corresponde generar XML fiscal.'});
+      if(sale.document_mode==='FE'&&documentType!=='FE')return res.status(409).json({error:'La venta se registró para factura electrónica, no para tiquete.'});
+      if(sale.document_mode==='TE'&&documentType!=='TE')return res.status(409).json({error:'La venta se registró para tiquete electrónico, no para factura.'});
+      const result=createFeXmlDraft({company,fiscal,sale,client,lines,payments,documentType});
       return res.status(result.ready?200:422).json(result);
     }catch(err){return res.status(400).json({error:'No se pudo generar el borrador: '+err.message});}
   });
@@ -1286,6 +1293,14 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
       const saleType=String(body.sale_type||'');
       if(!['contado','credito'].includes(saleType))throw Error('Tipo de venta inválido.');
       const clientId=body.client_id==null||body.client_id===''?null:Number(body.client_id);
+      // Compatibilidad API previa: si el campo falta, se respeta la ruta FE/TE heredada.
+      // La interfaz actual siempre envía su elección, incluida GENERICA.
+      const documentMode=body.document_mode==null?(clientId?'FE':saleType==='contado'?'TE':'GENERICA'):String(body.document_mode);
+      if(!['FE','TE','GENERICA'].includes(documentMode))throw Error('Modalidad de comprobante inválida.');
+      if(documentMode==='FE'&&!clientId)throw Error('Factura electrónica requiere un cliente registrado.');
+      if(documentMode!=='FE'&&clientId)throw Error('Solo la factura electrónica admite un receptor registrado.');
+      if(documentMode==='TE'&&saleType!=='contado')throw Error('Tiquete electrónico para consumidor final requiere venta de contado.');
+      if(saleType==='credito'&&documentMode!=='FE')throw Error('El crédito requiere factura electrónica con cliente registrado.');
       if(saleType==='credito'&&!clientId)throw Error('Las ventas a crédito requieren un cliente registrado.');
       if(clientId&&!db.prepare('SELECT id FROM clients WHERE id=? AND company_id=?').get(clientId,companyId))throw Error('Cliente no pertenece a esta empresa.');
       if(!Array.isArray(body.lines)||!body.lines.length||body.lines.length>100)throw Error('Agrega entre 1 y 100 líneas.');
@@ -1338,8 +1353,8 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
              VALUES (?,?,?,?,?,?,?,?,?)`).run(companyId,p.id,'salida',line.quantity,-line.quantity,before,after,'Venta POS','Descuento automático de inventario');
           }
         }
-        const id=Number(db.prepare(`INSERT INTO sales(company_id,client_id,sale_type,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents)
-          VALUES (?,?,?,?,?,?,?,?,?)`).run(companyId,clientId,saleType,subtotal,discount,tax,total,paid,total-paid).lastInsertRowid);
+        const id=Number(db.prepare(`INSERT INTO sales(company_id,client_id,sale_type,document_mode,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents)
+          VALUES (?,?,?,?,?,?,?,?,?,?)`).run(companyId,clientId,saleType,documentMode,subtotal,discount,tax,total,paid,total-paid).lastInsertRowid);
         const addLine=db.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents,unit_cost_cents,fiscal_unit_price_5,fiscal_subtotal_5,fiscal_discount_5,fiscal_base_5,fiscal_tax_5,fiscal_total_5,fiscal_input_price_5,fiscal_includes_tax,fiscal_calculation_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
         // Captura el costo al vender, no el costo actual del catálogo. No estimar históricos.
         for(const l of detailed){

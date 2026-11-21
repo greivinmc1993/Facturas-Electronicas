@@ -1,0 +1,14 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');const ui=fs.readFileSync(path.join(root,'src/main.jsx'),'utf8');
+const server=fs.readFileSync(path.join(root,'server/index.js'),'utf8');
+const check=(title,fn)=>{fn();console.log('OK UI TE 4.4:',title)};
+check('Botón de tiquete electrónico diferenciado del comercial',()=>{assert.match(ui,/Borrador TE 4\.4 · consumidor final/);assert.match(ui,/Vista previa del tiquete/)});
+check('Sin datos receptor la UI ofrece TE',()=>{assert.match(ui,/Sin datos · Tiquete electrónico/);assert.match(ui,/borrador TE 4\.4/)});
+check('TE bloqueado si venta tiene receptor o es a crédito',()=>assert.match(ui,/document_mode==='GENERICA'\|\|details\.document_mode==='FE'\|\|Boolean\(details\.client\)\|\|details\.sale_type!=='contado'/));
+check('La solicitud FE/TE transmite solo el tipo permitido',()=>assert.match(ui,/documentType==='TE'\?'TE':'FE'/));
+check('Backend valida documento del parámetro',()=>{assert.match(server,/if\(!\['FE','TE'\]\.includes\(documentType\)\)/);assert.match(server,/createFeXmlDraft\(\{company,fiscal,sale,client,lines,payments,documentType\}\)/)});
+check('Vista previa avisa falta de valor fiscal',()=>assert.match(ui,/Sin validez fiscal/));
+check('Descarga diferencia FE y TE',()=>assert.match(ui,/FacturaCR_BORRADOR_\$\{xmlDraft.documentType/));
+check('No se usa POST de emisión tributaria',()=>assert.doesNotMatch(server,/app\.post\('\/api\/companies\/:companyId\/sales\/:saleId\/fe\/xml-draft'/));
+check('Acciones separadas y simétricas para FE/TE y tiquete comercial',()=>{const css=fs.readFileSync(path.join(root,'src/style.css'),'utf8');assert.match(ui,/feDraftActionGroup/);assert.match(ui,/feDraftCommercialGroup/);assert.match(css,/feDraftActionGroup button/);assert.match(css,/grid-template-columns:1fr/)});

@@ -9,7 +9,7 @@ check('Botón de borrador accesible desde detalle de venta',()=>assert.match(ui,
 check('La vista indica que el XML no tiene validez fiscal',()=>assert.match(ui,/Sin validez fiscal/));
 check('La vista advierte que no fue firmado ni enviado',()=>assert.match(ui,/NO está firmado/));
 check('Botón de descarga solo si el borrador está listo',()=>assert.match(ui,/disabled=\{!xmlDraft\.ready\}/));
-check('Archivo descargado incluye la palabra BORRADOR',()=>assert.match(ui,/FacturaCR_BORRADOR_FE44_venta_/));
+check('Archivo descargado incluye la palabra BORRADOR',()=>assert.match(ui,/FacturaCR_BORRADOR_\$\{xmlDraft.documentType/));
 check('La descarga genera un Blob XML sin transmitir datos',()=>assert.match(ui,/new Blob\(\[xmlDraft\.xml\]/));
 check('Errores de validación de venta aparecen dentro de ventana',()=>assert.match(ui,/xmlDraft\.issues\|\|\[\]/));
 check('Los estilos son acotados para no afectar ventas ni empresas',()=>assert.match(css,/\.feDraftModal\{/));

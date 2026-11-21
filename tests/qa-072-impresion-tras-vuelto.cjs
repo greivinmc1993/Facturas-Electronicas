@@ -25,7 +25,7 @@ async function runCase({vuelto,autoPrint}){
   let receipt=null;
   const ref={current:null};
   const scope={
-    companyId:1, saleType:'contado', clientId:'', requestedDiscount:'0',
+    companyId:1, saleType:'contado', documentMode:'GENERICA', clientId:'', requestedDiscount:'0',
     cart:[{id:5,quantity:1}],actualPayments:[{method:'Efectivo',amount:100}],
     changeCents:vuelto, tenderCents:12000, cashApplied:10000,
     ticketSettings:{autoPrint}, draftWriteQueue:{current:Promise.resolve()},
@@ -39,6 +39,7 @@ async function runCase({vuelto,autoPrint}){
       throw Error('API no esperada '+endpoint);
     },
     setCart:()=>{},setPayments:()=>{},setDiscount:()=>{},setCashTendered:()=>{},
+    setClientId:()=>{},setClientQuery:()=>{},setDocumentMode:()=>{},setSaleType:()=>{},
     setChangeReceipt:value=>{receipt=value},setNotice:value=>notices.push(value),
     saleMoney:value=>String(value),
     load:async()=>records.push('historial'), canReadHistory:true, loadCredits:async()=>records.push('creditos'),

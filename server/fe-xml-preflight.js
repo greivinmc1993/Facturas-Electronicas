@@ -3,7 +3,7 @@
  * No es un parser XML genérico ni un validador XSD. No acepta documentos externos.
  * Ningún resultado de este módulo autoriza firma, numeración o envío a Hacienda.
  */
-const NS='https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica';
+const NAMESPACES={FE:'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica',TE:'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/tiqueteElectronico'};
 const FIVE=/^(0|[1-9]\d*)\.\d{5}$/;
 const THREE=/^(0|[1-9]\d*)\.\d{3}$/;
 const HEADER=['Clave','ProveedorSistemas','CodigoActividadEmisor','NumeroConsecutivo','FechaEmision','Emisor','Receptor','CondicionVenta','DetalleServicio','ResumenFactura'];
@@ -12,19 +12,23 @@ const lineAt=(xml,fragment)=>{const n=xml.indexOf(fragment);return n<0?null:1+xm
 const tagValue=(xml,tag)=>{
   const m=xml.match(new RegExp(`<${tag}>([^<]*)<\\/${tag}>`));return m?m[1]:null;
 };
-export function preflightFe44Draft(xml,{expectedLines}={}){
+export function preflightFe44Draft(xml,{expectedLines,documentType='FE'}={}){
   const findings=[];
   const report=(severity,field,fragment,message)=>findings.push({severity,field,line:lineAt(xml,fragment),message});
   if(typeof xml!=='string'||xml.length>2_000_000||xml.length<200){
     return {kind:'draft-preflight',schema:'NOT_VALIDATED',signature:'NOT_VALIDATED',ok:false,findings:[{severity:'error',field:'XML',line:null,message:'Borrador XML vacío o fuera de tamaño esperado.'}]};
   }
-  if(!xml.includes(`<FacturaElectronica xmlns="${NS}">`))report('error','FacturaElectronica','<FacturaElectronica','El elemento principal no utiliza el espacio de nombres FE 4.4 esperado.');
-  if(!xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>'))report('error','XML','<FacturaElectronica','Falta la declaración XML UTF-8.');
+  if(!Object.hasOwn(NAMESPACES,documentType))report('error','TipoDocumento','<?xml','Tipo de documento de prueba desconocido.');
+  const root=documentType==='TE'?'TiqueteElectronico':'FacturaElectronica';
+  const namespace=NAMESPACES[documentType];
+  if(!xml.includes(`<${root} xmlns="${namespace}">`)||!xml.includes(`</${root}>`))report('error',root,`<${root}`,'El elemento principal no utiliza el espacio de nombres esperado para FE/TE 4.4.');
+  if(documentType==='TE'&&(/<Receptor>/.test(xml)||/<CodigoActividadReceptor>/.test(xml)))report('error','Receptor','<TiqueteElectronico','El borrador TE de consumidor final no debe inventar datos del receptor.');
+  if(!xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>'))report('error','XML',`<${root}`,'Falta la declaración XML UTF-8.');
   let prior=-1;
-  for(const name of HEADER){
+  for(const name of HEADER.filter(name=>documentType!=='TE'||name!=='Receptor')){
     const position=xml.indexOf(`<${name}>`);
-    if(position<0){report('error',name,'<FacturaElectronica',`Falta el elemento ${name}.`);continue}
-    if(position<prior)report('error',name,`<${name}>`,`El elemento ${name} aparece fuera del orden básico del borrador FE 4.4.`);
+    if(position<0){report('error',name,`<${root}`,`Falta el elemento ${name}.`);continue}
+    if(position<prior)report('error',name,`<${name}>`,`El elemento ${name} aparece fuera del orden básico del borrador ${documentType} 4.4.`);
     prior=position;
   }
   const key=tagValue(xml,'Clave'),consecutive=tagValue(xml,'NumeroConsecutivo');
@@ -73,6 +77,6 @@ export function preflightFe44Draft(xml,{expectedLines}={}){
       if(digits(v,100000n)!==expected)report('error',`ResumenFactura.${tag}`,`<${tag}>`,`${tag} no coincide con la suma de líneas generadas.`);
     }
   }
-  report('notice','Firma y XSD', '<FacturaElectronica', 'Prevalidación local únicamente: XML sin firma, clave ni consecutivo fiscal; esquema XSD oficial no comprobado.');
+  report('notice','Firma y XSD', `<${documentType==='TE'?'TiqueteElectronico':'FacturaElectronica'}`,  'Prevalidación local únicamente: XML sin firma, clave ni consecutivo fiscal; esquema XSD oficial no comprobado.');
   return {kind:'draft-preflight',schema:'NOT_VALIDATED',signature:'NOT_VALIDATED',ok:!findings.some(f=>f.severity==='error'),findings};
 }

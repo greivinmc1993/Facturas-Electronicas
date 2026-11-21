@@ -1644,3 +1644,25 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feDraftPreflight li{margin:4px 0}
 .feDraftSchemaStatus{font-weight:700;color:#8d451a}
 @media(max-width:620px){.feDraftPreflight{padding:12px}}
+
+/* v0.6.87: opciones fiscales de prueba diferenciadas del recibo comercial. */
+.catalogTools .feDraftActionGroup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0 12px}
+.catalogTools .feDraftActionGroup button{width:100%;min-height:42px;min-width:0;white-space:normal;text-align:center}
+.catalogTools .feDraftCommercialGroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.catalogTools .feDraftCommercialGroup button{min-height:38px}
+@media(max-width:620px){.catalogTools .feDraftActionGroup{grid-template-columns:1fr}.catalogTools .feDraftCommercialGroup button{flex:1 1 140px}}
+
+
+/* v0.6.87 — Modalidad de comprobante y selector de cliente condicionado. */
+.posDocumentModeSelector{border:1px solid #cbdce7;border-radius:14px;background:#f6fafc;margin:12px 0 6px;padding:14px;min-width:0}
+.posDocumentModeSelector legend{color:#153b55;font-weight:800;padding:0 8px;font-size:14px}
+.posDocumentModeOptions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.posDocumentModeOption{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #cbdce7;border-radius:11px;padding:12px 13px;cursor:pointer;min-width:0;transition:border-color .18s,background .18s,box-shadow .18s}
+.posDocumentModeOption:hover{border-color:#178577;box-shadow:0 2px 8px rgba(0,0,0,.045)}
+.posDocumentModeOption.selected{border-color:#168577;background:#eaf8f4;box-shadow:0 0 0 1px rgba(22,133,119,.15)}
+.posDocumentModeOption input{margin:3px 0 0;flex:none;accent-color:#147d70}
+.posDocumentModeOption span{display:grid;gap:5px;min-width:0}
+.posDocumentModeOption strong{font-size:12px;color:#173a51;line-height:1.4}
+.posDocumentModeOption small{font-size:11px;color:#526c7c;line-height:1.45}
+.posDocumentModeHint{margin:12px 0 0;font-size:12px}
+@media(max-width:850px){.posDocumentModeOptions{grid-template-columns:1fr}}

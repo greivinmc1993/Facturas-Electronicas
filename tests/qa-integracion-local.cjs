@@ -71,7 +71,7 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
   return {status,body:result};
  };
  try{
-  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.86')});
+  await check('API de diagnóstico declara versión actual',async()=>{const r=await call('GET','/api/health');assert.equal(r.status,200);assert.equal(r.body.version,'0.6.87')});
   await check('Diagnóstico de respaldos: estado inicial sin modificar SQLite',async()=>{
    const before=fs.statSync(dbPath).size;
    const r=await call('GET','/api/backups/automatic');
@@ -721,6 +721,62 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    assert.equal(after.prepare('SELECT COUNT(*) AS n FROM sales').get().n,sales);
    assert.equal(after.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name LIKE 'fe_invoices%'").get().n,0);
    after.close();
+  });
+  await check('Borrador TE 4.4: consumidor final sin cliente, misma venta y SQLite intacto',async()=>{
+   const setup=new DatabaseSync(dbPath);
+   const ticketSaleId=Number(setup.prepare(`INSERT INTO sales(company_id,client_id,sale_type,currency,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_cents) VALUES (?,NULL,'contado','CRC',100000,0,13000,113000,113000,0)`).run(a).lastInsertRowid);
+   setup.prepare(`INSERT INTO sale_lines(sale_id,product_id,description,quantity,unit_price_cents,tax_rate,discount_cents,subtotal_cents,tax_cents,total_cents) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(ticketSaleId,prodId,'Producto QA',1,100000,13,0,100000,13000,113000);
+   setup.prepare('INSERT INTO sale_payments(sale_id,method,amount_cents) VALUES (?,?,?)').run(ticketSaleId,'Efectivo',113000);
+   setup.close();
+   const snapshot=read();const totalVentas=snapshot.prepare('SELECT COUNT(*) AS n FROM sales').get().n;snapshot.close();
+   let r=await call('GET',`/api/companies/${a}/sales/${ticketSaleId}/fe/xml-draft?documentType=TE`);
+   assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.documentType,'TE');assert.equal(r.body.ready,true);
+   assert.match(r.body.xml,/<TiqueteElectronico xmlns=/);assert.doesNotMatch(r.body.xml,/<Receptor>/);
+   assert.match(r.body.xml,/<TotalComprobante>1130\.00000<\/TotalComprobante>/);
+   assert.equal(r.body.preflight.schema,'NOT_VALIDATED');
+   r=await call('GET',`/api/companies/${a}/sales/${ticketSaleId}/fe/xml-draft?documentType=FE`);
+   assert.equal(r.status,422);assert.match(r.body.issues.join(' '),/Cliente:/);
+   r=await call('GET',`/api/companies/${a}/sales/${ticketSaleId}/fe/xml-draft?documentType=OTRO`);
+   assert.equal(r.status,400);
+   r=await call('GET',`/api/companies/${b}/sales/${ticketSaleId}/fe/xml-draft?documentType=TE`);
+   assert.equal(r.status,404);
+   const after=read();assert.equal(after.prepare('SELECT COUNT(*) AS n FROM sales').get().n,totalVentas);after.close();
+  });
+  await check('v0.6.87: FE, TE y genérica se guardan sin mezclar receptores o generar XML genérico',async()=>{
+   const product=await call('POST',`/api/companies/${a}/products`,{
+    kind:'servicio',description:'Servicio modalidad FE TE',cabys:'5999999999999',product_code:'QA-MODO-087',
+    price:'700.00000',price_includes_tax:'1',currency:'CRC',tax_code:'08',unit:'Sp',cost:'0',stock:'0',min_stock:'0',track_stock:'0'
+   });
+   assert.equal(product.status,201,JSON.stringify(product.body));
+   const create=(mode,client=null,kind='contado')=>call('POST',`/api/companies/${a}/sales`,{
+    sale_type:kind,document_mode:mode,client_id:client,discount:'0',
+    lines:[{product_id:product.body.id,quantity:1}],payments:[{method:'Efectivo',amount:'700'}]
+   });
+   let r=await create('FE',clientId);assert.equal(r.status,201,JSON.stringify(r.body));const feId=r.body.id;
+   r=await create('TE');assert.equal(r.status,201,JSON.stringify(r.body));const teId=r.body.id;
+   r=await create('GENERICA');assert.equal(r.status,201,JSON.stringify(r.body));const genId=r.body.id;
+   const sql=read();
+   assert.equal(sql.prepare('SELECT document_mode FROM sales WHERE id=?').get(feId).document_mode,'FE');
+   assert.equal(sql.prepare('SELECT document_mode FROM sales WHERE id=?').get(teId).document_mode,'TE');
+   assert.equal(sql.prepare('SELECT document_mode FROM sales WHERE id=?').get(genId).document_mode,'GENERICA');
+   assert.equal(sql.prepare('SELECT client_id FROM sales WHERE id=?').get(teId).client_id,null);
+   assert.equal(sql.prepare('SELECT client_id FROM sales WHERE id=?').get(genId).client_id,null);
+   const prevHistorical=sql.prepare('SELECT COUNT(*) AS n FROM sales WHERE document_mode IS NULL').get().n;
+   assert.ok(prevHistorical>0,'No reclasificar históricos');sql.close();
+   const fe=await call('GET',`/api/companies/${a}/sales/${feId}/fe/xml-draft?documentType=FE`);
+   assert.equal(fe.status,200,JSON.stringify(fe.body));assert.match(fe.body.xml,/<FacturaElectronica/);
+   const te=await call('GET',`/api/companies/${a}/sales/${teId}/fe/xml-draft?documentType=TE`);
+   assert.equal(te.status,200,JSON.stringify(te.body));assert.match(te.body.xml,/<TiqueteElectronico/);
+   assert.doesNotMatch(te.body.xml,/<Receptor>/);assert.doesNotMatch(te.body.xml,/<CodigoActividadReceptor>/);
+   for(const [id,mode] of [[feId,'TE'],[teId,'FE'],[genId,'FE'],[genId,'TE']]){
+    const wrong=await call('GET',`/api/companies/${a}/sales/${id}/fe/xml-draft?documentType=${mode}`);
+    assert.equal(wrong.status,409,JSON.stringify(wrong.body));
+   }
+   const rejected=[['FE',null,'contado'],['TE',clientId,'contado'],['GENERICA',clientId,'contado'],['TE',null,'credito'],['GENERICA',null,'credito']];
+   for(const [mode,client,kind] of rejected){const bad=await create(mode,client,kind);assert.equal(bad.status,400,JSON.stringify(bad.body))}
+   const badMode=await create('INVALIDO');assert.equal(badMode.status,400);
+   const detail=await call('GET',`/api/companies/${a}/sales/${genId}`);
+   assert.equal(detail.status,200);assert.equal(detail.body.document_mode,'GENERICA');
   });
   await check('v0.6.72: venta nueva conserva fotografía fiscal y XML exacto en SQLite',async()=>{
    const before=read();const stock=before.prepare('SELECT stock FROM products WHERE id=?').get(prodId).stock;before.close();
