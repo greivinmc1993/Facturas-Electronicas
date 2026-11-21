@@ -54,6 +54,7 @@ async function run(){
   assert.match(preload,/facturacrXsd/);
   assert.match(ui,/Elegir carpeta XSD y validar borrador/);
   assert.match(ui,/xsdResult\.errors/);
+  assert.match(ui,/xmldsig-core-schema\.xsd/);
   assert.match(css,/feXsdLocalPanel/);
  });
  await check('El paquete incluye el validador fuera de asar',()=>{

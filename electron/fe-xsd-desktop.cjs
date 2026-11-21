@@ -68,6 +68,8 @@ async function validateDraftLocally({xml,documentType,schemaDir,pythonScript,run
    xsdFile:report.schemaFile,
    xsdSHA256:report.schemaSHA256,
    xmlSHA256:report.xmlSHA256,
+   localXmlDsigMapping:report.localXmlDsigMapping===true,
+   dependenciesSHA256:report.dependenciesSHA256||{},
    errors:Array.isArray(report.errors)?report.errors.slice(0,40):[],
    warning:'Solo se compara con el XSD elegido. Su origen y vigencia NO están verificados. El borrador no está firmado, usa claves ficticias y NO es un comprobante válido ante Hacienda.'
   };

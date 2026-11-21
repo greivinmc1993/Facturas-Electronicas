@@ -36,6 +36,9 @@ TYPES = {
 MAX_FILE = 8 * 1024 * 1024
 MAX_DEPENDENCIES = 32
 XSD_NAMESPACE = '{http://www.w3.org/2001/XMLSchema}'
+XMLDSIG_NAMESPACE = 'http://www.w3.org/2000/09/xmldsig#'
+XMLDSIG_IMPORT = '../../xmldsig-core-schema.xsd'
+XMLDSIG_FILE = 'xmldsig-core-schema.xsd'
 
 
 class ValidationInputError(ValueError):
@@ -55,7 +58,7 @@ def require_file(path, *, kind):
 
 
 def parse_safe(path):
-    """Sin red, entidades ni DTD (también en los XSD importados)."""
+    """Parseo sin red ni entidades externas. Se admite SOLO el DOCTYPE W3C del XSD XMLDSIG."""
     require_file(path, kind='XML/XSD')
     parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False,
                              huge_tree=False, remove_comments=False)
@@ -63,8 +66,14 @@ def parse_safe(path):
         document = etree.parse(str(path), parser)
     except etree.XMLSyntaxError as error:
         raise ValidationInputError(f'XML/XSD mal formado ({Path(path).name}): {error}') from error
-    if document.docinfo.doctype:
-        raise ValidationInputError(f'DOCTYPE/DTD no permitido en {Path(path).name}.')
+    doctype = document.docinfo.doctype
+    if doctype:
+        sig_doctype = ('<!DOCTYPE schema PUBLIC "-//W3C//DTD XMLSchema 200102//EN" '
+                       '"http://www.w3.org/2001/XMLSchema.dtd">')
+        is_w3c_dsig = (Path(path).name == XMLDSIG_FILE and doctype == sig_doctype and
+                        document.getroot().get('targetNamespace') == XMLDSIG_NAMESPACE)
+        if not is_w3c_dsig:
+            raise ValidationInputError(f'DOCTYPE/DTD no permitido en {Path(path).name}.')
     return document
 
 
@@ -72,11 +81,39 @@ def sha256_file(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def resolve_local_import(current, element, root):
+    """Resolución local estricta; solo XMLDSIG puede mapearse a un archivo hermano."""
+    location = element.get('schemaLocation')
+    tag = etree.QName(element).localname
+    if not location:
+        raise ValidationInputError(f'La dependencia {tag} carece de schemaLocation.')
+    uri = urlsplit(location)
+    if (uri.scheme or uri.netloc or uri.query or uri.fragment or
+            location.startswith(('/', '\\')) or ':' in location or '\\' in location):
+        raise ValidationInputError(f'Dependencia XSD externa o no local: {location}')
+    requested = (current.parent / location).resolve()
+    if inside(requested, root):
+        return requested, requested
+    if (location == XMLDSIG_IMPORT and tag == 'import' and
+            element.get('namespace') == XMLDSIG_NAMESPACE):
+        local = (current.parent / XMLDSIG_FILE).resolve()
+        if not inside(local, root):
+            raise ValidationInputError('Archivo XMLDSIG fuera de la carpeta autorizada.')
+        if not local.is_file():
+            raise ValidationInputError(
+                f'Falta {XMLDSIG_FILE}. Descárgalo de una fuente confiable y '
+                'colócalo junto a los XSD 4.4, en la carpeta que seleccionaste. '
+                'No se permite leer ../../ fuera de esa carpeta.')
+        return requested, local
+    raise ValidationInputError(f'Dependencia XSD fuera de --schema-root: {location}')
+
+
 def check_dependencies(schema_path, schema_root):
-    """Bloquea importaciones remotas, travesías y enlaces externos al árbol autorizado."""
+    """Verifica todos los XSD accesibles antes de compilar, sin ampliar la raíz de confianza."""
     root = Path(schema_root).resolve()
     queue = [Path(schema_path).resolve()]
     seen = set()
+    redirects = {}
     while queue:
         current = queue.pop()
         if not inside(current, root):
@@ -91,23 +128,44 @@ def check_dependencies(schema_path, schema_root):
         seen.add(current)
         for tag in ('include', 'import', 'redefine', 'override'):
             for element in doc.getroot().iter(XSD_NAMESPACE + tag):
-                location = element.get('schemaLocation')
-                if not location:
-                    if tag == 'import':
-                        raise ValidationInputError(f'Importación XSD sin ruta local: {current.name}')
-                    raise ValidationInputError(f'La dependencia {tag} carece de schemaLocation.')
-                uri = urlsplit(location)
-                # URL absoluta, UNC, rutas Windows absolutas, fragmentos y query:
-                # todo lo que no sea una ruta relativa de archivos locales se rechaza.
-                if (uri.scheme or uri.netloc or uri.query or uri.fragment or
-                        location.startswith(('/', '\\')) or ':' in location or '\\' in location):
-                    raise ValidationInputError(f'Dependencia XSD externa o no local: {location}')
-                dependent = (current.parent / location).resolve()
-                if not inside(dependent, root):
-                    raise ValidationInputError(f'Dependencia XSD fuera de --schema-root: {location}')
+                requested, dependent = resolve_local_import(current, element, root)
                 require_file(dependent, kind='dependencia XSD')
+                if requested != dependent:
+                    if requested in redirects and redirects[requested] != dependent:
+                        raise ValidationInputError('Conflicto de dependencia XMLDSIG local.')
+                    redirects[requested] = dependent
                 queue.append(dependent)
-    return sorted(seen)
+    return sorted(seen), redirects
+
+
+class SchemaRootResolver(etree.Resolver):
+    """Nunca consulta disco fuera del conjunto de archivos previamente autorizados."""
+
+    def __init__(self, allowed, redirects):
+        super().__init__()
+        self.allowed = set(allowed)
+        self.redirects = redirects
+
+    def resolve(self, url, pubid, context):
+        # Lxml normaliza el import relativo ../../ a una ruta absoluta.
+        # Se acepta únicamente si la inspección previa autorizó ese destino.
+        uri = urlsplit(url)
+        windows_drive = (os.name == 'nt' and len(url) >= 3 and
+                         url[1] == ':' and url[2] in ('/', '\\'))
+        if (uri.scheme not in ('', 'file') and not windows_drive) or uri.netloc or uri.query or uri.fragment:
+            raise ValidationInputError('Intento de abrir una dependencia XSD externa.')
+        if uri.scheme == 'file':
+            from urllib.parse import unquote
+            local_path = unquote(uri.path)
+            if os.name == 'nt' and local_path.startswith('/') and len(local_path) > 2 and local_path[2] == ':':
+                local_path = local_path[1:]
+            candidate = Path(local_path).resolve()
+        else:
+            candidate = Path(url).resolve()
+        chosen = self.redirects.get(candidate, candidate)
+        if chosen not in self.allowed:
+            raise ValidationInputError('Dependencia XSD no autorizada durante la compilación.')
+        return self.resolve_filename(str(chosen), context)
 
 
 def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=None):
@@ -117,8 +175,12 @@ def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=No
     namespace = NAMESPACE + ns_name
     schema_path, xml_path = Path(schema_path), Path(xml_path)
     root = Path(schema_root or schema_path.parent).resolve()
-    dependencies = check_dependencies(schema_path, root)
-    schema_doc = parse_safe(schema_path)
+    dependencies, redirects = check_dependencies(schema_path, root)
+    # La compilación conserva el XSD original sin editarlo, con un resolver aislado.
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False,
+                             huge_tree=False, remove_comments=False)
+    parser.resolvers.add(SchemaRootResolver(dependencies, redirects))
+    schema_doc = etree.parse(str(schema_path), parser)
     xml_doc = parse_safe(xml_path)
     if schema_doc.getroot().get('targetNamespace') != namespace:
         raise ValidationInputError(f'El XSD {kind} no declara el namespace 4.4 esperado: {namespace}')
@@ -145,6 +207,7 @@ def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=No
         'xmlFile': xml_path.name,
         'xmlSHA256': sha256_file(xml_path),
         'dependenciesSHA256': hashes,
+        'localXmlDsigMapping': bool(redirects),
         'errors': [{'line': e.line, 'column': e.column, 'field': e.path or '',
                     'message': e.message} for e in list(schema.error_log)[:40]],
     }
@@ -204,6 +267,50 @@ def self_test():
                             expected_hashes=manifest)
         assert signed['validWithSuppliedSchema'] and len(signed['dependenciesSHA256']) == 2
         checks += 1
+        # Import habitual de Hacienda: ../../xmldsig-core-schema.xsd.
+        # Mapeo seguro exclusivamente hacia el archivo local junto a los XSD.
+        signature = schema_dir / XMLDSIG_FILE
+        signature_body = ('<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+                          f'targetNamespace="{XMLDSIG_NAMESPACE}">'
+                          '<xs:simpleType name="FirmaDemo"><xs:restriction base="xs:integer"/>'
+                          '</xs:simpleType></xs:schema>')
+        signature.write_text(signature_body, encoding='utf-8')
+        fe_schema.write_text(f'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+                             f'xmlns:ds="{XMLDSIG_NAMESPACE}" targetNamespace="{ns}" '
+                             'elementFormDefault="qualified">'
+                             '<xs:import namespace="http://www.w3.org/2000/09/xmldsig#" '
+                             'schemaLocation="../../xmldsig-core-schema.xsd"/>'
+                             '<xs:element name="FacturaElectronica" type="ds:FirmaDemo"/>'
+                             '</xs:schema>', encoding='utf-8')
+        result = check_pair('FE', fe_schema, fe_xml, schema_root=schema_dir)
+        assert result['validWithSuppliedSchema'] and result['localXmlDsigMapping']
+        assert XMLDSIG_FILE in result['dependenciesSHA256']
+        checks += 1
+        # Si falta la dependencia, el mensaje guía al usuario y nunca sale del directorio.
+        signature.unlink()
+        try:
+            check_pair('FE', fe_schema, fe_xml, schema_root=schema_dir)
+            raise AssertionError('Dependencia XMLDSIG faltante no rechazada.')
+        except ValidationInputError as error:
+            assert 'Falta xmldsig-core-schema.xsd' in str(error)
+            checks += 1
+        # El DOCTYPE estándar del esquema W3C no puede usarse para cargar DTD externos.
+        signature.write_text('<?xml version="1.0"?>'
+                             '<!DOCTYPE schema PUBLIC "-//W3C//DTD XMLSchema 200102//EN" '
+                             '"http://www.w3.org/2001/XMLSchema.dtd" '
+                             '[<!ENTITY dsig "http://www.w3.org/2000/09/xmldsig#">]>'
+                             + signature_body, encoding='utf-8')
+        assert check_pair('FE', fe_schema, fe_xml, schema_root=schema_dir)['validWithSuppliedSchema']
+        checks += 1
+        # Cualquier otro DOCTYPE, incluso dentro del archivo de firma, es rechazado.
+        signature.write_text('<!DOCTYPE schema [<!ENTITY test SYSTEM "file:///secret">]>'
+                             + signature_body, encoding='utf-8')
+        try:
+            check_pair('FE', fe_schema, fe_xml, schema_root=schema_dir)
+            raise AssertionError('DTD no reconocido en XMLDSIG no rechazado.')
+        except ValidationInputError:
+            checks += 1
+        signature.unlink()
         # El enlace relativo hacia un archivo externo a la raíz se rechaza.
         outside = folder / 'external.xsd'
         outside.write_text(common.read_text(encoding='utf-8'), encoding='utf-8')

@@ -647,7 +647,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>
      <section className="feXsdLocalPanel" aria-label="Validación XSD local del borrador">
       <h4>Comparar borrador con XSD 4.4 local</h4>
-      <p>Selecciona una carpeta con esquemas XSD y sus dependencias obtenidos de una fuente confiable. La aplicación comparará el borrador FE/TE sin enviarlo a Hacienda ni cambiar SQLite. <b>No verifica el origen o vigencia del XSD.</b></p>
+      <p>Selecciona una carpeta con esquemas XSD y sus dependencias obtenidos de una fuente confiable. Si los XSD incluyen la referencia «../../xmldsig-core-schema.xsd», guarda también <code>xmldsig-core-schema.xsd</code> junto a ellos en la misma carpeta. FacturaCR resolverá únicamente esa dependencia conocida sin acceder a carpetas externas. <b>No verifica el origen o vigencia del XSD.</b></p>
       <button type="button" className="secondary" disabled={!xmlDraft.ready||xsdBusy} onClick={validateDraftWithLocalXsd}>{xsdBusy?'Validando XSD…':'Elegir carpeta XSD y validar borrador'}</button>
       {xsdResult?.status==='CANCELLED'&&<p role="status">Selección cancelada. No se alteró el XML.</p>}
       {xsdResult?.status==='CANNOT_VALIDATE'&&<p role="alert" className="feXsdLocalError">No se pudo validar: {xsdResult.error}</p>}
@@ -655,6 +655,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
        <strong>{xsdResult.status==='MATCHES_LOCAL_XSD'?'Coincide con el XSD local elegido':'El XML no coincide con el XSD local elegido'}</strong>
        <p>XSD: {xsdResult.xsdFile} · SHA-256: <code>{xsdResult.xsdSHA256}</code></p>
        <p>XML SHA-256: <code>{xsdResult.xmlSHA256}</code></p>
+       {xsdResult.localXmlDsigMapping&&<p>Dependencia XMLDSIG resuelta desde la carpeta XSD seleccionada (sin acceso a rutas externas).</p>}
        <p>{xsdResult.warning}</p>
        {xsdResult.errors?.length>0&&<ol>{xsdResult.errors.map((problem,i)=><li key={i}>Línea {problem.line||'?'}{problem.field?` · ${problem.field}`:''}: {problem.message}</li>)}</ol>}
       </div>}

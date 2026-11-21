@@ -46,7 +46,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check 'lxml>=5,<7' 'cryptography>=42,<47'
       - name: Comprobar validador XMLSchema (esquema mínimo sintético, NO XSD de Hacienda)
         run: python tests/qa-086-xsd-official.py --self-test
-      - name: Matriz XSD FE/TE/NC/ND v4.4 (21 controles sintéticos, NO homologación)
+      - name: Matriz XSD FE/TE/NC/ND v4.4 (25 controles sintéticos, NO homologación)
         run: python tests/qa-087-xsd-pareja.py --self-test
       - name: Puente escritorio Node/Python para FE/TE (XSD sintéticos, sin envío)
         run: npm run qa:xsd:desktop-real

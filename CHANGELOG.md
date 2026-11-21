@@ -1,3 +1,9 @@
+## [0.6.90 · corrección XSD XMLDSIG] — Dependencia local de firma XML (21/11/2026)
+
+- Corrige el error `Dependencia XSD fuera de --schema-root: ../../xmldsig-core-schema.xsd` al validar un XSD v4.4 que importa el esquema estándar de firma XML. FacturaCR acepta **solo** esa referencia concreta como alias al `xmldsig-core-schema.xsd` que el usuario coloca junto a los demás XSD.
+- El validador mantiene la raíz de confianza, no navega fuera de ella, no descarga archivos, registra hashes del archivo y no modifica XSD/SQLite ni habilita emisión. Admite únicamente el DOCTYPE estándar W3C del archivo XMLDSIG, sin cargar DTD externo ni entidades.
+- Guía de validación ampliada y matriz sintética extendida de 21 a **25 controles**, cubriendo alias, ausencia de archivo y DTD seguro/inseguro.
+
 ## [0.6.90] — Comparación XSD desde escritorio para borradores FE/TE (21/11/2026)
 
 - Nuevo botón en el diálogo del borrador FE/TE: compara el XML con XSD seleccionados localmente mediante el selector de carpetas de Electron. La ventana presenta diferencias por línea y huellas SHA-256; nunca presenta un XSD local como certificado oficialmente.
