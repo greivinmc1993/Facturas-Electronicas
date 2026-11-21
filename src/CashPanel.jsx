@@ -81,7 +81,7 @@ export default function CashPanel({companyId,company,isCashier=false}){
       <article><small>Gastos en efectivo</small><strong className="cashNegative">−{currency(total?.expense_cents)}</strong><small>{total?.expense_count||0} gasto(s)</small></article>
       <article><small>Efectivo esperado</small><strong>{currency(total?.expected_cents)}</strong></article>
      </section>
-     <section className="cashColumns">{!isCashier&&<div className="card"><h3>Registrar gasto</h3><p className="hint">Solo gastos pagados en efectivo desde la caja abierta; no se descuenta inventario.</p>
+     <section className={`cashColumns${isCashier?' cashColumnsSingle':''}`}>{!isCashier&&<div className="card"><h3>Registrar gasto</h3><p className="hint">Solo gastos pagados en efectivo desde la caja abierta; no se descuenta inventario.</p>
       <form onSubmit={e=>{e.preventDefault();post('expenses',expense,'Gasto registrado en esta sesión.')}}>
        <label className="field">Categoría<select value={expense.category} onChange={e=>setExpense(p=>({...p,category:e.target.value}))}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
        <label className="field">Descripción<input required minLength="3" maxLength="250" value={expense.description} onChange={e=>setExpense(p=>({...p,description:e.target.value}))} placeholder="Ej.: Compra de bolsas"/></label>
