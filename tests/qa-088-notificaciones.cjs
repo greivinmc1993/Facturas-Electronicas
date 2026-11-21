@@ -18,7 +18,7 @@ for(const [code,label] of [['setRecoveryMessage(\'\')','recuperación'],['setMes
 ok(users.includes("onClose={()=>setError('')}"),'error de usuario cerrable');
 ok(users.includes("onClose={()=>setMessage('')}"),'mensaje de usuario cerrable');
 ok(main.includes('Generar tres códigos nuevos'),'texto del botón propietario');
-ok(css.includes('ownerRecoveryTools form button{min-height:44px'),'botón legible');
+ok(css.includes('ownerRecoveryTools form > button[type="submit"]{min-height:44px'),'botón de envío legible sin afectar Mostrar');
 ok(css.includes('.dismissibleNoticeClose:hover'),'feedback de cierre');
 ok(users.includes('issuedSecrets'),'entrega única al alta');
 ok(main.includes('recoveryMethod'),'recuperación local seleccionable');

@@ -1,0 +1,27 @@
+'use strict';
+const {strict:assert}=require('node:assert');
+const fs=require('node:fs');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const root=path.resolve(__dirname,'..');
+const get=f=>fs.readFileSync(path.join(root,f),'utf8');
+(async()=>{
+ const {buildRecoveryCodesPdfHtml,recoveryCodesPdfFilename}=await import(pathToFileURL(path.join(root,'src/recovery-codes-pdf.mjs')).href);
+ const code=i=>`FCR2-${String(i).repeat(8)}-${'A'.repeat(8)}-${'B'.repeat(8)}-${'C'.repeat(8)}-${'D'.repeat(8)}-${'E'.repeat(8)}`;
+ const codes=[code(1),code(2),code(3)];
+ let n=0;const pass=(msg,fn)=>{fn();++n;console.log('OK '+msg)};
+ const html=buildRecoveryCodesPdfHtml(codes,{accountLabel:'usuario QA <script>alert(1)</script>',issuedAt:new Date('2026-11-20T19:00:00-06:00')});
+ pass('Los tres códigos personales aparecen completos en PDF',()=>{for(const c of codes)assert.ok(html.includes(c));});
+ pass('El documento se genera en A4 vertical e incluye advertencia de seguridad',()=>{assert.match(html,/@page\{size:A4 portrait/);assert.match(html,/no está cifrado/);assert.match(html,/CONFIDENCIAL/)});
+ pass('Se escapa la identidad del usuario, sin inyectar HTML ejecutable',()=>{assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'))});
+ pass('No incorpora claves, contraseña o partes del kit extraordinario',()=>{assert.ok(!html.includes('FCRK-'));assert.ok(!html.includes('fileContent'));assert.ok(!html.includes('FacturaCR-Rescate.fcr'))});
+ pass('Ningún recurso remoto ni JavaScript en el PDF',()=>{assert.ok(!/<script[\s>]/i.test(html));assert.ok(!/<(?:img|iframe|link)[\s>]/i.test(html));assert.match(html,/default-src 'none'/)});
+ pass('Se rechazan conjuntos incompletos o caracteres maliciosos',()=>{assert.throws(()=>buildRecoveryCodesPdfHtml(codes.slice(0,2)));assert.throws(()=>buildRecoveryCodesPdfHtml([...codes.slice(0,2),'<script>']))});
+ pass('Nombre de PDF no revela la cuenta ni los códigos',()=>assert.equal(recoveryCodesPdfFilename(new Date('2026-11-20T19:00:00-06:00')),'FacturaCR_codigos_recuperacion_2026-11-20.pdf'));
+ const panel=get('src/RecoverySecretsPanel.jsx'),users=get('src/UsersPanel.jsx'),main=get('src/main.jsx');
+ pass('Solo se guarda mientras se muestran tres códigos; nunca el kit',()=>{assert.match(panel,/codes\.length===3&&<div className="recoveryPdfActions"/);assert.match(panel,/buildRecoveryCodesPdfHtml\(codes,\{accountLabel\}\)/);assert.ok(panel.includes('Guardar mis 3 códigos en PDF'));assert.ok(panel.includes('landscape:false'));});
+ pass('La entrega se habilita al crear usuarios y recuperar cuentas',()=>{assert.ok(users.includes('accountLabel={issuedSecrets.username}'));assert.ok(main.includes('accountLabel={ownerTempCredential.username}'));assert.ok(main.includes('accountLabel={sessionUser?.username||username}'));});
+ pass('Electron renderiza en ventana aislada y pide destino mediante diálogo',()=>{const desktop=get('electron/main.cjs');assert.ok(desktop.includes("facturacr:save-sales-pdf"));assert.ok(desktop.includes('printToPDF('));assert.ok(desktop.includes('showSaveDialog('));assert.ok(desktop.includes('sandbox:true'));});
+ pass('Existe limpieza explícita para módulos obsoletos sin tocar datos',()=>{const script=get('scripts/cleanup-legacy-email.cjs');assert.ok(script.includes('server/email-recovery.js'));assert.ok(script.includes('fs.unlinkSync(full)'));assert.ok(!script.includes('*.sqlite'));});
+ console.log('QA 0.6.88 PDF personal y limpieza CI: '+n+'/'+n);
+})().catch(error=>{console.error(error);process.exitCode=1});

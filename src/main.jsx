@@ -740,7 +740,7 @@ function BackupWorkspace({autoBackup,autoConfig,setAutoConfig,backupStatus,busy,
  </section>;
 }
 
-function App({account,securityPanel}){
+function App({account,securityPanel,recoveryCodeCard,recoveryMessageCard}){
  const restoreInput=useRef(null),catalogInput=useRef(null),bulkInput=useRef(null);
  const [backupStatus,setBackupStatus]=useState(null),[catalogPreview,setCatalogPreview]=useState(null),[catalogBusy,setCatalogBusy]=useState(false);
  const [bulkPreview,setBulkPreview]=useState(null),[bulkFile,setBulkFile]=useState(null),[bulkPrice,setBulkPrice]=useState(true),[bulkStock,setBulkStock]=useState(false),[bulkCabys,setBulkCabys]=useState(false),[bulkBusy,setBulkBusy]=useState(false);
@@ -1136,7 +1136,7 @@ function App({account,securityPanel}){
   {!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<button className={tab==='cashier-kardex'?'navactive':''} onClick={()=>setTab('cashier-kardex')}><span className="navIcon"><UiIcon name="boxes" size={18}/></span><span>Kardex · Movimientos</span></button>}
   <button className={tab==='cash'?'navactive':''} onClick={()=>setTab('cash')}><span className="navIcon"><UiIcon name="receipt" size={18}/></span><span>Caja y gastos</span></button>
   {account?.isOwner&&<button className={tab==='backups'?'navactive':''} onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldos</span></button>}<span>Facturas electrónicas · Próximamente</span>{account?.isOwner&&<button className={tab==='audit'?'navactive':''} onClick={()=>setTab('audit')}><span className="navIcon"><UiIcon name="shield" size={18}/></span><span>Auditoría del propietario</span></button>}{(account?.isOwner||account?.companies?.some(c=>c.role==='company_admin')||account?.delegatedCashierCompanies?.length>0)&&<button className={tab==='users'?'navactive':''} onClick={()=>setTab('users')}><span className="navIcon"><UiIcon name="users" size={18}/></span><span>Usuarios y permisos</span></button>}
- </nav><div className="sidebarBottom"><div className="sidebarProtection"><span className="sidebarProtectionIcon" aria-hidden="true"><UiIcon name="shield" size={18}/></span><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div>{account?.isOwner&&<button type="button" className="sidebarBackupButton" onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldar base SQLite</span></button>}<small>FacturaCR · v{APP_VERSION}</small></div></aside><main>{securityPanel}{tab!=='backups'&&<header><h2>{tab==='dashboard'?'Dashboard comercial':tab==='companies'?'Empresas':tab==='clients'?'Clientes':tab==='sales'?'Punto de venta':tab==='quotes'?'Cotizaciones y proformas':tab==='valuation'?'Valoración de inventario':tab==='cash'?'Caja y gastos':tab==='kardex'?'Kardex de inventario':tab==='users'?'Usuarios y permisos':tab==='audit'?'Auditoría del propietario':tab==='cashier-kardex'?'Kardex · Movimientos':'Inventario y servicios'}</h2><p>Información guardada localmente y separada por empresa</p></header>}
+ </nav><div className="sidebarBottom"><div className="sidebarProtection"><span className="sidebarProtectionIcon" aria-hidden="true"><UiIcon name="shield" size={18}/></span><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div>{account?.isOwner&&<button type="button" className="sidebarBackupButton" onClick={()=>setTab('backups')}><span className="navIcon"><UiIcon name="backup" size={18}/></span><span>Respaldar base SQLite</span></button>}<small>FacturaCR · v{APP_VERSION}</small></div></aside><main>{recoveryCodeCard}{recoveryMessageCard}{securityPanel}{tab!=='backups'&&<header><h2>{tab==='dashboard'?'Dashboard comercial':tab==='companies'?'Empresas':tab==='clients'?'Clientes':tab==='sales'?'Punto de venta':tab==='quotes'?'Cotizaciones y proformas':tab==='valuation'?'Valoración de inventario':tab==='cash'?'Caja y gastos':tab==='kardex'?'Kardex de inventario':tab==='users'?'Usuarios y permisos':tab==='audit'?'Auditoría del propietario':tab==='cashier-kardex'?'Kardex · Movimientos':'Inventario y servicios'}</h2><p>Información guardada localmente y separada por empresa</p></header>}
  {account?.isOwner&&['companies','dashboard'].includes(tab)&&ownerBackupNotice&&<section className={'ownerBackupNotice ownerBackupNotice-'+ownerBackupNotice.severity} role={ownerBackupNotice.severity==='warning'?'alert':'status'} aria-label="Aviso de protección de respaldos">
   <span className="ownerBackupNoticeIcon"><UiIcon name="backup" size={19}/></span>
   <div className="ownerBackupNoticeBody"><strong>{ownerBackupNotice.title}</strong><p>{ownerBackupNotice.detail}</p></div>
@@ -1418,7 +1418,13 @@ function SecureApp(){
      await reload();
    }catch(err){setError(err.message)}finally{setBusy(false)}
  };
- const recoveryCodeCard=recoverySecrets&&<RecoverySecretsPanel payload={recoverySecrets} onDone={()=>{setRecoverySecrets(null);setRecoveryMessage('')}}/>;
+ const recoveryCodeCard=recoverySecrets&&<RecoverySecretsPanel payload={recoverySecrets} accountLabel={sessionUser?.username||username} onDone={()=>{setRecoverySecrets(null);setRecoveryMessage('')}}/>;
+ // Cuando se generan secretos, llevar al usuario a su entrega sin desplazar el sidebar.
+ useEffect(()=>{
+  if(!recoverySecrets||locked)return;
+  const frame=requestAnimationFrame(()=>document.querySelector('.secureRoot .recoverySecretsPanel')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  return()=>cancelAnimationFrame(frame);
+ },[recoverySecrets,locked]);
  const saveMinutes=async()=>{
   if(!hasSession||sessionUser?.passwordChangeRequired||settingsBusy)return;
   setSettingsBusy(true);setSettingsFeedback(null);
@@ -1499,7 +1505,7 @@ function SecureApp(){
         <strong>Contraseña temporal para @{ownerTempCredential.username}</strong>
         <p>Estos datos solo se mostrarán una vez. Entrega la contraseña y los códigos de manera privada.</p>
         <input readOnly aria-label="Nueva contraseña temporal" value={ownerTempCredential.password} onFocus={e=>e.target.select()}/>
-        <RecoverySecretsPanel payload={{recoveryCodes:ownerTempCredential.recoveryCodes}} onDone={()=>setOwnerTempCredential(null)} title="Códigos nuevos del usuario"/>
+        <RecoverySecretsPanel payload={{recoveryCodes:ownerTempCredential.recoveryCodes}} accountLabel={ownerTempCredential.username} onDone={()=>setOwnerTempCredential(null)} title="Códigos nuevos del usuario"/>
         <div className="actions">
          <button type="button" className="secondary" onClick={()=>{navigator.clipboard?.writeText(ownerTempCredential.password).catch(()=>{});}}>Copiar contraseña</button>
          <button type="button" onClick={()=>setOwnerTempCredential(null)}>Ya la entregué</button>
@@ -1512,12 +1518,10 @@ function SecureApp(){
  return <div className="secureRoot">
   {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button><button type="button" onClick={openSecurity}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button><button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
    {settingsFeedback&&<div className={'securitySaveToast '+(settingsFeedback.type==='error'?'securitySaveToastError':'securitySaveToastSuccess')} role={settingsFeedback.type==='error'?'alert':'status'} aria-live={settingsFeedback.type==='error'?'assertive':'polite'}><UiIcon name={settingsFeedback.type==='error'?'close':'check'} size={18}/><span>{settingsFeedback.message}</span><button type="button" onClick={()=>setSettingsFeedback(null)} aria-label="Cerrar notificación"><UiIcon name="close" size={15}/></button></div>}
-  {hasSession&&recoveryCodeCard}
-  {hasSession&&recoveryMessage&&<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>}
-  {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser} securityPanel={securityPanel}/></div>}
+  {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser} securityPanel={securityPanel} recoveryCodeCard={!locked?recoveryCodeCard:null} recoveryMessageCard={!locked&&recoveryMessage?<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>:null}/></div>}
   {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':recoveryMode?'Recuperar contraseña sin Internet':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'La cuenta propietaria recibe tres códigos y un kit extraordinario de dos partes, mostrados una sola vez.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':recoveryMode?'Recupera tu propia cuenta usando uno de tus tres códigos. El propietario también puede utilizar su archivo y clave extraordinarios.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
-   {!hasSession&&recoveryCodeCard}
-   {!hasSession&&recoveryMessage&&<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>}
+   {(!hasSession||sessionUser?.passwordChangeRequired)&&recoveryCodeCard}
+   {(!hasSession||sessionUser?.passwordChangeRequired)&&recoveryMessage&&<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>}
    {state&&!state.setupRequired&&!locked&&!hasSession&&recoveryMode&&<form onSubmit={resetOwnerPassword}>
      <p className="hint">Cada código es personal, funciona una sola vez y no requiere correo. Si eres propietario y perdiste tus tres códigos, selecciona «Kit extraordinario».</p>
      <label>Nombre de usuario<input required minLength={3} maxLength={80} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)}/></label>

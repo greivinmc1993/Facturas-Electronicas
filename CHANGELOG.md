@@ -1,3 +1,22 @@
+## v0.6.88 — Corrección visual de entrega de códigos, sidebar y controles (20/11/2026)
+
+- **Se conserva v0.6.88**. La entrega única de tres códigos y el kit aparece ahora dentro del `<main>` de FacturaCR, no antes del menú lateral; por ello, no empuja ni desplaza el sidebar.
+- El panel tiene un ancho máximo de 960 px, contenido fluido y retícula de códigos `1fr / 126px`, con adaptación a móviles. Los botones «Copiar» y «Copiar clave» comparten exactamente el mismo ancho y alto.
+- El hover global ya no altera el centrado del botón «Mostrar/Ocultar». El control se alinea mediante posición absoluta con márgenes verticales fijos, sin `translateY`; también se eliminan desplazamientos de los controles «Copiar».
+- Se ajustaron selectores CSS que aplicaban dimensiones de botones de envío a los botones «Mostrar» anidados. Las dimensiones grandes quedan limitadas a los botones de envío directos.
+- Al generar un nuevo conjunto de secretos, la interfaz desplaza el contenido hasta su panel de entrega, manteniendo la navegación lateral fija.
+- **QA:** nuevo `tests/qa-088-visual-security.cjs` con 11 comprobaciones y adaptación de pruebas históricas de layout al lugar correcto del panel. Pruebas de Chromium a anchos de 1536, 1024, 770, 600 y 375 px: sin scroll horizontal ni desplazamiento en hover. `npm test` completo debe mantenerse aprobado.
+- **No cambia** SQLite, códigos de recuperación, kit `.fcr`, contraseñas, recuperación local sin correo, ventas ni emisión fiscal. Siguen pendientes los XSD oficiales, la firma y la integración Hacienda para v0.6.89.
+- **Seguridad:** si códigos válidos aparecen en capturas de pantalla compartidas, deben renovarse para invalidarlos.
+
+## v0.6.88 — Ajuste adicional: exportación PDF personal y reparación CI
+
+- Se agrega «Guardar mis 3 códigos en PDF» en la pantalla de entrega única, con HTML escapado, impresión A4 vertical y diálogo nativo; la clave FCRK y el archivo `.fcr` no se incluyen.
+- La prueba `qa-088-recovery-pdf.cjs` verifica el documento, su aislamiento de recursos externos y los puntos de integración.
+- Se agrega `npm run cleanup:legacy-email` para eliminar **del repositorio fuente** archivos de recuperación de correo que pueden sobrevivir al descomprimir sobre una carpeta Git existente y ocasionar `AssertionError: server/email-recovery.js true !== false` en Windows y Linux.
+- Se conserva la aserción de eliminación de correo para evitar que la prueba pase ocultando archivos históricos.
+- Sin migraciones adicionales de SQLite, sin reiniciar contraseñas y sin tocar la emisión fiscal.
+
 ## [0.6.88] — Recuperación exclusivamente local con 3 códigos y kit del propietario (20/11/2026)
 
 - **Sin correo para recuperar contraseñas:** retirados formularios, rutas `/api/auth/email/*` y `/api/auth/mail/*`, módulos SMTP y almacén local `smtp-settings.secure` (limpieza best effort); no se modifican correos comerciales de clientes/empresas.

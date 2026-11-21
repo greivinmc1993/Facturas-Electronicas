@@ -7,7 +7,7 @@ const css=fs.readFileSync(path.join(base,'src/style.css'),'utf8');
 let count=0;
 const check=(name,fn)=>{fn();count++;console.log('OK Avisos interfaz v0.6.69:',name)};
 const effect=main.split('// Aviso para el propietario al entrar a Empresas o Dashboard.')[1].split('const sizeLabel=')[0];
-const markup=main.split('<main>{securityPanel}')[1].split('{message&&')[0];
+const markup=main.split('<main>{recoveryCodeCard}{recoveryMessageCard}{securityPanel}')[1].split('{message&&')[0];
 check('Únicamente el propietario consulta las alertas',()=>assert.match(effect,/if\(!account\?\.isOwner \|\| !\['companies','dashboard'\]\.includes\(tab\)\)return/));
 check('Una solicitud GET al entrar a Empresas o Dashboard sin temporizadores adicionales',()=>{
  assert.equal((effect.match(/api\('\/api\/backups\/automatic'\)/g)||[]).length,1);

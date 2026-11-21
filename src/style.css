@@ -774,7 +774,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .recoveryInlineMessage{max-width:960px;margin:10px auto;padding:11px 15px;background:#e6f7f1;border-radius:9px;color:#145d4b;font-size:13px}
 .ownerRecoveryTools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(310px,450px);gap:20px;align-items:end;max-width:1540px;margin:18px auto 0;border-top:1px solid #d0e3e4;padding-top:16px}
 .ownerRecoveryTools strong{font-size:13px;color:#173f4a}.ownerRecoveryTools p{margin:5px 0;font-size:12px;line-height:1.5;color:#607781}.ownerRecoveryTools small{font-size:11px;color:#547367}
-.ownerRecoveryTools form{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:12px;align-items:end;margin:0}.ownerRecoveryTools form label{display:grid;gap:6px;margin:0;font-size:11px;font-weight:700;color:#395868}.ownerRecoveryTools form input{box-sizing:border-box;min-width:0;width:100%;height:42px;border-radius:9px;padding:0 10px;border:1px solid #b4cfd2;background:white}.ownerRecoveryTools form button{height:42px;border-radius:9px;margin:0;white-space:nowrap}
+.ownerRecoveryTools form{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:12px;align-items:end;margin:0}.ownerRecoveryTools form label{display:grid;gap:6px;margin:0;font-size:11px;font-weight:700;color:#395868}.ownerRecoveryTools form input{box-sizing:border-box;min-width:0;width:100%;height:42px;border-radius:9px;padding:0 10px;border:1px solid #b4cfd2;background:white}.ownerRecoveryTools form > button[type="submit"]{height:42px;border-radius:9px;margin:0;white-space:nowrap}
 @media(max-width:850px){.ownerRecoveryTools{grid-template-columns:1fr}.ownerRecoveryTools form{max-width:580px}}
 @media(max-width:520px){.ownerRecoveryTools form{grid-template-columns:1fr}.recoveryCodeNotice{margin:10px;padding:13px}.recoveryCodeNotice input{font-size:11px}}
 
@@ -803,14 +803,14 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .ownerAssistedForm label{display:grid;gap:6px;margin:0;min-width:0;font-size:11px;font-weight:700;color:#395868}
 .ownerAssistedForm :is(input,select){width:100%;box-sizing:border-box;margin:0;height:42px;min-height:42px}
 .ownerAssistedForm input{border-radius:10px;border:1px solid #a9c7ca;padding:0 12px;background:#fff}
-.ownerAssistedForm button{grid-column:1/-1;justify-self:end;min-height:42px;margin:0}
+.ownerAssistedForm > button[type="submit"]{grid-column:1/-1;justify-self:end;min-height:42px;margin:0}
 .ownerAssistedContent>.authError{margin:0;color:#9d2637}
 .ownerTemporaryNotice{padding:13px 16px;border:1px solid #81c4b7;border-radius:11px;background:#eff9f5;color:#1a544a;display:grid;gap:9px}
 .ownerTemporaryNotice strong{font-size:13px}.ownerTemporaryNotice p{font-size:12px;margin:0;line-height:1.5}
 .ownerTemporaryNotice input{box-sizing:border-box;min-width:0;width:100%;height:42px;border:1px solid #a0c9be;border-radius:9px;padding:0 12px;background:#fff;color:#194e46;font:700 13px Consolas,monospace}
 .ownerTemporaryNotice .actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:0}
 @media(max-width:1000px){.ownerAssistedRecoveryTools{grid-template-columns:1fr}}
-@media(max-width:620px){.ownerAssistedForm{grid-template-columns:1fr}.ownerAssistedForm button{justify-self:stretch;width:100%}}
+@media(max-width:620px){.ownerAssistedForm{grid-template-columns:1fr}.ownerAssistedForm > button[type="submit"]{justify-self:stretch;width:100%}}
 
 /* v0.6.63 · Barra de sesión y menú lateral anclados; el panel de seguridad
    puede crecer o mostrar errores sin desplazar la navegación del negocio. */
@@ -958,8 +958,8 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
  }
  .secureRoot .securitySettingsPanel .ownerRecoveryTools form,
  .secureRoot .securitySettingsPanel .ownerAssistedForm{grid-template-columns:minmax(0,1fr)}
- .secureRoot .securitySettingsPanel .ownerRecoveryTools form button,
- .secureRoot .securitySettingsPanel .ownerAssistedForm button{width:100%}
+ .secureRoot .securitySettingsPanel .ownerRecoveryTools form > button[type="submit"],
+ .secureRoot .securitySettingsPanel .ownerAssistedForm > button[type="submit"]{width:100%}
  .secureRoot .layout>main .auditHead .actions{justify-content:flex-start}
 }
 @container facturacr-workspace (max-width:540px){
@@ -1646,8 +1646,8 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .dismissibleNotice button.dismissibleNoticeClose{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;min-width:32px;height:32px;min-height:32px;padding:0;margin:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:23px;line-height:1;font-weight:500;cursor:pointer}
 .dismissibleNotice button.dismissibleNoticeClose:hover,.dismissibleNotice button.dismissibleNoticeClose:focus-visible{background:rgba(16,75,64,.12);outline-offset:2px}
 .authPanel .dismissibleNotice{margin:8px 0}
-.secureRoot .securitySettingsPanel .ownerRecoveryTools form button{min-height:44px;height:auto;min-width:175px;padding:10px 14px;font-size:13px;font-weight:700;line-height:1.3;white-space:normal;text-align:center;overflow-wrap:normal}
-@media(max-width:520px){.secureRoot .securitySettingsPanel .ownerRecoveryTools form button{width:100%}}
+.secureRoot .securitySettingsPanel .ownerRecoveryTools form > button[type="submit"]{min-height:44px;height:auto;min-width:175px;padding:10px 14px;font-size:13px;font-weight:700;line-height:1.3;white-space:normal;text-align:center;overflow-wrap:normal}
+@media(max-width:520px){.secureRoot .securitySettingsPanel .ownerRecoveryTools form > button[type="submit"]{width:100%}}
 /* v0.6.88: entrega única de códigos de recuperación, compatible con pantallas pequeñas. */
 .recoverySecretsPanel{border:1px solid #92c6bf;border-radius:12px;padding:18px;margin:14px 0;background:var(--surface,#f4fbf9);display:grid;gap:12px;max-width:100%;overflow-wrap:anywhere}
 .recoverySecretsPanel .recoveryCodesGrid,.recoverySecretsPanel .recoveryKitContents{display:grid;gap:10px;min-width:0}
@@ -1659,3 +1659,92 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .recoverySecretsPanel .recoveryAcknowledge input{width:18px;min-width:18px;height:18px;flex:0 0 18px}
 .recoveryOwnerKitForm,.recoveryRotationForm{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 @media(max-width:680px){.recoverySecretsPanel .recoverySecretRow{flex-direction:column;align-items:stretch}}
+
+/* v0.6.88: exportación privada de tres códigos con confirmación accesible */
+.recoveryPdfActions{display:grid;gap:6px;align-items:start;justify-items:start;min-width:0}
+.recoveryPdfActions>button{width:auto!important;min-width:255px;min-height:42px;max-width:100%;white-space:normal;text-align:center;padding:10px 16px;line-height:1.35}
+.recoveryPdfActions .hint,.recoveryPdfFeedback{margin:2px 0;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.recoveryPdfFeedback{padding:9px 12px;border-radius:8px;background:#e9f6f3;color:#17483e}
+@media(max-width:520px){.recoveryPdfActions{justify-items:stretch}.recoveryPdfActions>button{min-width:0;width:100%!important}}
+
+/* v0.6.88 · Corrección de Seguridad: panel dentro de main y controles simétricos.
+   Evita el conflicto entre el transform centrador del botón y el hover global.
+   Los selectores de envío solo afectan al botón DIRECTO del formulario. */
+.secureRoot .layout>main>.recoverySecretsPanel{
+ width:min(100%,960px);max-width:100%;min-width:0;
+ margin:0 0 22px;padding:clamp(14px,2vw,22px);scroll-margin-top:82px;
+ box-sizing:border-box;overflow:visible;
+}
+.recoverySecretsPanel{min-width:0;max-width:100%;box-sizing:border-box;}
+.recoverySecretsPanel .recoveryCodesGrid,
+.recoverySecretsPanel .recoveryKitContents,
+.recoverySecretsPanel .recoveryPdfActions{width:100%;min-width:0;max-width:100%;}
+.recoverySecretsPanel .recoverySecretRow{
+ display:grid;grid-template-columns:minmax(0,1fr) 126px;
+ gap:10px;align-items:end;min-width:0;max-width:100%;width:100%;
+}
+.recoverySecretsPanel .recoverySecretRow label{
+ display:grid;gap:6px;min-width:0;width:100%;margin:0;
+ font-size:12px;line-height:1.4;
+}
+.recoverySecretsPanel .recoverySecretRow input{
+ display:block;width:100%;min-width:0;max-width:100%;
+ height:42px;min-height:42px;margin:0;padding:0 12px;
+ font-size:12px;line-height:1.2;overflow:hidden;text-overflow:clip;
+}
+.recoverySecretsPanel .recoverySecretRow button.recoverySecretButton{
+ display:inline-flex;align-items:center;justify-content:center;
+ width:126px;min-width:126px;max-width:126px;
+ height:42px;min-height:42px;max-height:42px;
+ padding:0 10px;margin:0;
+ font-size:12px;font-weight:700;line-height:1.2;
+ text-align:center;border:1px solid #c7d9dd;border-radius:9px;
+ box-sizing:border-box;
+}
+.recoverySecretsPanel .recoveryKitDownload{
+ min-height:42px;min-width:170px;width:max-content;
+ justify-self:start;padding:0 16px;font-size:12px;font-weight:700;
+}
+.recoverySecretsPanel .recoverySecretsDone{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:42px;min-width:210px;max-width:100%;width:max-content;
+ padding:10px 18px;justify-self:end;font-size:12px;font-weight:750;
+}
+.recoverySecretsPanel .recoveryAcknowledge{margin:4px 0 0;min-width:0;max-width:100%;line-height:1.5;}
+.recoverySecretsPanel .recoveryAcknowledge input{
+ width:18px!important;min-width:18px!important;max-width:18px!important;
+ height:18px;min-height:18px;padding:0;margin:0;
+ flex:0 0 18px;
+}
+/* La posición vertical del control de contraseña NO depende de transform.
+   Los hover/active globales quedan anulados solo en botones utilitarios. */
+.secureRoot .passwordInputControl>button.passwordInputToggle{
+ position:absolute;top:6px;bottom:6px;right:6px;
+ transform:none!important;min-height:0!important;max-height:none;
+ height:auto!important;width:80px;min-width:80px!important;max-width:80px;
+ margin:0;padding:0 8px;border-radius:8px;line-height:1.2;
+ box-sizing:border-box;
+}
+.secureRoot .passwordInputControl>button.passwordInputToggle:not(:disabled):is(:hover,:active,:focus-visible),
+.secureRoot .recoverySecretsPanel button:not(:disabled):is(:hover,:active){
+ transform:none!important;
+}
+/* Los campos de Seguridad conservan la misma altura que el botón de mostrar. */
+.secureRoot .securitySettingsPanel .passwordInputControl{min-width:0;width:100%;}
+.secureRoot .securitySettingsPanel .passwordInputControl>input{height:42px;min-height:42px;}
+.secureRoot .securitySettingsPanel .ownerRecoveryTools form > button[type="submit"],
+.secureRoot .securitySettingsPanel .ownerAssistedForm > button[type="submit"]{
+ align-self:end;min-height:42px;height:42px;box-sizing:border-box;
+}
+@media(max-width:680px){
+ .recoverySecretsPanel .recoverySecretRow{grid-template-columns:minmax(0,1fr);gap:6px;}
+ .recoverySecretsPanel .recoverySecretRow button.recoverySecretButton{
+  width:126px;max-width:100%;justify-self:end;
+ }
+ .recoverySecretsPanel .recoverySecretsDone{width:100%;justify-self:stretch;}
+}
+@media(max-width:360px){
+ .secureRoot .passwordInputControl>button.passwordInputToggle{
+  width:70px;min-width:70px!important;max-width:70px;
+ }
+}

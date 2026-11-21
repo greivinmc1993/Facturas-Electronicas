@@ -1,3 +1,36 @@
+## Ajuste visual de Seguridad — v0.6.88 (20/11/2026)
+
+La entrega única de tres códigos y el kit extraordinario del propietario se renderizan **dentro del área principal**, no encima del menú. El panel ocupa hasta 960 px; sus botones «Copiar» y «Copiar clave» miden 126 × 42 px, y los controles «Mostrar/Ocultar» permanecen centrados incluso al pasar el puntero. Los campos se adaptan a pantallas pequeñas y la entrega se desplaza a la vista cuando se generan códigos nuevos.
+
+Se mantienen los códigos de un solo uso, la descarga PDF, el kit `.fcr` y la recuperación sin correo; **no se altera SQLite ni la política de usuarios**. Ejecuta `npm test` y revisa visualmente Seguridad y bloqueo, creación de usuarios y kit. Por seguridad, renueva cualquier código real que haya aparecido en una captura compartida.
+
+La corrección anterior para GitHub Actions sigue aplicándose: al actualizar una carpeta Git antigua mediante ZIP, ejecutar **`npm run cleanup:legacy-email` antes de `npm test`**, verificar los archivos eliminados en `git status --short` y publicar el commit. El ZIP no elimina automáticamente los archivos obsoletos existentes.
+
+## Corrección v0.6.88 — PDF de códigos y CI GitHub Actions (20/11/2026)
+
+- **«Guardar mis 3 códigos en PDF»** aparece solamente en la pantalla de entrega única de tres códigos FCR2: alta de usuario, primer cambio de contraseña, renovación, recuperación del propietario y restablecimiento por propietario. Abre un diálogo nativo para elegir la ubicación del PDF, tamaño A4 vertical. No guarda la contraseña ni ninguna parte del kit extraordinario.
+- **Cuidado:** el PDF contiene tres secretos válidos **sin cifrar**; no lo sincronices ni compartas sin protección. Copiar o guardar el PDF no sustituye la confirmación consciente de resguardo. Nunca guardar junto con el archivo `.fcr` y la clave `FCRK` del propietario.
+- **Corrección del fallo GitHub Actions (`server/email-recovery.js true !== false`):** extraer un ZIP sobre un repositorio existente **no borra los archivos antiguos**. El archivo `server/email-recovery.js` puede seguir rastreado por Git aunque no venga en el ZIP nuevo. Antes de `npm test` y del commit, ejecutar **`npm run cleanup:legacy-email`** desde la raíz. Este comando solo elimina cuatro archivos obsoletos de recuperación SMTP (cuando estén presentes y sin referencias activas). No toca usuarios, SQLite, SMTP de terceros ni correos comerciales. Ejecutar `git status --short`: verificar las eliminaciones y después `git add -A` para que GitHub Actions reciba el borrado.
+- Las aserciones de `tests/qa-088-no-email-recovery.cjs` **no se relajan**. Continúan bloqueando módulos obsoletos que permanezcan en el repositorio. El CI solamente quedará verde cuando Git reciba las eliminaciones correspondientes.
+- La aplicación conserva versión `0.6.88`; no cambia esquema SQLite, roles ni los procedimientos fiscales. El envío real FE/TE a Hacienda sigue bloqueado.
+
+**Orden recomendado (PowerShell):**
+
+```powershell
+# Antes: respaldo independiente y comprobado de SQLite
+npm ci
+npm run cleanup:legacy-email
+npm test
+npm run qa:real-server
+npm run dist:win
+git status --short
+git add -A
+git commit -m "fix: v0.6.88 - PDF codigos y limpieza modulos correo CI"
+git push origin main
+```
+
+---
+
 # FacturaCR v0.6.88 — Recuperación local sin correo (versión actual)
 
 > **Versión vigente:** recuperación de cuentas mediante códigos individuales de un solo uso. **SMTP, Gmail, verificación del correo y recuperación por correo fueron retirados.** Las referencias de versiones anteriores son únicamente historial y no son instrucciones vigentes.

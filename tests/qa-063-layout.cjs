@@ -47,11 +47,11 @@ console.log('OK Diseño: menú lateral anclado sin superposición');
 // Regresión real: un sticky dentro de .layout NO puede colocarse sobre
 // un hermano que precede a .layout. El panel de seguridad debe ser hijo
 // de <main>; de otro modo todo el menú lateral se desplazará hacia abajo.
-const appStart=jsx.indexOf('function App({account,securityPanel})');
+const appStart=jsx.indexOf('function App({account,securityPanel,recoveryCodeCard,recoveryMessageCard})');
 const secureStart=jsx.indexOf('function SecureApp()');
 assert.ok(appStart>=0&&secureStart>appStart,'App debe recibir el panel de Seguridad');
 const appSource=jsx.slice(appStart,secureStart);
-assert.match(appSource,/<main>\{securityPanel\}/,'Seguridad debe aparecer al inicio de <main>, junto al menú');
+assert.match(appSource,/<main>\{recoveryCodeCard\}\{recoveryMessageCard\}\{securityPanel\}/,'Seguridad debe aparecer al inicio de <main>, junto al menú');
 assert.ok(!appSource.includes('className="securitySettingsPanel"'),'La sección se crea una sola vez dentro de SecureApp');
 const secureSource=jsx.slice(secureStart);
 assert.match(secureSource,/const securityPanel = hasSession&&securitySettingsOpen/,'Seguridad se construye únicamente con sesión válida');
