@@ -11,6 +11,9 @@ import KardexPanel from './KardexPanel.jsx';
 import CashPanel from './CashPanel.jsx';
 import InventoryValuationPanel from './InventoryValuationPanel.jsx';
 import UsersPanel from './UsersPanel.jsx';
+import PasswordInput from './PasswordInput.jsx';
+import RecoverySecretsPanel from './RecoverySecretsPanel.jsx';
+import DismissibleNotice from './DismissibleNotice.jsx';
 import AuditPanel from './AuditPanel.jsx';
 import FePreparationPanel from './FePreparationPanel.jsx';
 import CompanyFiscalFields,{EMPTY_COMPANY_FISCAL,postalFromLocation} from './CompanyFiscalFields.jsx';
@@ -512,7 +515,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true}){
     </div>
   </div>}
 
-  <div className="card"><h3>Punto de venta · {company?.trade_name||company?.legal_name}</h3><p className="hint">Registro comercial interno en colones. No emite factura electrónica ni valida comprobantes ante Hacienda.</p>{notice&&<p className="notice" role="status">{notice}</p>}
+  <div className="card"><h3>Punto de venta · {company?.trade_name||company?.legal_name}</h3><p className="hint">Registro comercial interno en colones. No emite factura electrónica ni valida comprobantes ante Hacienda.</p>{notice&&<DismissibleNotice className="notice" onClose={()=>setNotice('')}>{notice}</DismissibleNotice>}
    <div className="posQuickTools">
     <div className="posQuickSearch"><Field title="Buscar artículo, código o SKU"><input value={query} onChange={e=>{setQuery(e.target.value);setProductPage(1)}} placeholder="Escribe para buscar entre todos los artículos" autoComplete="off"/></Field>
      {productSuggestions.length>0&&<div className="posSuggestions" aria-label="Sugerencias de artículos"><p className="hint">Resultados rápidos · pulsa para añadir al carrito</p>{productSuggestions.map(p=><button type="button" key={p.id} className="posSuggestion" onClick={()=>{add(p);setQuery('');setProductPage(1);setNotice(`Añadido al carrito: ${p.description}`)}}><span><strong>{p.description}</strong><small>{p.product_code||p.barcode||'Sin código'} · {p.kind==='servicio'?'Servicio':`Stock: ${p.stock}`}</small></span><b>₡{Math.round(basePrice(p)).toLocaleString('es-CR')}</b></button>)}</div>}
@@ -1139,7 +1142,7 @@ function App({account,securityPanel}){
   <div className="ownerBackupNoticeBody"><strong>{ownerBackupNotice.title}</strong><p>{ownerBackupNotice.detail}</p></div>
   <button type="button" className="secondary ownerBackupNoticeAction" onClick={()=>setTab('backups')}><UiIcon name="folder-open" size={16}/><span>Revisar respaldos</span></button>
  </section>}
- {message&&<p className="notice" role="status">{message}</p>}
+ {message&&<DismissibleNotice className="notice" onClose={()=>setMessage('')}>{message}</DismissibleNotice>}
  {tab==='users'&&<UsersPanel account={account}/>}
  {tab==='audit'&&account?.isOwner&&<AuditPanel/>}
  {tab==='cashier-kardex'&&!account?.isOwner&&account?.companies?.some(c=>c.company_id===selected&&c.role==='cashier')&&<CashierStockPanel companyId={selected}/>}
@@ -1272,18 +1275,12 @@ function SecureApp(){
  const [username,setUsername]=useState(''),[displayName,setDisplayName]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[newPassword,setNewPassword]=useState('');
  const [locked,setLocked]=useState(false),[minutes,setMinutes]=useState(15),[savedMinutes,setSavedMinutes]=useState(15),[settingsBusy,setSettingsBusy]=useState(false),[accountMenuOpen,setAccountMenuOpen]=useState(false),[securitySettingsOpen,setSecuritySettingsOpen]=useState(false);
  const [settingsFeedback,setSettingsFeedback]=useState(null);
- // El código de recuperación se mantiene solo en memoria y se muestra una vez.
- const [recoveryCode,setRecoveryCode]=useState(''),[recoveryMode,setRecoveryMode]=useState(false);
- const [recoveryInput,setRecoveryInput]=useState(''),[recoveryNewPassword,setRecoveryNewPassword]=useState(''),[recoveryConfirm,setRecoveryConfirm]=useState(''),[ownerRecoveryPassword,setOwnerRecoveryPassword]=useState('');
- const [ownerRecoveryConfigured,setOwnerRecoveryConfigured]=useState(null),[recoveryMessage,setRecoveryMessage]=useState('');
- // Cada usuario puede verificar su propio correo; recuperar nunca cambia su rol.
- const [emailStatus,setEmailStatus]=useState(null),[emailValue,setEmailValue]=useState(''),[emailPassword,setEmailPassword]=useState('');
- const [emailVerifyCode,setEmailVerifyCode]=useState(''),[emailVerifyPending,setEmailVerifyPending]=useState(false),[emailFeedback,setEmailFeedback]=useState(null);
- const [emailRecoveryMode,setEmailRecoveryMode]=useState(false),[emailResetRequested,setEmailResetRequested]=useState(false);
- const [emailResetCode,setEmailResetCode]=useState(''),[emailResetPassword,setEmailResetPassword]=useState(''),[emailResetConfirm,setEmailResetConfirm]=useState('');
- // Solo el propietario administra SMTP; nunca se devuelve la clave guardada al navegador.
- const [smtpStatus,setSmtpStatus]=useState(null),[smtpBusy,setSmtpBusy]=useState(false),[smtpFeedback,setSmtpFeedback]=useState(null);
- const [smtpForm,setSmtpForm]=useState({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});
+ // Los secretos solo existen en memoria de la pantalla hasta que el usuario los confirma.
+ const [recoverySecrets,setRecoverySecrets]=useState(null),[recoveryMode,setRecoveryMode]=useState(false);
+ const [recoveryInput,setRecoveryInput]=useState(''),[recoveryNewPassword,setRecoveryNewPassword]=useState(''),[recoveryConfirm,setRecoveryConfirm]=useState('');
+ const [ownerRecoveryPassword,setOwnerRecoveryPassword]=useState(''),[ownerKitPassword,setOwnerKitPassword]=useState('');
+ const [recoveryStatus,setRecoveryStatus]=useState(null),[recoveryMessage,setRecoveryMessage]=useState('');
+ const [recoveryMethod,setRecoveryMethod]=useState('code'),[recoveryKitFile,setRecoveryKitFile]=useState(''),[recoveryKitKey,setRecoveryKitKey]=useState('');
  // El propietario puede recuperar cuentas de personal, nunca otras personas.
  // La contraseña temporal se muestra solo una vez y no se persiste en el navegador.
  const [ownerUsers,setOwnerUsers]=useState([]),[ownerTarget,setOwnerTarget]=useState(''),[ownerAssistPassword,setOwnerAssistPassword]=useState('');
@@ -1299,7 +1296,7 @@ function SecureApp(){
   return()=>cancelAnimationFrame(frame);
  },[securitySettingsOpen,locked]);
  const activity=useRef(Date.now()),lastTouch=useRef(0);
- const lockNow=()=>{setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoveryCode('');setOwnerRecoveryPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
+ const lockNow=()=>{setAccountMenuOpen(false);setSecuritySettingsOpen(false);setSettingsFeedback(null);setLocked(true);setRecoveryMode(false);setRecoverySecrets(null);setOwnerRecoveryPassword('');setOwnerKitPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setPassword('');void fetch('/api/auth/lock',{method:'POST'}).catch(()=>{});};
  const reload=async()=>{
   try{
    const r=await fetch('/api/auth/status',{cache:'no-store'});
@@ -1320,7 +1317,7 @@ function SecureApp(){
    if(!hasSession||locked)return;
    const onActivity=()=>{
      activity.current=Date.now();
-     if(Date.now()-lastTouch.current>30000){lastTouch.current=Date.now();fetch('/api/auth/touch',{method:'POST'}).then(r=>{if(r.status===401){setLocked(true);setRecoveryCode('');setPassword('')}}).catch(()=>{});}
+     if(Date.now()-lastTouch.current>30000){lastTouch.current=Date.now();fetch('/api/auth/touch',{method:'POST'}).then(r=>{if(r.status===401){setLocked(true);setRecoverySecrets(null);setPassword('')}}).catch(()=>{});}
    };
    // Solo el valor confirmado por SQLite rige el tiempo, no una selección pendiente.
    const monitor=()=>{if(savedMinutes>0&&Date.now()-activity.current>=savedMinutes*60000)lockNow()};
@@ -1354,7 +1351,7 @@ function SecureApp(){
     if(state?.setupRequired&&password!==confirm)throw Error('Las contraseñas no coinciden.');
     if(state?.setupRequired){
       const created=await api('/api/auth/setup',{method:'POST',body:JSON.stringify({username,displayName,password})});
-      if(created.recoveryCode)setRecoveryCode(created.recoveryCode);
+      setRecoverySecrets({recoveryCodes:created.recoveryCodes,emergencyKit:created.emergencyKit});
     }
     const loginUsername=locked && sessionUser?.username ? sessionUser.username : username;
     const result=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:loginUsername,password})});
@@ -1362,28 +1359,17 @@ function SecureApp(){
     await reload();
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoveryCode('');setRecoveryMode(false);setOwnerRecoveryPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setEmailStatus(null);setEmailValue('');setEmailPassword('');setEmailVerifyCode('');setEmailVerifyPending(false);setEmailFeedback(null);setEmailRecoveryMode(false);setEmailResetRequested(false);setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setSmtpStatus(null);setSmtpFeedback(null);setSmtpForm({host:'smtp.gmail.com',user:'',from:'',smtpPassword:'',ownerPassword:'',testTo:''});setState(null);await reload();}};
+ const logout=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});}finally{setLocked(false);setPassword('');setSecuritySettingsOpen(false);setAccountMenuOpen(false);setSettingsFeedback(null);setRecoverySecrets(null);setRecoveryMode(false);setOwnerRecoveryPassword('');setOwnerKitPassword('');setOwnerAssistPassword('');setOwnerTempCredential(null);setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('');setRecoveryStatus(null);setState(null);await reload();}};
+ const refreshRecovery=async()=>{try{setRecoveryStatus(await api('/api/auth/recovery/status'))}catch{setRecoveryStatus(null)}};
  const openSecurity=async()=>{
    setMinutes(savedMinutes);setSettingsFeedback(null);setAccountMenuOpen(false);
-   const opening=!securitySettingsOpen;
-   setSecuritySettingsOpen(opening);
-   if(!opening){setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null)}
+   const opening=!securitySettingsOpen;setSecuritySettingsOpen(opening);
    setOwnerTempCredential(null);setOwnerAssistPassword('');setOwnerAssistError('');
-   if(!opening){setOwnerUsers([]);setOwnerTarget('')}
-   setEmailPassword('');setEmailVerifyCode('');setEmailFeedback(null);setEmailVerifyPending(false);
-   if(opening){
-     try{const email=await api('/api/auth/email/status');setEmailStatus(email);setEmailValue(email.email||'');setEmailVerifyPending(false);setEmailFeedback(null)}
-     catch{setEmailStatus(null);setEmailValue('')}
-   }
-   if(opening&&sessionUser?.isOwner){
-     try{const m=await api('/api/auth/mail/settings');setSmtpStatus(m);setSmtpFeedback(null);setSmtpForm(f=>({...f,host:m.host||'smtp.gmail.com',user:m.user||'',from:m.from||'',smtpPassword:'',ownerPassword:'',testTo:m.from||m.user||''}));}
-     catch(e){setSmtpStatus(null);setSmtpFeedback({type:'error',message:e.message})}
-     try{const v=await api('/api/auth/recovery/status');setOwnerRecoveryConfigured(!!v.configured)}
-     catch{setOwnerRecoveryConfigured(null)}
-     try{
-       const list=await api('/api/auth/users');
-       setOwnerUsers(list.filter(u=>!u.is_owner&&u.is_active));setOwnerTarget('');
-     }catch(e){setOwnerUsers([]);setOwnerAssistError('No se pudo consultar las cuentas: '+e.message)}
+   if(!opening){setOwnerUsers([]);setOwnerTarget('');return}
+   await refreshRecovery();
+   if(sessionUser?.isOwner){
+     try{const list=await api('/api/auth/users');setOwnerUsers(list.filter(u=>!u.is_owner&&u.is_active));setOwnerTarget('')}
+     catch(e){setOwnerUsers([]);setOwnerAssistError('No se pudo consultar las cuentas: '+e.message)}
    }
  };
  const assistOwnerRecover=async e=>{
@@ -1394,7 +1380,7 @@ function SecureApp(){
      if(!await confirmAction('Se cerrarán las sesiones de la cuenta seleccionada y se emitirá una nueva contraseña temporal.',{title:'Recuperar cuenta del personal',confirmLabel:'Generar contraseña temporal',danger:true}))return;
      const result=await api(`/api/auth/users/${Number(ownerTarget)}/owner-recovery`,{method:'POST',body:JSON.stringify({currentPassword:ownerAssistPassword})});
      const target=ownerUsers.find(u=>u.id===Number(ownerTarget));
-     setOwnerTempCredential({username:target?.username||'',password:result.temporaryPassword});
+     setOwnerTempCredential({username:target?.username||'',password:result.temporaryPassword,recoveryCodes:result.recoveryCodes});
      setOwnerAssistPassword('');
      setSettingsFeedback({type:'success',message:'Cuenta recuperada. Entrega la contraseña temporal de forma privada; el usuario deberá cambiarla al iniciar sesión.'});
    }catch(err){setOwnerAssistError(err.message)}finally{setOwnerAssistBusy(false)}
@@ -1402,86 +1388,37 @@ function SecureApp(){
  const rotateRecovery=async e=>{
    e.preventDefault();setBusy(true);setSettingsFeedback(null);
    try{
-     if(!await confirmAction('El código de recuperación anterior dejará de funcionar y será reemplazado por uno nuevo.',{title:'Reemplazar código de emergencia',confirmLabel:'Reemplazar código',danger:true}))return;
+     if(!await confirmAction('Los códigos anteriores dejarán de funcionar. Debes guardar los tres nuevos antes de cerrar la ventana.',{title:'Renovar tres códigos',confirmLabel:'Generar tres códigos',danger:true}))return;
      const result=await api('/api/auth/recovery/rotate',{method:'POST',body:JSON.stringify({password:ownerRecoveryPassword})});
-     setRecoveryCode(result.recoveryCode);setOwnerRecoveryPassword('');setOwnerRecoveryConfigured(true);
-     setSettingsFeedback({type:'success',message:'Nuevo código generado. Guárdalo fuera del equipo; solo se mostrará ahora.'});
-   }catch(err){setSettingsFeedback({type:'error',message:'No se pudo generar el código: '+err.message})}
-   finally{setBusy(false)}
+     setRecoverySecrets({recoveryCodes:result.recoveryCodes});setOwnerRecoveryPassword('');await refreshRecovery();
+     setSettingsFeedback({type:'success',message:'Tres códigos nuevos generados. Guárdalos; se muestran una sola vez.'});
+   }catch(err){setSettingsFeedback({type:'error',message:'No se pudo generar los códigos: '+err.message})}finally{setBusy(false)}
+ };
+ const rotateOwnerKit=async e=>{
+   e.preventDefault();setBusy(true);setSettingsFeedback(null);
+   try{
+     if(!await confirmAction('El kit extraordinario anterior dejará de funcionar. Guarda el archivo y la nueva clave por separado.',{title:'Renovar kit extraordinario',confirmLabel:'Generar kit',danger:true}))return;
+     const result=await api('/api/auth/recovery/owner-kit/rotate',{method:'POST',body:JSON.stringify({password:ownerKitPassword})});
+     setRecoverySecrets({emergencyKit:result.emergencyKit});setOwnerKitPassword('');await refreshRecovery();
+     setSettingsFeedback({type:'success',message:'Kit nuevo generado. Guarda ambas partes en lugares distintos.'});
+   }catch(err){setSettingsFeedback({type:'error',message:err.message})}finally{setBusy(false)}
  };
  const resetOwnerPassword=async e=>{
    e.preventDefault();setBusy(true);setError('');setRecoveryMessage('');
    try{
      if(recoveryNewPassword!==recoveryConfirm)throw Error('Las contraseñas nuevas no coinciden.');
-     const result=await api('/api/auth/recovery/reset',{method:'POST',body:JSON.stringify({username,recoveryCode:recoveryInput,newPassword:recoveryNewPassword})});
-     setRecoveryCode(result.recoveryCode);setRecoveryInput('');setRecoveryNewPassword('');setRecoveryConfirm('');setPassword('');setRecoveryMode(false);
-     setRecoveryMessage('Contraseña restaurada. Guarda el nuevo código de recuperación e inicia sesión.');
+     const data={username,newPassword:recoveryNewPassword,method:recoveryMethod};
+     if(recoveryMethod==='emergency'){
+       data.fileContent=recoveryKitFile;data.emergencyKey=recoveryKitKey;
+     }else data.recoveryCode=recoveryInput;
+     const result=await api('/api/auth/recovery/reset',{method:'POST',body:JSON.stringify(data)});
+     setRecoverySecrets(result.recoveryCodes?{recoveryCodes:result.recoveryCodes,emergencyKit:result.emergencyKit}:null);
+     setRecoveryInput('');setRecoveryKitFile('');setRecoveryKitKey('');setRecoveryNewPassword('');setRecoveryConfirm('');setPassword('');setRecoveryMode(false);
+     setRecoveryMessage(`Contraseña restaurada. ${result.remaining===0?'No quedan códigos; inicia sesión y genera tres nuevos.':'Inicia sesión con tu nueva contraseña.'}`);
      await reload();
    }catch(err){setError(err.message)}finally{setBusy(false)}
  };
- const editSmtp=(key,value)=>{setSmtpForm(f=>({...f,[key]:value}));setSmtpFeedback(null)};
- const saveSmtp=async e=>{
-   e.preventDefault();setSmtpBusy(true);setSmtpFeedback(null);
-   try{
-     const result=await api('/api/auth/mail/settings',{method:'PUT',body:JSON.stringify({host:smtpForm.host,port:465,user:smtpForm.user,from:smtpForm.from,smtpPassword:smtpForm.smtpPassword,currentPassword:smtpForm.ownerPassword})});
-     setSmtpStatus(result);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));
-     setSmtpFeedback({type:'success',message:'Configuración SMTP cifrada y guardada. Envía ahora un correo de prueba.'});
-     try{const email=await api('/api/auth/email/status');setEmailStatus(email)}catch{/* La configuración ya se guardó; no mostrar un fallo engañoso. */}
-   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
- };
- const testSmtp=async e=>{
-   e.preventDefault();setSmtpBusy(true);setSmtpFeedback(null);
-   try{
-     const result=await api('/api/auth/mail/test',{method:'POST',body:JSON.stringify({currentPassword:smtpForm.ownerPassword,to:smtpForm.testTo})});
-     setSmtpForm(f=>({...f,ownerPassword:''}));setSmtpFeedback({type:'success',message:result.message});
-   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
- };
- const removeSmtp=async()=>{
-   if(!await confirmAction('Se desactivará la recuperación por correo hasta configurar otro servidor. Se conservarán los correos verificados.',{title:'Eliminar configuración SMTP',confirmLabel:'Eliminar configuración',danger:true}))return;
-   setSmtpBusy(true);setSmtpFeedback(null);
-   try{
-     const result=await api('/api/auth/mail/settings',{method:'DELETE',body:JSON.stringify({currentPassword:smtpForm.ownerPassword})});
-     setSmtpStatus(result);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));
-     setSmtpFeedback({type:'success',message:'Configuración SMTP eliminada. Los correos verificados se conservaron.'});
-     try{const email=await api('/api/auth/email/status');setEmailStatus(email)}catch{/* La configuración ya se guardó; no mostrar un fallo engañoso. */}
-   }catch(err){setSmtpFeedback({type:'error',message:err.message})}finally{setSmtpBusy(false)}
- };
- const requestEmailVerification=async e=>{
-   e.preventDefault();setBusy(true);setEmailFeedback(null);
-   try{
-     const result=await api('/api/auth/email/verification/request',{method:'POST',body:JSON.stringify({email:emailValue,password:emailPassword})});
-     setEmailPassword('');setEmailVerifyPending(true);setEmailFeedback({type:'success',message:result.message});
-   }catch(err){setEmailFeedback({type:'error',message:err.message})}finally{setBusy(false)}
- };
- const confirmEmailVerification=async e=>{
-   e.preventDefault();setBusy(true);setEmailFeedback(null);
-   try{
-     await api('/api/auth/email/verification/confirm',{method:'POST',body:JSON.stringify({code:emailVerifyCode})});
-     const result=await api('/api/auth/email/status');setEmailStatus(result);setEmailValue(result.email||'');setEmailVerifyCode('');setEmailVerifyPending(false);
-     setEmailFeedback({type:'success',message:'Correo verificado. Ya puedes recuperar tu contraseña por correo.'});
-   }catch(err){setEmailFeedback({type:'error',message:err.message})}finally{setBusy(false)}
- };
- const requestEmailReset=async e=>{
-   e.preventDefault();setBusy(true);setError('');setRecoveryMessage('');
-   try{
-     const result=await api('/api/auth/email/recovery/request',{method:'POST',body:JSON.stringify({username})});
-     setRecoveryMessage(result.message);setEmailResetRequested(true);
-   }catch(err){setError(err.message)}finally{setBusy(false)}
- };
- const confirmEmailReset=async e=>{
-   e.preventDefault();setBusy(true);setError('');
-   try{
-     if(emailResetPassword!==emailResetConfirm)throw Error('Las contraseñas nuevas no coinciden.');
-     await api('/api/auth/email/recovery/reset',{method:'POST',body:JSON.stringify({username,code:emailResetCode,newPassword:emailResetPassword})});
-     setEmailResetCode('');setEmailResetPassword('');setEmailResetConfirm('');setEmailResetRequested(false);setEmailRecoveryMode(false);
-     setRecoveryMessage('Contraseña actualizada. Inicia sesión con la nueva contraseña.');await reload();
-   }catch(err){setError(err.message)}finally{setBusy(false)}
- };
- const recoveryCodeCard=recoveryCode&&<section className="recoveryCodeNotice" role="status" aria-label="Código de recuperación del propietario">
-   <div><strong>Código de recuperación del propietario</strong><p>Guárdalo fuera de este equipo, preferiblemente en un lugar privado y seguro. Solo se mostrará una vez. Quien tenga este código podrá restablecer la contraseña propietaria.</p></div>
-   <input aria-label="Código privado de recuperación" readOnly value={recoveryCode} onFocus={e=>e.target.select()}/>
-   <div className="actions"><button type="button" className="secondary" onClick={async()=>{try{await navigator.clipboard.writeText(recoveryCode);setRecoveryMessage('Código copiado. Guárdalo en un sitio seguro.')}catch{setRecoveryMessage('Selecciona el código y cópialo manualmente.')}}}>Copiar código</button><button type="button" onClick={()=>{setRecoveryCode('');setRecoveryMessage('');}}>Ya guardé mi código</button></div>
- </section>;
+ const recoveryCodeCard=recoverySecrets&&<RecoverySecretsPanel payload={recoverySecrets} onDone={()=>{setRecoverySecrets(null);setRecoveryMessage('')}}/>;
  const saveMinutes=async()=>{
   if(!hasSession||sessionUser?.passwordChangeRequired||settingsBusy)return;
   setSettingsBusy(true);setSettingsFeedback(null);
@@ -1496,7 +1433,7 @@ function SecureApp(){
  };
  const changeTemporaryPassword=async e=>{
    e.preventDefault();setBusy(true);setError('');
-   try{if(newPassword!==confirm)throw Error('Las contraseñas no coinciden.');await api('/api/auth/password-change',{method:'POST',body:JSON.stringify({oldPassword:password,newPassword})});setPassword('');setNewPassword('');setConfirm('');await reload();}catch(e){setError(e.message)}finally{setBusy(false)}
+   try{if(newPassword!==confirm)throw Error('Las contraseñas no coinciden.');const result=await api('/api/auth/password-change',{method:'POST',body:JSON.stringify({oldPassword:password,newPassword})});if(result.recoveryCodes)setRecoverySecrets({recoveryCodes:result.recoveryCodes});setPassword('');setNewPassword('');setConfirm('');await reload();}catch(e){setError(e.message)}finally{setBusy(false)}
  };
  const needsGate=!state||!!state.setupRequired||!hasSession||locked||!!sessionUser?.passwordChangeRequired;
  const securityPanel = hasSession&&securitySettingsOpen&&!sessionUser.passwordChangeRequired&&(
@@ -1520,20 +1457,28 @@ function SecureApp(){
       </label>
       <div className="securitySettingsActions">
        <button type="button" onClick={saveMinutes} disabled={settingsBusy||minutes===savedMinutes}>{settingsBusy?'Guardando…':'Guardar configuración'}</button>
-       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false);setSmtpForm(f=>({...f,smtpPassword:'',ownerPassword:''}));setSmtpFeedback(null);setOwnerTempCredential(null);setOwnerAssistPassword('');setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('')}} disabled={settingsBusy}>Cerrar</button>
+       <button type="button" className="secondary" onClick={()=>{setMinutes(savedMinutes);setSecuritySettingsOpen(false);setOwnerTempCredential(null);setOwnerAssistPassword('');setOwnerAssistError('');setOwnerUsers([]);setOwnerTarget('')}} disabled={settingsBusy}>Cerrar</button>
       </div>
      </div>
     </div>
+    <div className="ownerRecoveryTools">
+      <div><strong>Mis tres códigos de recuperación</strong><p>Independientes y de un solo uso. Se entregan al crear la cuenta y se pueden renovar confirmando la contraseña.</p>
+       <small>{recoveryStatus?.configured?`Disponibles: ${recoveryStatus.remaining} de 3.`:recoveryStatus?.legacyAvailable?'Código antiguo del propietario disponible solo hasta generar los tres nuevos.':'Todavía no tienes códigos; genéralos y guárdalos.'}</small></div>
+      <form className="recoveryRotationForm" onSubmit={rotateRecovery}><label>Contraseña actual
+       <PasswordInput type="password" autoComplete="current-password" required value={ownerRecoveryPassword} onChange={e=>setOwnerRecoveryPassword(e.target.value)}/></label>
+       <button disabled={busy} type="submit">Generar tres códigos nuevos</button></form>
+    </div>
     {sessionUser?.isOwner&&<div className="ownerRecoveryTools">
-      <div><strong>Recuperación del propietario</strong><p>Un código de un solo uso permite restablecer la contraseña si la olvidas. El código se almacena únicamente como hash criptográfico, no en texto visible.</p><small>{ownerRecoveryConfigured===true?'Código configurado. Puedes reemplazarlo cuando quieras.':ownerRecoveryConfigured===false?'Esta instalación todavía no tiene código de recuperación. Genera uno y guárdalo.':'Para generar un código, confirma tu contraseña actual.'}</small></div>
-      <form onSubmit={rotateRecovery}><label htmlFor="owner-recovery-password">Contraseña actual
-        <input id="owner-recovery-password" type="password" autoComplete="current-password" required value={ownerRecoveryPassword} onChange={e=>setOwnerRecoveryPassword(e.target.value)}/>
-      </label><button disabled={busy} type="submit">{ownerRecoveryConfigured===false?'Crear código de recuperación':'Reemplazar código'}</button></form>
+      <div><strong>Kit extraordinario del propietario</strong><p>Úsalo solo si pierdes la contraseña y los tres códigos. Archivo .fcr más clave separada. No existe acceso oculto.</p>
+       <small>{recoveryStatus?.emergencyConfigured?'Kit configurado. Puedes renovarlo con tu contraseña.':'Kit pendiente. Genéralo y guarda sus dos partes.'}</small></div>
+      <form className="recoveryOwnerKitForm" onSubmit={rotateOwnerKit}><label>Contraseña actual
+       <PasswordInput type="password" autoComplete="current-password" required value={ownerKitPassword} onChange={e=>setOwnerKitPassword(e.target.value)}/></label>
+       <button disabled={busy} type="submit">Generar kit extraordinario</button></form>
     </div>}
     {sessionUser?.isOwner&&<div className="ownerAssistedRecoveryTools" aria-label="Recuperación de cuentas por el propietario">
       <div className="ownerAssistedHeading">
        <strong>Recuperar cuentas del personal</strong>
-       <p>Solo el propietario puede recuperar la cuenta de otro usuario. Se genera una contraseña temporal sin cambiar el rol, las empresas asignadas ni el correo verificado.</p>
+       <p>Solo el propietario puede recuperar la cuenta de otro usuario. Se genera una contraseña temporal sin cambiar el rol, las empresas asignadas .</p>
        <small>La contraseña temporal se muestra una sola vez. Entrégala de forma privada.</small>
       </div>
       <div className="ownerAssistedContent">
@@ -1545,63 +1490,22 @@ function SecureApp(){
          </select>
         </label>
         <label>Confirma tu contraseña de propietario
-         <input required type="password" autoComplete="current-password" value={ownerAssistPassword} disabled={ownerAssistBusy} onChange={e=>setOwnerAssistPassword(e.target.value)}/>
+         <PasswordInput required type="password" autoComplete="current-password" value={ownerAssistPassword} disabled={ownerAssistBusy} onChange={e=>setOwnerAssistPassword(e.target.value)}/>
         </label>
         <button disabled={ownerAssistBusy||!ownerTarget} type="submit">{ownerAssistBusy?'Comprobando…':'Generar contraseña temporal'}</button>
        </form>
-       {ownerAssistError&&<p className="authError" role="alert">{ownerAssistError}</p>}
+       {ownerAssistError&&<DismissibleNotice variant="error" className="authError" onClose={()=>setOwnerAssistError('')}>{ownerAssistError}</DismissibleNotice>}
        {ownerTempCredential&&<div className="ownerTemporaryNotice" role="status">
         <strong>Contraseña temporal para @{ownerTempCredential.username}</strong>
-        <p>Este dato se mostrará una sola vez. El usuario deberá cambiarlo en su próximo inicio. No lo envíes por un canal público.</p>
+        <p>Estos datos solo se mostrarán una vez. Entrega la contraseña y los códigos de manera privada.</p>
         <input readOnly aria-label="Nueva contraseña temporal" value={ownerTempCredential.password} onFocus={e=>e.target.select()}/>
+        <RecoverySecretsPanel payload={{recoveryCodes:ownerTempCredential.recoveryCodes}} onDone={()=>setOwnerTempCredential(null)} title="Códigos nuevos del usuario"/>
         <div className="actions">
-         <button type="button" className="secondary" onClick={()=>{navigator.clipboard?.writeText(ownerTempCredential.password).catch(()=>{});}}>Copiar</button>
+         <button type="button" className="secondary" onClick={()=>{navigator.clipboard?.writeText(ownerTempCredential.password).catch(()=>{});}}>Copiar contraseña</button>
          <button type="button" onClick={()=>setOwnerTempCredential(null)}>Ya la entregué</button>
         </div>
        </div>}
       </div>
-    </div>}
-    {sessionUser?.isOwner&&<div className="smtpAdminTools" aria-label="Correo emisor SMTP">
-     <div className="smtpAdminHeading">
-      <strong><UiIcon name="settings" size={17}/> Correo emisor de FacturaCR</strong>
-      <p>Solo el propietario configura la cuenta que enviará códigos a todos los usuarios. La clave queda cifrada por el sistema operativo, fuera de SQLite y de GitHub.</p>
-      <small className={smtpStatus?.configured?'smtpConfigured':'smtpNotConfigured'}>{smtpStatus?.configured?'Servidor guardado. Puedes enviar un correo de prueba.':smtpStatus?.available===false?'Almacenamiento seguro no disponible aquí. Configura el correo desde la aplicación Windows instalada.':'Servidor SMTP pendiente de configurar.'}</small>
-     </div>
-     {smtpStatus?.available&&<div className="smtpAdminContent">
-      <form className="smtpAdminForm" onSubmit={saveSmtp}>
-       <label>Servidor SMTP<input required maxLength={253} value={smtpForm.host} onChange={e=>editSmtp('host',e.target.value)} placeholder="smtp.gmail.com"/></label>
-       <label>Puerto TLS<input readOnly value="465" aria-label="Puerto TLS fijo 465"/></label>
-       <label>Usuario SMTP<input required type="email" autoComplete="off" value={smtpForm.user} onChange={e=>editSmtp('user',e.target.value)} placeholder="correo@empresa.com"/></label>
-       <label>Correo remitente<input required type="email" autoComplete="off" value={smtpForm.from} onChange={e=>editSmtp('from',e.target.value)} placeholder="correo@empresa.com"/></label>
-       <label>Clave SMTP<input type="password" autoComplete="new-password" value={smtpForm.smtpPassword} onChange={e=>editSmtp('smtpPassword',e.target.value)} required={!smtpStatus?.passwordSaved} placeholder={smtpStatus?.passwordSaved?'Dejar vacío para conservar clave':'Clave o contraseña de aplicación'}/></label>
-       <label>Contraseña del propietario<input type="password" autoComplete="current-password" required value={smtpForm.ownerPassword} onChange={e=>editSmtp('ownerPassword',e.target.value)} placeholder="Confirma para guardar o probar"/></label>
-       {smtpForm.host.trim().toLowerCase()==='smtp.gmail.com'&&<p className="smtpGmailHint">Para Gmail, utiliza una contraseña de aplicación de 16 caracteres, no la contraseña normal. Activa la verificación en dos pasos y genera la clave en <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Contraseñas de aplicaciones de Google</a>. Si ya guardaste otra clave, escribe aquí la nueva y pulsa Guardar SMTP cifrado.</p>}
-       <div className="smtpAdminActions"><button type="submit" disabled={smtpBusy}>{smtpBusy?'Procesando…':'Guardar SMTP cifrado'}</button><button type="button" disabled={smtpBusy||!smtpStatus?.configured} className="secondary" onClick={removeSmtp}>Eliminar configuración</button></div>
-      </form>
-      {smtpStatus?.configured&&<form className="smtpTestForm" onSubmit={testSmtp}>
-       <label>Enviar correo de prueba a<input type="email" required maxLength={254} value={smtpForm.testTo} onChange={e=>editSmtp('testTo',e.target.value)} placeholder="tu-correo@ejemplo.com"/></label>
-       <button type="submit" disabled={smtpBusy||!smtpForm.ownerPassword}>{smtpBusy?'Enviando…':'Enviar correo de prueba'}</button>
-       <small>Vuelve a escribir arriba tu contraseña de propietario para cada prueba. La aceptación SMTP no garantiza que el mensaje llegue a la bandeja de entrada.</small>
-      </form>}
-     </div>}
-     {smtpFeedback&&<p className={smtpFeedback.type==='error'?'authError':'emailSuccess'} role="status">{smtpFeedback.message}</p>}
-    </div>}
-    {emailStatus?.eligible&&<div className="emailRecoveryTools" aria-label="Correo para recuperación">
-      <div className="emailRecoveryHeading">
-       <strong>Recuperación por correo</strong>
-       <p>Disponible para propietario, administradores, supervisores y cajeros. Cada persona registra su propio correo y solo puede recuperar su cuenta, sin cambiar de rol ni de empresa.</p>
-       <small>{!emailStatus.configured?'El envío SMTP todavía no está configurado en este equipo.':emailStatus.verified?`Correo verificado: ${emailStatus.email}`:'Todavía no tienes un correo verificado.'}</small>
-      </div>
-      {emailStatus.configured&&<form className="emailRecoveryForm" onSubmit={requestEmailVerification}>
-        <label>Correo electrónico<input required type="email" autoComplete="email" maxLength="254" value={emailValue} onChange={e=>setEmailValue(e.target.value)} placeholder="ejemplo@negocio.com"/></label>
-        <label>Confirma tu contraseña actual<input required type="password" autoComplete="current-password" value={emailPassword} onChange={e=>setEmailPassword(e.target.value)}/></label>
-        <button disabled={busy} type="submit">{emailStatus.verified?'Cambiar y verificar correo':'Enviar código de verificación'}</button>
-      </form>}
-      {emailVerifyPending&&emailStatus.configured&&<form className="emailRecoveryForm emailVerifyForm" onSubmit={confirmEmailVerification}>
-       <label>Código recibido en tu correo<input required autoComplete="one-time-code" spellCheck={false} value={emailVerifyCode} onChange={e=>setEmailVerifyCode(e.target.value)} placeholder="FCR-MAIL-XXXXXX-XXXXXX-XXXXXX"/></label>
-       <button disabled={busy} type="submit">Confirmar correo</button>
-      </form>}
-      {emailFeedback&&<p className={emailFeedback.type==='error'?'authError':'emailSuccess'} role="status">{emailFeedback.message}</p>}
     </div>}
    </section>
   );
@@ -1609,46 +1513,37 @@ function SecureApp(){
   {hasSession&&<div className="sessionBar"><div className="sessionIdentity"><div className="sessionAvatar"><UiIcon name="shield" size={18}/></div><div><small>Sesión activa</small><strong>{sessionUser.displayName}</strong><span>{sessionUser.isOwner?'Propietario de instalación':'Usuario autorizado'}</span></div></div><div className="sessionTools"><span className="sessionState"><span className="sessionLiveDot"/> Conectado</span><div className="sessionMenuWrap"><button type="button" className="sessionMenuButton" aria-expanded={accountMenuOpen} onClick={()=>setAccountMenuOpen(v=>!v)}><UiIcon name="users" size={17}/> Mi sesión <UiIcon name="chevron" size={15}/></button>{accountMenuOpen&&<div className="sessionMenu"><div className="sessionMenuHeading">{sessionUser.username}<small>Acceso protegido</small></div><button type="button" onClick={lockNow}><UiIcon name="lock" size={17}/> Bloquear ahora</button><button type="button" onClick={openSecurity}><UiIcon name="settings" size={17}/> Seguridad y bloqueo</button><button type="button" className="menuLogout" onClick={logout}><UiIcon name="logout" size={17}/> Cerrar sesión</button></div>}</div></div></div>}
    {settingsFeedback&&<div className={'securitySaveToast '+(settingsFeedback.type==='error'?'securitySaveToastError':'securitySaveToastSuccess')} role={settingsFeedback.type==='error'?'alert':'status'} aria-live={settingsFeedback.type==='error'?'assertive':'polite'}><UiIcon name={settingsFeedback.type==='error'?'close':'check'} size={18}/><span>{settingsFeedback.message}</span><button type="button" onClick={()=>setSettingsFeedback(null)} aria-label="Cerrar notificación"><UiIcon name="close" size={15}/></button></div>}
   {hasSession&&recoveryCodeCard}
-  {hasSession&&recoveryMessage&&<p className="recoveryInlineMessage" role="status">{recoveryMessage}</p>}
+  {hasSession&&recoveryMessage&&<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>}
   {hasSession&&!sessionUser.passwordChangeRequired&&<div aria-hidden={locked} className={locked?'securityCovered':''}><App key={sessionUser.id} account={sessionUser} securityPanel={securityPanel}/></div>}
-  {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':emailRecoveryMode?'Recuperar contraseña por correo':recoveryMode?'Recuperar acceso del propietario':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'Esta cuenta tendrá control de todas las empresas existentes. No hay contraseñas de desarrollador.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':emailRecoveryMode?'Cada usuario recupera únicamente su propia cuenta mediante el correo que verificó previamente. El rol y las empresas asignadas no cambian.':recoveryMode?'Restaura el acceso solo con el código privado entregado al propietario y una contraseña nueva.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
+  {needsGate&&<div className="authOverlay"><section className="authPanel" aria-label="Acceso seguro a FacturaCR"><div className="authBrand">◈ FACTURACR <span>v{APP_VERSION}</span></div><h1>{!state?'Conectando…':state.setupRequired?'Configurar propietario':locked?'Sesión bloqueada':recoveryMode?'Recuperar contraseña sin Internet':sessionUser?.passwordChangeRequired?'Cambiar contraseña temporal':'Iniciar sesión'}</h1><p>{state?.setupRequired?'La cuenta propietaria recibe tres códigos y un kit extraordinario de dos partes, mostrados una sola vez.':locked?'Tu venta y el carrito permanecen abiertos. Ingresa tu contraseña para continuar.':recoveryMode?'Recupera tu propia cuenta usando uno de tus tres códigos. El propietario también puede utilizar su archivo y clave extraordinarios.':sessionUser?.passwordChangeRequired?'Por seguridad, debes establecer una contraseña personal antes de usar FacturaCR.':'Accede a las empresas y operaciones autorizadas.'}</p>
    {!hasSession&&recoveryCodeCard}
-   {!hasSession&&recoveryMessage&&<p className="recoveryInlineMessage" role="status">{recoveryMessage}</p>}
-   {state&&!state.setupRequired&&!locked&&!hasSession&&emailRecoveryMode&&<form onSubmit={emailResetRequested?confirmEmailReset:requestEmailReset}>
-     <label>Tu nombre de usuario<input required autoComplete="username" minLength={3} maxLength={80} value={username} onChange={e=>setUsername(e.target.value)}/></label>
-     {emailResetRequested&&<>
-       <label>Código enviado al correo<input required autoComplete="one-time-code" spellCheck={false} value={emailResetCode} onChange={e=>setEmailResetCode(e.target.value)} placeholder="FCR-MAIL-XXXXXX-XXXXXX-XXXXXX"/></label>
-       <label>Nueva contraseña<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={emailResetPassword} onChange={e=>setEmailResetPassword(e.target.value)}/></label>
-       <label>Confirmar contraseña<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={emailResetConfirm} onChange={e=>setEmailResetConfirm(e.target.value)}/></label>
-     </>}
-     {error&&<p className="authError" role="alert">{error}</p>}
-     <button type="submit" disabled={busy}>{busy?'Procesando…':emailResetRequested?'Cambiar contraseña':'Enviar código a mi correo'}</button>
-     {emailResetRequested&&<button type="button" className="secondary" disabled={busy} onClick={()=>{setEmailResetRequested(false);setEmailResetCode('');setError('')}}>Solicitar otro código</button>}
-     <button type="button" className="secondary" disabled={busy} onClick={()=>{setEmailRecoveryMode(false);setEmailResetRequested(false);setError('')}}>Volver al inicio de sesión</button>
-   </form>}
+   {!hasSession&&recoveryMessage&&<DismissibleNotice className="recoveryInlineMessage" onClose={()=>setRecoveryMessage('')}>{recoveryMessage}</DismissibleNotice>}
    {state&&!state.setupRequired&&!locked&&!hasSession&&recoveryMode&&<form onSubmit={resetOwnerPassword}>
-     <p className="hint">Esta opción requiere el código que se entregó al configurar al propietario o al generar otro desde Seguridad. No hay recuperación universal.</p>
-     <label>Usuario propietario<input required minLength={3} maxLength={80} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)}/></label>
-     <label>Código de recuperación<input required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e=>setRecoveryInput(e.target.value)} placeholder="FCR1-XXXXXXXX-..."/></label>
-     <label>Nueva contraseña<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={recoveryNewPassword} onChange={e=>setRecoveryNewPassword(e.target.value)}/></label>
-     <label>Confirmar nueva contraseña<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={recoveryConfirm} onChange={e=>setRecoveryConfirm(e.target.value)}/></label>
-     {error&&<p className="authError" role="alert">{error}</p>}
+     <p className="hint">Cada código es personal, funciona una sola vez y no requiere correo. Si eres propietario y perdiste tus tres códigos, selecciona «Kit extraordinario».</p>
+     <label>Nombre de usuario<input required minLength={3} maxLength={80} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)}/></label>
+     <label>Método de recuperación<select value={recoveryMethod} onChange={e=>{setRecoveryMethod(e.target.value);setError('')}}><option value="code">Uno de mis tres códigos</option><option value="emergency">Kit extraordinario del propietario</option></select></label>
+     {recoveryMethod==='code'?<label>Código de recuperación<input required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e=>setRecoveryInput(e.target.value)} placeholder="FCR2-XXXXXXXX-..."/></label>:<>
+      <label>Archivo de recuperación del propietario (.fcr)<input type="file" required accept=".fcr,application/json" onChange={async e=>{const file=e.target.files?.[0];if(!file){setRecoveryKitFile('');return}if(file.size>2048){setError('Archivo de recuperación demasiado grande.');setRecoveryKitFile('');return}setRecoveryKitFile(await file.text())}}/></label>
+      <label>Clave extraordinaria<input required autoComplete="off" spellCheck={false} value={recoveryKitKey} onChange={e=>setRecoveryKitKey(e.target.value)} placeholder="FCRK-XXXXXXXX-..."/></label>
+     </>}
+     <label>Nueva contraseña<PasswordInput required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={recoveryNewPassword} onChange={e=>setRecoveryNewPassword(e.target.value)}/></label>
+     <label>Confirmar nueva contraseña<PasswordInput required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={recoveryConfirm} onChange={e=>setRecoveryConfirm(e.target.value)}/></label>
+     {error&&<DismissibleNotice variant="error" className="authError" onClose={()=>setError('')}>{error}</DismissibleNotice>}
      <button type="submit" disabled={busy}>{busy?'Comprobando…':'Restablecer contraseña'}</button>
-     <button className="secondary" type="button" disabled={busy} onClick={()=>{setRecoveryMode(false);setRecoveryInput('');setError('')}}>Volver al inicio de sesión</button>
+     <button className="secondary" type="button" disabled={busy} onClick={()=>{setRecoveryMode(false);setRecoveryInput('');setRecoveryKitFile('');setRecoveryKitKey('');setError('')}}>Volver al inicio de sesión</button>
    </form>}
-   {hasSession&&sessionUser?.passwordChangeRequired&&!locked&&<form onSubmit={changeTemporaryPassword}><label>Contraseña temporal<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Nueva contraseña personal<input type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></label><label>Confirmar nueva contraseña<input type="password" required minLength={12} maxLength={128} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>{error&&<p className="authError" role="alert">{error}</p>}<button disabled={busy}>Guardar contraseña personal</button></form>}
-   {state&&(!hasSession||locked)&&!recoveryMode&&!emailRecoveryMode&&<form onSubmit={submit}>
+   {hasSession&&sessionUser?.passwordChangeRequired&&!locked&&<form onSubmit={changeTemporaryPassword}><label>Contraseña temporal<PasswordInput type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Nueva contraseña personal<PasswordInput type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></label><label>Confirmar nueva contraseña<PasswordInput type="password" required minLength={12} maxLength={128} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>{error&&<DismissibleNotice variant="error" className="authError" onClose={()=>setError('')}>{error}</DismissibleNotice>}<button disabled={busy}>Guardar contraseña personal</button></form>}
+   {state&&(!hasSession||locked)&&!recoveryMode&&<form onSubmit={submit}>
     {(!locked||!sessionUser)&&<label>Usuario<input autoComplete="username" required minLength={3} maxLength={80} value={username} onChange={e=>setUsername(e.target.value)} placeholder="usuario"/></label>}
     {state.setupRequired&&<label>Nombre del propietario<input required minLength={2} maxLength={160} value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Nombre completo"/></label>}
     {locked&&sessionUser&&<label>Cuenta<input readOnly value={sessionUser.username}/></label>}
-    <label>Contraseña<input required autoFocus type="password" autoComplete={state.setupRequired?'new-password':'current-password'} minLength={state.setupRequired?12:1} value={password} onChange={e=>setPassword(e.target.value)}/></label>
-    {state.setupRequired&&<label>Confirmar contraseña<input required type="password" autoComplete="new-password" minLength={12} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>}
+    <label>Contraseña<PasswordInput required autoFocus type="password" autoComplete={state.setupRequired?'new-password':'current-password'} minLength={state.setupRequired?12:1} value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    {state.setupRequired&&<label>Confirmar contraseña<PasswordInput required type="password" autoComplete="new-password" minLength={12} value={confirm} onChange={e=>setConfirm(e.target.value)}/></label>}
     {state.setupRequired&&<small>Usa 12 caracteres como mínimo, letras y números. Guarda estas credenciales en un lugar seguro.</small>}
-    {error&&<p className="authError" role="alert">{error}</p>}
+    {error&&<DismissibleNotice variant="error" className="authError" onClose={()=>setError('')}>{error}</DismissibleNotice>}
     <button disabled={busy} type="submit">{busy?'Comprobando…':state.setupRequired?'Crear propietario y entrar':locked?'Desbloquear':'Entrar a FacturaCR'}</button>
     {!state.setupRequired&&!locked&&<div className="authRecoveryChoices">
-      {state.emailRecoveryAvailable&&<button type="button" className="authRecoveryLink" onClick={()=>{setEmailRecoveryMode(true);setRecoveryMode(false);setEmailResetRequested(false);setError('');setRecoveryMessage('')}}>Recuperar mi cuenta por correo</button>}
-      <button type="button" className="authRecoveryLink" onClick={()=>{setRecoveryMode(true);setEmailRecoveryMode(false);setError('');setRecoveryMessage('')}}>Recuperar propietario con código de emergencia</button>
+      <button type="button" className="authRecoveryLink" onClick={()=>{setRecoveryMode(true);setRecoveryMethod('code');setError('');setRecoveryMessage('')}}>Recuperar mi cuenta con código de emergencia</button>
     </div>}
    </form>}
    {!state&&error&&<p className="authError">{error} <button onClick={reload}>Reintentar</button></p>}

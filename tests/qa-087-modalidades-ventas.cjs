@@ -49,4 +49,4 @@ check('Estilos adaptables a pantalla pequeña',()=>{
  assert.match(css,/posDocumentModeOptions/);
  assert.match(css,/@media\(max-width:850px\)\{\.posDocumentModeOptions/);
 });
-console.log('QA modalidades v0.6.87:',passed,'/',passed);
+console.log('QA modalidades v0.6.88:',passed,'/',passed);

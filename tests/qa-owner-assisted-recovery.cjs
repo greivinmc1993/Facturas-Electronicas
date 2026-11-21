@@ -55,7 +55,6 @@ const { DatabaseSync } = require('node:sqlite');
     assert.equal(call('POST',url,{currentPassword:'Equivocada12345'},owner,params).status,403);
     assert.equal(db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(id).password_hash,prev);
   });
-  db.prepare("INSERT INTO access_user_emails(user_id,email,verified) VALUES (?,?,1)").run(id,'cajero@ejemplo.com');
   const roleBefore=db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(id);
   let newTemporary;
   test('El propietario genera una contraseña aleatoria temporal para el cajero',()=>{
@@ -67,9 +66,9 @@ const { DatabaseSync } = require('node:sqlite');
     assert.equal(call('GET','/api/auth/status',{},cashierSession).data.authenticated,false);
     assert.equal(call('POST','/api/auth/login',{username:'cajero',password:temp}).status,401);
   });
-  test('Los roles, empresas y correo verificado no cambian',()=>{
+  test('Los roles y empresas no cambian y se entregan códigos nuevos',()=>{
     assert.deepEqual(db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(id),roleBefore);
-    assert.equal(db.prepare('SELECT email,verified FROM access_user_emails WHERE user_id=?').get(id).email,'cajero@ejemplo.com');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM access_recovery_codes WHERE user_id=?').get(id).n,3);
     assert.equal(db.prepare('SELECT password_change_required FROM access_users WHERE id=?').get(id).password_change_required,1);
   });
   test('La nueva clave solo permite acceder tras cambio obligatorio',()=>{

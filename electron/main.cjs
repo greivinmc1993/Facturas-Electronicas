@@ -1,5 +1,4 @@
-const {app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage} = require('electron');
-const {createMailSettingsStore}=require('./mail-settings.cjs');
+const {app, BrowserWindow, Menu, ipcMain, dialog, shell} = require('electron');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
@@ -354,9 +353,10 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   try {
     if (!dev) {
+      // La configuración SMTP anterior ya no se usa para recuperar contraseñas.
+      await fs.unlink(path.join(app.getPath('userData'),'smtp-settings.secure')).catch(()=>{});
       const {startServer} = await import('../server/index.js');
-      server = await startServer({dataDir:app.getPath('userData'),port:0,staticDir:path.join(__dirname,'../dist'),
-        mailSettingsStore:createMailSettingsStore({dataDir:app.getPath('userData'),safeStorage})});
+      server = await startServer({dataDir:app.getPath('userData'),port:0,staticDir:path.join(__dirname,'../dist')});
     }
     mainWindow = new BrowserWindow({width:1180,height:760,minWidth:850,minHeight:580,
       title:'FacturaCR', icon:path.join(__dirname,'../build/icon.png'),

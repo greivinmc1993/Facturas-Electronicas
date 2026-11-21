@@ -778,41 +778,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @media(max-width:850px){.ownerRecoveryTools{grid-template-columns:1fr}.ownerRecoveryTools form{max-width:580px}}
 @media(max-width:520px){.ownerRecoveryTools form{grid-template-columns:1fr}.recoveryCodeNotice{margin:10px;padding:13px}.recoveryCodeNotice input{font-size:11px}}
 
-/* v0.6.61: sección de correo con alineación independiente del resto del panel. */
-.emailRecoveryTools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(290px,1.3fr);gap:16px 24px;max-width:1540px;margin:16px auto 0;padding-top:18px;border-top:1px solid #d0e3e4;align-items:start}
-.emailRecoveryHeading strong{color:#174956;font-size:13px}
-.emailRecoveryHeading p{margin:5px 0;font-size:12px;line-height:1.5;color:#607781}
-.emailRecoveryHeading small{display:block;color:#357d6f;font-size:12px;overflow-wrap:anywhere}
-.emailRecoveryForm{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,1fr);gap:12px;align-items:end;margin:0}
-.emailRecoveryForm label{display:grid;gap:6px;font-size:11px;font-weight:700;color:#395868;margin:0;min-width:0}
-.emailRecoveryForm input{box-sizing:border-box;width:100%;height:42px;min-width:0;border-radius:9px;padding:0 10px;border:1px solid #b4cfd2;background:#fff}
-.emailRecoveryForm button{height:42px;margin:0;grid-column:1/-1;justify-self:end}
-.emailVerifyForm{grid-column:2}
-.emailSuccess{grid-column:1/-1;color:#207d61;font-size:12px;margin:0}
-.emailRecoveryTools>.authError{grid-column:1/-1;margin:0}
 .authRecoveryChoices{display:grid;gap:4px}
-@media(max-width:940px){.emailRecoveryTools{grid-template-columns:1fr}.emailVerifyForm{grid-column:1}}
-@media(max-width:560px){.emailRecoveryForm{grid-template-columns:1fr}.emailRecoveryForm button{width:100%}}
-
-/* v0.6.62: correo saliente, columnas simétricas y controles consistentes. */
-.smtpAdminTools{display:grid;grid-template-columns:minmax(220px,.85fr) minmax(0,1.7fr);gap:16px 24px;max-width:1540px;margin:16px auto 0;padding-top:18px;border-top:1px solid #d0e3e4;align-items:start}
-.smtpAdminHeading strong{display:flex;align-items:center;gap:8px;color:#174956;font-size:13px}
-.smtpAdminHeading p{margin:6px 0;font-size:12px;line-height:1.6;color:#607781}
-.smtpAdminHeading small{display:block;font-size:12px;line-height:1.5}
-.smtpConfigured{color:#207d61}.smtpNotConfigured{color:#a15d28}
-.smtpAdminContent{display:grid;gap:14px;min-width:0}
-.smtpAdminForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;align-items:end}
-.smtpAdminForm label,.smtpTestForm label{display:grid;gap:6px;margin:0;min-width:0;font-size:11px;font-weight:700;color:#395868}
-.smtpAdminForm input,.smtpTestForm input{box-sizing:border-box;min-width:0;width:100%;height:42px;border-radius:9px;padding:0 11px;border:1px solid #b4cfd2;background:#fff}
-.smtpAdminForm input[readonly]{background:#edf4f4;color:#42616b}
-.smtpAdminActions{display:flex;gap:10px;justify-content:flex-end;grid-column:1/-1;align-items:center;flex-wrap:wrap}
-.smtpAdminActions button,.smtpTestForm button{min-height:42px;margin:0}
-.smtpTestForm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end;border-top:1px solid #d0e3e4;padding-top:14px;margin:0}
-.smtpTestForm small{grid-column:1/-1;font-size:11px;line-height:1.5;color:#607781}
-.smtpAdminTools>.authError,.smtpAdminTools>.emailSuccess{grid-column:1/-1;margin:0}
-@media(max-width:1000px){.smtpAdminTools{grid-template-columns:1fr}}
-@media(max-width:580px){.smtpAdminForm,.smtpTestForm{grid-template-columns:1fr}.smtpAdminActions{flex-direction:column;align-items:stretch}.smtpAdminActions button,.smtpTestForm button{width:100%}}
-
 
 /* v0.6.62: selectores uniformes de Seguridad y Usuarios; flecha SVG y estados accesibles. */
 .securitySettingsPanel select,.usersWorkspace select{
@@ -828,8 +794,6 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .securitySettingsPanel select:focus-visible,.usersWorkspace select:focus-visible{outline:2px solid #2f9b8b;outline-offset:2px;box-shadow:0 0 0 3px #a9dace66}
 .securitySettingsPanel select:disabled,.usersWorkspace select:disabled{color:#718791;background-color:#eef3f4;cursor:not-allowed;opacity:.78}
 .securitySettingsPanel select option,.usersWorkspace select option{color:#183e4a;background:#fff}
-.smtpGmailHint{grid-column:1/-1;margin:0;padding:11px 13px;border:1px solid #d7e6c5;border-radius:9px;background:#f8fbf1;color:#476038;font-size:12px;line-height:1.55}
-.smtpGmailHint a{color:#086f67;font-weight:700;text-decoration:underline;text-underline-offset:2px}
 .ownerAssistedRecoveryTools{display:grid;grid-template-columns:minmax(220px,.85fr) minmax(0,1.7fr);gap:16px 24px;max-width:1540px;margin:16px auto 0;padding-top:18px;border-top:1px solid #d0e3e4;align-items:start}
 .ownerAssistedHeading strong{color:#174956;font-size:13px}
 .ownerAssistedHeading p{margin:6px 0;font-size:12px;line-height:1.6;color:#607781}
@@ -934,8 +898,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
  width:100%;padding:clamp(16px,1.7vw,30px) var(--fcr-page-gutter);
 }
 .secureRoot .securitySettingsPanel>:is(
- .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
- .smtpAdminTools,.emailRecoveryTools){
+ .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools){
  width:100%;max-width:var(--fcr-content-max);min-width:0;
  margin-left:auto;margin-right:auto;
  grid-template-columns:minmax(250px,.95fr) minmax(0,1.65fr);
@@ -954,22 +917,14 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 }
 .secureRoot .securitySettingsPanel .securitySettingsActions{grid-template-columns:168px 90px}
 .secureRoot .securitySettingsPanel :is(
- .ownerRecoveryTools,.ownerAssistedRecoveryTools,.smtpAdminTools,.emailRecoveryTools){
+ .ownerRecoveryTools,.ownerAssistedRecoveryTools){
  row-gap:16px;align-items:start;
 }
-.secureRoot .securitySettingsPanel :is(
- .ownerRecoveryTools,.ownerAssistedContent,.ownerAssistedForm,
- .smtpAdminContent,.smtpAdminForm,.smtpTestForm,
- .emailRecoveryForm,.emailRecoveryHeading){min-width:0}
+.secureRoot .securitySettingsPanel :is(.ownerRecoveryTools,.ownerAssistedContent,.ownerAssistedForm){min-width:0}
 .secureRoot .securitySettingsPanel .ownerRecoveryTools{align-items:center}
 .secureRoot .securitySettingsPanel .ownerRecoveryTools form{width:100%;max-width:none}
-.secureRoot .securitySettingsPanel .ownerAssistedForm,
-.secureRoot .securitySettingsPanel .smtpAdminForm,
-.secureRoot .securitySettingsPanel .emailRecoveryForm{width:100%}
+.secureRoot .securitySettingsPanel .ownerAssistedForm{width:100%}
 .secureRoot .securitySettingsPanel :is(input,select,textarea){max-width:100%;min-width:0}
-.secureRoot .securitySettingsPanel :is(.emailRecoveryTools>.authError,
- .emailRecoveryTools>.emailSuccess,.smtpAdminTools>.authError,
- .smtpAdminTools>.emailSuccess){min-width:0}
 
 /* Adaptación según el ancho REAL del área de trabajo, descontando el menú. */
 @container facturacr-workspace (min-width:980px){
@@ -986,10 +941,9 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 @media (max-width:1190px){
  .secureRoot .securitySettingsPanel>:is(
   .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
-  .smtpAdminTools,.emailRecoveryTools){grid-template-columns:minmax(0,1fr);}
+  ){grid-template-columns:minmax(0,1fr);}
  .secureRoot .securitySettingsPanel .securitySettingsControls{max-width:760px}
  .secureRoot .securitySettingsPanel .ownerRecoveryTools form{max-width:760px}
- .secureRoot .securitySettingsPanel .emailVerifyForm{grid-column:1}
 }
 @media (max-width:760px){
  .secureRoot .layout>main{padding:20px var(--fcr-page-gutter)}
@@ -1003,16 +957,9 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
   width:100%;grid-template-columns:repeat(2,minmax(0,1fr));
  }
  .secureRoot .securitySettingsPanel .ownerRecoveryTools form,
- .secureRoot .securitySettingsPanel .ownerAssistedForm,
- .secureRoot .securitySettingsPanel .emailRecoveryForm,
- .secureRoot .securitySettingsPanel .smtpAdminForm,
- .secureRoot .securitySettingsPanel .smtpTestForm{grid-template-columns:minmax(0,1fr)}
- .secureRoot .securitySettingsPanel .smtpAdminActions{justify-content:stretch}
- .secureRoot .securitySettingsPanel .smtpAdminActions button,
+ .secureRoot .securitySettingsPanel .ownerAssistedForm{grid-template-columns:minmax(0,1fr)}
  .secureRoot .securitySettingsPanel .ownerRecoveryTools form button,
- .secureRoot .securitySettingsPanel .ownerAssistedForm button,
- .secureRoot .securitySettingsPanel .emailRecoveryForm button,
- .secureRoot .securitySettingsPanel .smtpTestForm button{width:100%}
+ .secureRoot .securitySettingsPanel .ownerAssistedForm button{width:100%}
  .secureRoot .layout>main .auditHead .actions{justify-content:flex-start}
 }
 @container facturacr-workspace (max-width:540px){
@@ -1051,8 +998,7 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
  scroll-margin-top:clamp(75px,6vw,90px);
 }
 .secureRoot .layout>main>.securitySettingsPanel>:is(
- .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools,
- .smtpAdminTools,.emailRecoveryTools){
+ .securitySettingsInner,.ownerRecoveryTools,.ownerAssistedRecoveryTools){
  width:100%;max-width:none;margin-left:0;margin-right:0;
 }
 @media (min-width:761px){
@@ -1673,3 +1619,43 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .salesHistoryFilters{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:950px){.salesHistoryFilters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.salesHistoryFilters{grid-template-columns:minmax(0,1fr)}}
+
+
+/* v0.6.88 — Mostrar/ocultar contraseña sin alterar el ancho ni la simetría de los formularios. */
+.passwordInputControl{display:block;position:relative;width:100%;min-width:0;}
+.passwordInputControl>input{display:block;width:100%;min-width:0;box-sizing:border-box;padding-right:94px!important;}
+.passwordInputControl>.passwordInputToggle{
+ position:absolute;right:6px;top:50%;transform:translateY(-50%);
+ display:inline-flex;align-items:center;justify-content:center;
+ width:80px;min-width:80px;min-height:32px;height:calc(100% - 12px);
+ max-height:40px;box-sizing:border-box;margin:0;padding:5px 9px;
+ border:1px solid #ccdade;border-radius:7px;background:#eef4f6;
+ color:#153f4d;font:650 12px system-ui;line-height:1.2;cursor:pointer;
+ transition:background .16s ease,border-color .16s ease;
+}
+.passwordInputControl>.passwordInputToggle:hover{background:#dcebf0;border-color:#9abdc6;}
+.passwordInputControl>.passwordInputToggle:focus-visible{outline:2px solid #078775;outline-offset:2px;}
+.passwordInputControl>.passwordInputToggle:disabled{opacity:.6;cursor:not-allowed;}
+.userEditor .passwordInputControl>.passwordInputToggle{min-height:30px;}
+@media(max-width:360px){.passwordInputControl>.passwordInputToggle{width:70px;min-width:70px;}.passwordInputControl>input{padding-right:82px!important;}}
+
+/* v0.6.88 — notificaciones transitorias con cierre accesible y espaciado simétrico. */
+.dismissibleNotice{display:flex;align-items:center;gap:12px;min-width:0;max-width:100%;padding:10px 13px;border-radius:9px;background:#e9f8f3;color:#145d4b;font-size:13px;line-height:1.5;text-align:left;overflow-wrap:anywhere}
+.dismissibleNotice-error{background:#fff0f0;color:#9f2134;border:1px solid #f1c7cd}
+.dismissibleNoticeText{flex:1 1 auto;min-width:0}
+.dismissibleNotice button.dismissibleNoticeClose{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;min-width:32px;height:32px;min-height:32px;padding:0;margin:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:23px;line-height:1;font-weight:500;cursor:pointer}
+.dismissibleNotice button.dismissibleNoticeClose:hover,.dismissibleNotice button.dismissibleNoticeClose:focus-visible{background:rgba(16,75,64,.12);outline-offset:2px}
+.authPanel .dismissibleNotice{margin:8px 0}
+.secureRoot .securitySettingsPanel .ownerRecoveryTools form button{min-height:44px;height:auto;min-width:175px;padding:10px 14px;font-size:13px;font-weight:700;line-height:1.3;white-space:normal;text-align:center;overflow-wrap:normal}
+@media(max-width:520px){.secureRoot .securitySettingsPanel .ownerRecoveryTools form button{width:100%}}
+/* v0.6.88: entrega única de códigos de recuperación, compatible con pantallas pequeñas. */
+.recoverySecretsPanel{border:1px solid #92c6bf;border-radius:12px;padding:18px;margin:14px 0;background:var(--surface,#f4fbf9);display:grid;gap:12px;max-width:100%;overflow-wrap:anywhere}
+.recoverySecretsPanel .recoveryCodesGrid,.recoverySecretsPanel .recoveryKitContents{display:grid;gap:10px;min-width:0}
+.recoverySecretsPanel .recoverySecretRow{display:flex;align-items:end;gap:10px;min-width:0}
+.recoverySecretsPanel .recoverySecretRow label{min-width:0;flex:1}
+.recoverySecretsPanel .recoverySecretRow input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font-family:ui-monospace,monospace;font-size:.85rem}
+.recoverySecretsPanel .recoverySecretRow button{flex-shrink:0;width:auto}
+.recoverySecretsPanel .recoveryAcknowledge{display:flex;gap:10px;align-items:flex-start}
+.recoverySecretsPanel .recoveryAcknowledge input{width:18px;min-width:18px;height:18px;flex:0 0 18px}
+.recoveryOwnerKitForm,.recoveryRotationForm{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+@media(max-width:680px){.recoverySecretsPanel .recoverySecretRow{flex-direction:column;align-items:stretch}}

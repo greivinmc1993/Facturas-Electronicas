@@ -1,3 +1,72 @@
+# FacturaCR v0.6.88 — Recuperación local sin correo (versión actual)
+
+> **Versión vigente:** recuperación de cuentas mediante códigos individuales de un solo uso. **SMTP, Gmail, verificación del correo y recuperación por correo fueron retirados.** Las referencias de versiones anteriores son únicamente historial y no son instrucciones vigentes.
+
+## 1. Tres códigos personales, regenerables
+
+- Al crear una cuenta, el responsable autorizado recibe **tres códigos FCR2** distintos, con alta entropía. La pantalla los muestra **una sola vez**, junto con los controles de copia y la confirmación de resguardo. Nunca se guardan en texto claro en SQLite ni en Auditoría.
+- **IMPORTANTE:** cuando el usuario recién creado inicia sesión y cambia su contraseña temporal, se generan **tres códigos nuevos solo para él**; los entregados al creador se invalidan. El usuario debe guardar los suyos en ese momento. No reenviar códigos por correo ni usar capturas compartidas.
+- Cada código recupera exclusivamente la cuenta correspondiente, se consume una sola vez y revoca las sesiones anteriores. Una vez usado, el sistema muestra cuántos quedan.
+- Para generar **otros tres**, entra a **Mi sesión → Seguridad y bloqueo → Códigos de recuperación** y confirma la **contraseña actual**. Los anteriores se invalidan; los nuevos se muestran una única vez. Esto funciona también cuando ya quedan cero códigos, siempre que la persona recuerde su contraseña.
+- Una cuenta existente que todavía no tenga códigos puede obtener sus tres códigos iniciando sesión normalmente y usando la misma opción. Todos los roles pueden administrar **sus propios** códigos. Solo el propietario autenticado puede restablecer la contraseña de otra persona; ese proceso queda auditado y obliga al cambio de contraseña en el siguiente acceso.
+
+## 2. Kit extraordinario del propietario: archivo + clave por separado
+
+- Al configurar el primer propietario se muestran los tres códigos y un **kit de recuperación extraordinaria** de dos componentes: `FacturaCR-Rescate.fcr`, que contiene **una mitad aleatoria**, y una **clave FCRK** independiente. Para recuperar la cuenta sin contraseña ni códigos hacen falta **ambas partes**.
+- Guarda el archivo y la clave **en lugares distintos**. El archivo no está cifrado ni contiene contraseñas ni la segunda mitad; ninguno de los dos componentes permite por sí solo recuperar la cuenta. SQLite almacena solamente el verificador criptográfico correspondiente.
+- El propietario autenticado puede **renovar el kit** confirmando su contraseña. El anterior queda invalidado. Tras usar el kit para recuperar la cuenta, FacturaCR invalida el kit y los códigos previos y entrega inmediatamente un kit y tres códigos nuevos.
+- **Sin contraseña, sin códigos y sin ambas partes del kit no existe un acceso maestro, atajo de soporte ni recuperación garantizada.** Un respaldo de SQLite no sustituye la comprobación de identidad.
+
+## 3. Migración desde versiones anteriores (leer antes de instalar)
+
+1. **Detén la aplicación, crea y verifica un respaldo de la base SQLite** en una carpeta independiente. Conserva además un respaldo de la última versión funcional del proyecto.
+2. La migración crea `access_recovery_codes` y `access_owner_emergency`. Retira las tablas **exclusivas de recuperación por correo** `access_user_emails` y `access_email_tokens`, así como la interfaz, rutas SMTP y almacén local de credenciales SMTP. **No elimina correos comerciales de clientes o empresas**, ventas ni permisos.
+3. El antiguo código `FCR1` del propietario sigue siendo válido **solo durante la transición**, hasta que se generen sus nuevos códigos FCR2. Si el propietario ya conoce su contraseña, debe entrar, generar y **guardar los tres FCR2 y el kit de dos partes** antes de borrar su antiguo respaldo.
+4. El personal existente debe iniciar sesión y generar sus códigos cuanto antes. **Al retirar el correo ya no podrá recuperar la cuenta por email**; si pierde el acceso antes de generar códigos, el propietario autenticado podrá restablecer la contraseña y entregar temporalmente sus códigos nuevos.
+5. Prueba el inicio de sesión, la regeneración, una recuperación con código en una **cuenta de prueba** y el kit en un **perfil de ensayo** antes de actualizar datos reales de la empresa. Confirma que la restauración SQLite funciona y que GitHub Actions Windows/NSIS permanece en verde.
+
+## 4. Seguridad, compatibilidad y alcance
+
+- Los códigos FCR2 tienen 192 bits aleatorios, el kit usa dos secretos criptográficos independientes. Se guardan verificadores SHA-256 de secretos de alta entropía; las operaciones que reemplazan o consumen códigos son transaccionales y los intentos se limitan. No hay correos, SMTP ni contraseñas maestras.
+- Los secretos se devuelven por HTTP local solo en el momento de generarlos con `Cache-Control: no-store`. No agregarlos a archivos del proyecto, respaldos sin protección, logs, GitHub, capturas ni incidencias de soporte.
+- Se conservan ventas FE/TE/genérica, historiales, caja, inventario, auditoría, respaldos, impresión después del vuelto, XAdESjs de laboratorio y el bloqueo de emisión fiscal. Las nuevas tablas son migración aditiva, con retiro **intencional** de tablas exclusivas de recuperación de correo.
+- QA automatizado: `tests/qa-088-recovery-codes.cjs`, `tests/qa-088-legacy-migration.cjs`, `tests/qa-088-no-email-recovery.cjs`, regresiones y 76 pruebas de integración SQLite. **El servidor Express, la compilación React y el instalador NSIS en Windows deben verificarse en la instalación real y en GitHub Actions antes de reemplazar una versión productiva.**
+
+## 5. Próxima versión (mantener pendiente)
+
+**v0.6.89:** XSD oficiales vigentes de Hacienda para FE/TE 4.4, actividades económicas y CAByS oficiales, control de precisión fiscal, numeración y claves auténticas, firma XAdES-EPES con certificado real y verificador independiente, envío/aceptación en Hacienda, notas de crédito/débito y trazabilidad. No dividir líneas de productos ni alterar el IVA para forzar totales. Hasta completar la validación, los XML son borradores NO FISCALES.
+
+## 6. Instalación y GitHub
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run dist:win
+```
+
+Tras comprobar QA e instalador en Windows:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.88 - recuperacion local tres codigos y kit propietario"
+git push origin main
+```
+
+Se conservan `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows/`.
+
+---
+
+## Historial técnico de versiones anteriores
+
+## v0.6.88 — Contraseñas visibles de forma temporal (login y usuarios)
+
+- El acceso de usuarios, desbloqueo por inactividad, configuración del propietario, cambio de contraseña temporal y recuperación admiten **Mostrar / Ocultar** por campo. La contraseña permanece oculta por defecto y el botón no envía el formulario.
+- En **Usuarios y permisos**, la contraseña temporal al crear un usuario y la contraseña al confirmar eliminación también ofrecen el control. Cada campo conserva el autocompletado, límites, reglas y controles del servidor; el valor no se guarda adicionalmente.
+- El cambio es exclusivamente de interfaz. No hay migración SQLite, nuevos permisos ni cambio de autenticación.
+- Prueba nueva `tests/qa-088-password-visibility.cjs` incluida en `npm test`. Se conservan ventas FE/TE/genérica, sus historiales, XAdESjs de laboratorio y emisión bloqueada.
+- **Ajuste posterior sobre v0.6.88:** cierre manual «×» en notificaciones transitorias y botón de renovación de código legible. Recuperación con código individual por usuario queda registrada como mejora futura de seguridad, no aplicada en esta entrega.
+
 ## v0.6.87 — Corrección de tarjetas e historiales FE/TE/genérica (21-11-2026)
 
 - **Selector simétrico:** se corrige el estilo `input{width:100%}` heredado por los radios, que expandía los círculos y desplazaba los títulos. Tres tarjetas de altura uniforme, alineación centrada, radio de tamaño fijo, descripción legible, foco de teclado y adaptación a dos o una columna.
@@ -787,7 +856,7 @@ npm run qa:real-server
 npm run dist:win
 ```
 
-El monitor se implementa en `src/backup-health-monitor.js`, con pruebas en `tests/qa-068-backup-monitor.cjs` y `tests/qa-068-backup-monitor-ui.cjs`. No se modificaron datos SQLite, roles, recuperación SMTP ni cálculos de ventas.
+El monitor se implementa en `src/backup-health-monitor.js`, con pruebas en `tests/qa-068-backup-monitor.cjs` y `tests/qa-068-backup-monitor-ui.cjs`. No se modificaron datos SQLite, roles ni cálculos de ventas. (La recuperación SMTP citada históricamente fue retirada en v0.6.88.)
 
 ---
 
@@ -875,7 +944,7 @@ npm run qa:real-server
 npm run dist:win
 ```
 
-`npm test` contiene pruebas de ruta personalizada, escritura y validación en archivos temporales, persistencia de configuración, copia SQLite y retorno al directorio predeterminado. Las pruebas de integración usan un adaptador de SQLite exclusivamente para QA; hay que validar de nuevo el instalador y el cuadro nativo de selección de carpetas en Windows/GitHub Actions. Antes de actualizar, crea un respaldo verificable de la base activa. Los archivos de usuario y SMTP no deben sobrescribirse con el ZIP de código.
+`npm test` contiene pruebas de ruta personalizada, escritura y validación en archivos temporales, persistencia de configuración, copia SQLite y retorno al directorio predeterminado. Las pruebas de integración usan un adaptador de SQLite exclusivamente para QA; hay que validar de nuevo el instalador y el cuadro nativo de selección de carpetas en Windows/GitHub Actions. Antes de actualizar, crea un respaldo verificable de la base activa. Los archivos de datos del usuario no deben sobrescribirse con el ZIP de código. (El SMTP fue retirado en v0.6.88.)
 
 ## Manual de capacitación
 
@@ -889,7 +958,7 @@ Existe una **edición piloto de 46 páginas**, cuyo diseño se conservará para 
 
 Todos los módulos comparten la identidad visual de FacturaCR en **selectores, menús de usuario y empresas, opciones avanzadas y ventanas de confirmación**: verde institucional, bordes suaves, sombreado, espaciado, hover, foco visible y adaptación a ventanas estrechas.
 
-- Las confirmaciones de **retirar un acceso, registrar un movimiento de inventario, recuperar otra cuenta, reemplazar el código de emergencia y eliminar el SMTP** ya no utilizan `window.confirm`. Ahora usan un diálogo React reutilizable con **Cancelar** y una acción explícita; presionar Escape o cancelar **no ejecuta** la operación.
+- Las confirmaciones de **retirar un acceso, registrar un movimiento de inventario, recuperar otra cuenta, reemplazar el código de emergencia y eliminar el SMTP (opción histórica retirada en v0.6.88)** ya no utilizan `window.confirm`. Ahora usan un diálogo React reutilizable con **Cancelar** y una acción explícita; presionar Escape o cancelar **no ejecuta** la operación.
 - Los `<select>` existentes conservan sus opciones, validación, selección por teclado y llamadas `onChange`; en Chromium/Electron compatible, las listas abiertas muestran colores, selección y sombras de FacturaCR mediante `appearance: base-select`. Otros motores mantienen un menú nativo accesible.
 - Los formularios emergentes de empresas, eliminación de cuentas, eliminación de proformas, vista previa de tiquetes y menús propios comparten el mismo estilo. Los controles del sistema operativo como el explorador de archivos o el diálogo de impresora **conservan la interfaz de Windows**, ya que no se pueden rediseñar completamente mediante CSS de React.
 - Pruebas: `node tests/qa-063-estilos-interactivos.cjs` y `npm test`. La prueba visual independiente en Chromium verificó un selector abierto y cerrado, navegación por teclado, opciones avanzadas y adaptación a 480 y 1440 px. **Aún se debe validar el ejecutable Electron/Windows y GitHub Actions.** No se modificó SQLite ni la lógica de ventas, respaldos o permisos.
@@ -928,79 +997,11 @@ Pruebas del calendario: `node tests/qa-backup-schedule.cjs`; suite completa: `np
 - **Propietario:** entrar en **Auditoría del propietario** y aplicar filtros por evento, usuario, empresa y fecha. La tabla muestra descripciones entendibles. **Exportar página CSV** genera UTF-16 LE BOM para Excel Windows; **Guardar página PDF** utiliza Electron y produce un informe A4 horizontal con cabecera, filtros, totales y hasta 50 eventos de la página actual. Para exportar páginas adicionales, cambiar de página y repetir. La exportación PDF requiere abrir FacturaCR en su aplicación de escritorio.
 - **Codificación:** el CSV tiene BOM UTF-16 LE y la indicación `sep=;`. Al abrirlo directamente en Microsoft Excel de Windows deben visualizarse `Café`, `Inicio de sesión`, `Conteo físico`, `Ñandú` y los demás caracteres sin `Ã` ni `â€`.
 - **QA:** `npm test` incorpora 12 comprobaciones para reportes sin costos, CSV Excel, interpretación de eventos, sanitización del PDF y presencia del botón funcional. El PDF de ejemplo se verificó visualmente en A4 horizontal mediante un motor alternativo; debe comprobarse el guardado real con Electron en Windows y GitHub Actions.
-- **Compatibilidad:** es una corrección de v0.6.63, sin cambio de esquema SQLite. Respaldar la base antes de actualizar. Se conservan la autenticación y permisos anteriores, el código de emergencia, correo SMTP, ventas, caja, inventario, respaldos y QA de Windows.
+- **Compatibilidad:** es una corrección de v0.6.63, sin cambio de esquema SQLite. Respaldar la base antes de actualizar. Se conservaron entonces la autenticación y permisos anteriores, ventas, caja, inventario, respaldos y QA Windows; la recuperación SMTP fue retirada más adelante en v0.6.88.
 
-## Actualización correctiva de v0.6.62 — Gmail 534, desplegables y recuperación de otras cuentas
+## Historial v0.6.61–v0.6.63 — Correo/SMTP (retirado en v0.6.88)
 
-- **Diagnóstico del rechazo Gmail 534:** la pantalla de prueba ahora muestra un mensaje específico para la autenticación rechazada por Gmail. El servidor `smtp.gmail.com` con TLS 465 requiere una credencial aceptada por Google; si muestra 534 suele ser necesario crear una contraseña de aplicación con verificación en dos pasos. La app incluye enlace a `https://myaccount.google.com/apppasswords`. Debes **reemplazar la clave SMTP guardada** (campo «Clave SMTP») y volver a guardar antes de probar; cambiar el software por sí solo no modifica la decisión de autenticación de Google. Un 535 indica usuario/clave no aceptados. **No se solicita tu contraseña normal de Gmail**.
-- **Selectores uniformes y accesibles:** en Seguridad y bloqueo y Usuarios y permisos se aplican estilos comunes a los desplegables (42 px, flecha clara, foco de teclado, hover y adaptación a ventanas pequeñas). El panel no altera el CSS de otros módulos.
-- **Recuperación individual de todos:** cada cuenta puede seguir restableciendo **solo su propia contraseña** mediante un correo que verificó personalmente. Un cajero no puede recuperar la cuenta de un administrador, supervisor ni otra persona utilizando su código.
-- **Recuperación de cuentas ajenas SOLO propietario:** nueva sección **Mi sesión → Seguridad y bloqueo → Recuperar cuentas del personal** con selector de cuenta activa y confirmación de la contraseña del propietario. El servidor genera una contraseña temporal aleatoria (solo se muestra una vez), invalida las sesiones anteriores, exige un cambio al iniciar sesión y registra la acción en auditoría. No modifica roles, empresas, correos verificados ni datos comerciales. Las cuentas suspendidas deben reactivarse previamente.
-- **No hay atajos:** la edición normal `/api/auth/users/:userId` ya **no acepta cambios de contraseña** ni de propietarios ni de administradores. Los administradores de empresa pueden conservar los permisos delegados para crear usuarios y administrar asignaciones, pero no restablecer claves de cuentas existentes. El propietario recupera su propia cuenta mediante correo verificado o código local `FCR1-...` como antes.
-- **QA:** pruebas específicas de autenticación propietaria, separación por rol, rechazo de acceso sin sesión, revocación, auditoría, persistencia de rol/correo, obligatoriedad de cambio de contraseña y mensajes Gmail 534. Sin cambios en el esquema SQLite ni nuevas dependencias.
-
-### Para corregir tu error 534 en Gmail
-
-1. En tu cuenta Gmail activa la **verificación en dos pasos**, si aún no la tienes, y visita `https://myaccount.google.com/apppasswords`.
-2. Si tu cuenta permite contraseñas de aplicación, genera una para **FacturaCR** y copia sus 16 caracteres. No uses tu contraseña habitual de Gmail.
-3. Dentro de FacturaCR abre **Mi sesión → Seguridad y bloqueo → Correo emisor**; introduce la nueva contraseña de aplicación en **Clave SMTP**, confirma tu contraseña del propietario de FacturaCR y pulsa **Guardar SMTP cifrado**.
-4. Introduce nuevamente tu contraseña del propietario y pulsa **Enviar correo de prueba**. Comprueba la bandeja de entrada y correo no deseado. Si Google sigue rechazando el inicio de sesión, revisa las restricciones y alertas de seguridad de tu cuenta (especialmente si es Workspace).
-5. Cuando funcione, verifica el correo individual de un **cajero de prueba**, cierra sesión y recupera su propia contraseña. También prueba la recuperación administrativa en una cuenta de prueba desde la sección exclusiva del propietario.
-
-## Nuevo en v0.6.62 — Configuración de SMTP desde FacturaCR instalado
-
-- **Panel exclusivo del propietario:** abre **Mi sesión → Seguridad y bloqueo → Correo emisor de FacturaCR**. Permite configurar servidor SMTP, usuario, remitente, contraseña de aplicación y envío a un correo de prueba. Confirmación de la contraseña actual de propietario obligatoria para guardar, probar y eliminar. Ningún cajero, supervisor ni administrador de empresa puede administrar SMTP.
-- **Cifrado local real:** el ejecutable de Electron utiliza `safeStorage` (DPAPI en Windows) para guardar la configuración en un archivo protegido `smtp-settings.secure` dentro del directorio `userData`. La contraseña no se almacena en SQLite, no se incorpora en los respaldos comerciales, no aparece en la API ni se incluye en el instalador. Si el cifrado del sistema operativo no está disponible, se rechaza el guardado para evitar almacenamiento en texto plano.
-- **SMTP seguro:** solo puerto 465 con TLS implícito, validación de certificado y autenticación SMTP. En la pantalla de prueba, **«Aceptado por el servidor SMTP» no significa necesariamente «Entregado a la bandeja de entrada»**. Verifica Spam y mensajes rechazados por el proveedor.
-- **Todos los roles siguen recuperando solo su cuenta:** el propietario configura el servidor emisor una única vez; cada propietario, administrador, supervisor y cajero verifica su propio correo y recibe únicamente los códigos asociados a su identificador de usuario. No se elevan privilegios ni se reasignan empresas.
-- **Seguridad del panel:** requiere sesión propietaria, contraseña vigente, origen local idéntico, límites de pruebas y auditoría; en las respuestas se ocultan credenciales. La configuración no se transmite al navegador al leerla.
-- **Desarrollo:** la API web arrancada por `npm run desktop:dev` no dispone del almacén de contraseñas de Electron; para probar el panel con almacenamiento cifrado y el envío SMTP real, **utiliza el instalador Windows de `npm run dist:win`**. En desarrollo se conservan las variables de entorno anteriores como opción de pruebas.
-- **QA:** incluye pruebas automatizadas sin Internet de la configuración, permisos, cifrado simulado y envío simulado. El guardado real con Windows DPAPI y la entrega SMTP real requieren ejecución en Windows con un proveedor configurado. No guardar claves en GitHub Actions.
-
-### Cómo probar el correo en la aplicación instalada
-
-1. Haz un respaldo de SQLite; instala la versión y accede como propietario.
-2. Ve a **Mi sesión → Seguridad y bloqueo**. En «Correo emisor de FacturaCR» introduce el host SMTP del proveedor (para Gmail, `smtp.gmail.com`), usuario, remitente y **clave de aplicación** o credencial SMTP autorizada; el puerto 465 es fijo. Confirma tu contraseña del propietario y elige **Guardar SMTP cifrado**.
-3. Escribe una dirección tuya en **Enviar correo de prueba a**, vuelve a introducir la contraseña de propietario y pulsa **Enviar correo de prueba**. Comprueba que el mensaje aparezca en la bandeja de entrada o en spam.
-4. Sin salir de **Seguridad y bloqueo**, cada usuario puede registrar y verificar su **propio correo**. Enviará un código `FCR-MAIL-...` válido 15 minutos.
-5. Para probar la recuperación sin afectar datos de un negocio, crea un **usuario de prueba** de cajero en una empresa de prueba, verifica su correo, cierra sesión, solicita recuperación y establece una contraseña nueva con el código de 10 minutos. Confirma que siga siendo cajero, sin permisos nuevos.
-6. Conserva el código de emergencia del propietario como método alternativo cuando no haya correo o Internet.
-
-**Notas de seguridad:** el servicio SMTP pertenece a la instalación y al perfil de Windows, no a cada empresa. No compartas claves de aplicación ni códigos de recuperación. Al reinstalar bajo otro usuario de Windows, tendrás que configurar SMTP nuevamente. El archivo cifrado no está incluido en el respaldo SQLite.
-
-## Nuevo en v0.6.61 — Recuperación por correo individual para todos los roles
-
-- **Registro individual:** propietario, administradores, supervisores y cajeros pueden registrar únicamente su propio correo en **Mi sesión → Seguridad y bloqueo**. Requiere confirmar la contraseña actual y verificar un código recibido por correo. No existe registro público ni se pueden asignar roles por correo.
-- **Verificación previa:** la dirección existente continúa activa hasta que se verifique la nueva. Los códigos de verificación vencen a los **15 minutos**, tienen límite de intentos y solo se guarda un hash SHA-256 en SQLite.
-- **Recuperación individual:** en la pantalla de inicio, **Recuperar mi cuenta por correo** permite solicitar un código para cualquier cuenta activa que tenga un correo previamente verificado. Los códigos duran **10 minutos**, se usan una sola vez y la nueva contraseña debe cumplir las reglas existentes. Se invalidan las sesiones anteriores.
-- **Política de privilegios:** cada código está vinculado al identificador exclusivo de la cuenta que lo solicitó. Un cajero solamente recupera su propia cuenta de cajero; jamás la del propietario, administrador, supervisor u otro cajero. Recuperar la contraseña NO cambia roles, empresas ni permisos. El restablecimiento de cuentas ajenas se realiza únicamente por el propietario con reautenticación; el código de emergencia del propietario se conserva como alternativa.
-- **No enumeración de usuarios:** la solicitud pública no confirma si una cuenta existe, tiene correo o posee permisos. Se aplican límites de envío y de intentos de verificación.
-- **Migración SQLite aditiva:** se crean `access_user_emails` y `access_email_tokens`; no se alteran usuarios existentes, ventas, inventarios, carritos ni configuraciones de caja. Los correos anteriores no se asumen verificados.
-- **QA:** pruebas con SQLite temporal y un correo simulado, junto con la suite de regresión, para validar permisos, caducidad, token consumido, contraseña y sesiones. **El envío SMTP real debe comprobarse con un proveedor configurado:** las pruebas automatizadas no envían correos reales.
-
-## Configurar el correo saliente (SMTP cifrado)
-
-El envío **no queda activado por defecto**: debe proporcionarse un correo emisor y credenciales SMTP válidas en la computadora donde se ejecuta FacturaCR. Por seguridad, el transporte usa **TLS implícito en puerto 465**, comprueba el certificado del servidor y rechaza SMTP sin cifrado. No necesita una dependencia de npm adicional.
-
-Variables del proceso: `FACTURACR_SMTP_HOST`, `FACTURACR_SMTP_PORT` (465), `FACTURACR_SMTP_USER`, `FACTURACR_SMTP_PASSWORD` y, opcionalmente, `FACTURACR_SMTP_FROM` (si falta, usa el usuario SMTP). El proveedor debe admitir autenticación SMTP. Para proveedores que requieren clave de aplicación, utiliza una credencial específica del servicio y no la contraseña normal de tu cuenta.
-
-Ejemplo para una sesión de **PowerShell** (desarrollo o prueba, sin guardar la contraseña en el repositorio ni en un archivo):
-
-```powershell
-$env:FACTURACR_SMTP_HOST = 'smtp.tu-proveedor.com'
-$env:FACTURACR_SMTP_PORT = '465'
-$env:FACTURACR_SMTP_USER = 'avisos@tu-negocio.com'
-$env:FACTURACR_SMTP_FROM = 'avisos@tu-negocio.com'
-$secret = Read-Host 'Contraseña o clave de aplicación SMTP' -AsSecureString
-$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-try { $env:FACTURACR_SMTP_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
-finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
-npm run desktop:dev
-```
-
-Para la versión instalada, hay que iniciar el ejecutable desde el mismo entorno configurado o administrar las variables de forma protegida desde Windows antes de abrirlo. Al reiniciar sin ellas, **el correo deja de estar disponible, pero el inicio de sesión y la recuperación de emergencia del propietario siguen funcionando**. Evita guardar la contraseña SMTP en archivos `.env` que puedan subirse a GitHub, en un instalador compartido o en capturas y registros de QA.
-
-Las cuatro clases de cuenta con correos verificados pueden recuperar **solo su propia contraseña**. Un cajero seguirá siendo cajero, sin acceso adicional a empresas, costos ni funciones administrativas. El código está asociado al usuario, no al rol, y no permite iniciar sesión sin una nueva contraseña ni elevar privilegios. Los envíos reales requieren Internet y un proveedor SMTP disponible; todos los datos comerciales permanecen en SQLite local.
+Esta sección se conserva solamente para explicar el origen histórico del sistema. **Desde v0.6.88 no existen la configuración SMTP, la verificación individual de correo ni el restablecimiento por email.** No seguir los procedimientos antiguos de Gmail/SMTP: fueron reemplazados por los códigos FCR2 y el kit de dos partes del propietario descritos al comienzo del documento. Las modificaciones históricas de estas versiones se mantienen en `CHANGELOG.md`.
 
 ## Comprobaciones de la versión
 
@@ -1741,3 +1742,8 @@ La venta y el inventario quedan guardados antes de esta acción; un error o canc
 Los accesos de empresa se muestran como un grupo de botones alineados; el cambio de rol y las acciones de cuenta se presentan en una barra adaptable para pantallas pequeñas. En el buscador CABYS, **Buscar en Hacienda** abre el buscador oficial y **Catálogo BCCR (Excel)** abre/descarga el archivo publicado por el Banco Central. Si la descarga externa no se encuentra disponible, se puede consultar CABYS directamente desde Hacienda. Ninguno de estos vínculos valida por sí mismo la tarifa fiscal. No hay migración SQLite.
 
 La aplicación Electron abre únicamente las direcciones oficiales de CABYS permitidas explícitamente en el navegador externo, sin habilitar otras ventanas o enlaces arbitrarios.
+
+
+### v0.6.88 — Recuperación local implementada
+
+El sistema ahora utiliza exclusivamente tres códigos FCR2 de un solo uso por persona y un kit extraordinario de dos partes para el propietario. Consulta el procedimiento actualizado al **inicio del README**. La recuperación mediante correo y SMTP fue retirada de la aplicación. **Próxima prioridad:** XSD oficiales FE/TE 4.4 y las validaciones de Hacienda.

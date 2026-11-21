@@ -1,0 +1,28 @@
+// Regresión de contraseñas visibles: interfaz segura y controlada por cada campo.
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+let checks=0;const check=(title,fn)=>{fn();checks++;console.log('OK',title)};
+const component=read('src/PasswordInput.jsx');
+const login=read('src/main.jsx');
+const users=read('src/UsersPanel.jsx');
+const css=read('src/style.css');
+const pkg=JSON.parse(read('package.json'));
+const lock=JSON.parse(read('package-lock.json'));
+check('Versión v0.6.88 coherente',()=>{assert.equal(pkg.version,'0.6.88');assert.equal(lock.version,pkg.version);assert.equal(lock.packages[''].version,pkg.version)});
+check('El control permanece oculto inicialmente',()=>assert.match(component,/useState\(false\)/));
+check('Alterna exclusivamente el tipo de input',()=>assert.match(component,/type=\{visible&&!disabled\?'text':'password'\}/));
+check('El botón no envía formularios',()=>assert.match(component,/button type="button"/));
+check('El control tiene etiqueta accesible y estado',()=>{assert.match(component,/aria-label=\{visible\?'Ocultar contraseña':'Mostrar contraseña'\}/);assert.match(component,/aria-pressed=\{visible\}/)});
+check('La visibilidad no persiste en almacenamiento',()=>{assert.doesNotMatch(component,/localStorage|sessionStorage|fetch\(|console\.|navigator\.clipboard|document\.cookie/)});
+check('El campo conserva autocompletado y foco de acceso',()=>{assert.match(login,/<PasswordInput required autoFocus/);assert.match(login,/autoComplete=\{state\.setupRequired\?'new-password':'current-password'\}/)});
+check('Pantalla de desbloqueo reutiliza el control',()=>assert.match(login,/locked&&sessionUser&&<label>Cuenta/));
+check('Cambio inicial de contraseña incluye visibilidad',()=>{assert.match(login,/Contraseña temporal<PasswordInput/);assert.match(login,/Nueva contraseña personal<PasswordInput/);assert.match(login,/Confirmar nueva contraseña<PasswordInput/)});
+check('Recuperación mediante código o kit mantiene contraseña oculta',()=>{assert.match(login,/recoveryNewPassword[}][^<]*<\/label>/);assert.match(login,/Nueva contraseña<PasswordInput/);assert.match(login,/Clave extraordinaria/)});
+check('Alta de usuarios incluye mostrar u ocultar',()=>assert.match(users,/Contraseña temporal<PasswordInput/));
+check('Eliminación de perfiles exige contraseña como antes',()=>assert.match(users,/Tu contraseña actual<PasswordInput/));
+check('Control alineado sin desplazar el formulario',()=>{assert.match(css,/\.passwordInputControl\{[^}]*position:relative/);assert.match(css,/\.passwordInputControl>input\{[^}]*padding-right:94px/);assert.match(css,/\.passwordInputControl>\.passwordInputToggle\{[^}]*position:absolute/)});
+console.log(`QA 0.6.88 contraseñas: ${checks}/${checks}`);

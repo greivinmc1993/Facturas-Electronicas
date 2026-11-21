@@ -29,7 +29,7 @@ const checks=[
  ['limite de contenido uniforme',/--fcr-content-max:2200px/],
  ['dashboard y auditoria amplios',/\.bizDashboard,[\s\S]*?\.auditWorkspace\s*\{/],
  ['usuarios sin límite antiguo',/\.layout>main \.usersWorkspace,[\s\S]*?max-width:none/],
- ['seguridad fluida',/\.securitySettingsPanel>:is\([\s\S]*?\.emailRecoveryTools\)\s*\{[\s\S]*?max-width:var\(--fcr-content-max\)/],
+ ['seguridad fluida',/\.securitySettingsPanel>:is\([\s\S]*?\.ownerAssistedRecoveryTools\)\s*\{[\s\S]*?max-width:var\(--fcr-content-max\)/],
  ['reticula de seguridad equilibrada',/grid-template-columns:minmax\(250px,\.95fr\) minmax\(0,1\.65fr\)/],
  ['dos columnas por ancho util',/@container facturacr-workspace \(min-width:980px\)/],
  ['una columna por ancho util',/@container facturacr-workspace \(max-width:979px\)/],

@@ -2,7 +2,7 @@
 const {readFileSync}=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');const src=readFileSync(path.join(root,'src/main.jsx'),'utf8');
 const css=readFileSync(path.join(root,'src/style.css'),'utf8');let count=0;
-const check=(name,fn)=>{fn();count++;console.log('OK UI FE 4.4 v0.6.87:',name)};
+const check=(name,fn)=>{fn();count++;console.log('OK UI FE 4.4 v0.6.88:',name)};
 check('El usuario puede ver el estado de la prevalidación',()=>assert.match(src,/Prevalidación local XML 4\.4/));
 check('No anuncia que una prevalidación equivalga a XSD',()=>assert.match(src,/No equivale a validar contra el XSD oficial/));
 check('Se muestra la línea y el campo de cada inconsistencia',()=>assert.match(src,/f\.field.*f\.line/));

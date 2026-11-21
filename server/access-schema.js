@@ -63,22 +63,21 @@ export function ensureAccessSchema(db){
     code_hash TEXT NOT NULL CHECK(length(code_hash)=64),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
-  -- v0.6.61: el email solo funciona para recuperación después de verificarlo.
-  CREATE TABLE IF NOT EXISTS access_user_emails (
-    user_id INTEGER PRIMARY KEY REFERENCES access_users(id) ON DELETE CASCADE,
-    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-    verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN (0,1)),
-    verified_at TEXT
-  );
-  CREATE TABLE IF NOT EXISTS access_email_tokens (
+  -- v0.6.88: tres códigos independientes de un solo uso por usuario.
+  CREATE TABLE IF NOT EXISTS access_recovery_codes (
     user_id INTEGER NOT NULL REFERENCES access_users(id) ON DELETE CASCADE,
-    purpose TEXT NOT NULL CHECK(purpose IN ('verify','reset')),
+    slot INTEGER NOT NULL CHECK(slot BETWEEN 1 AND 3),
     code_hash TEXT NOT NULL CHECK(length(code_hash)=64),
-    pending_email TEXT NOT NULL,
-    expires_at INTEGER NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),
+    used_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(user_id,purpose)
+    PRIMARY KEY(user_id,slot)
+  );
+  -- Exclusivo del propietario: verificador del kit de dos partes, nunca sus secretos.
+  CREATE TABLE IF NOT EXISTS access_owner_emergency (
+    user_id INTEGER PRIMARY KEY REFERENCES access_users(id) ON DELETE CASCADE,
+    file_id TEXT NOT NULL CHECK(length(file_id)=32),
+    verifier_hash TEXT NOT NULL CHECK(length(verifier_hash)=64),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE TABLE IF NOT EXISTS access_company_roles (
     user_id INTEGER NOT NULL REFERENCES access_users(id) ON DELETE CASCADE,
@@ -128,5 +127,8 @@ export function ensureAccessSchema(db){
   // Baja lógica: conserva movimientos y actores históricos; la cuenta no puede volver a entrar.
   if(!db.prepare('PRAGMA table_info(access_users)').all().some(c=>c.name==='is_deleted'))
     db.exec('ALTER TABLE access_users ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0 CHECK(is_deleted IN (0,1))');
+  // Solo tablas de recuperación por correo; NO los emails de clientes o facturas.
+  // La migración no toca contraseñas, roles, empresas ni datos comerciales.
+  db.exec('DROP TABLE IF EXISTS access_email_tokens; DROP TABLE IF EXISTS access_user_emails;');
   db.exec('CREATE INDEX IF NOT EXISTS idx_access_audit_recent ON access_audit_log(id DESC)');
 }

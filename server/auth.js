@@ -1,9 +1,7 @@
 // Autenticación local v0.6.56: sin cuentas universales ni usuarios ocultos.
 import {randomBytes, scryptSync, timingSafeEqual, createHash} from 'node:crypto';
 import {isValidIdleLockMinutes,ACCESS_ROLES,defaultPermissionsFor} from './access-schema.js';
-import {registerEmailRecovery} from './email-recovery.js';
-import {isMailConfigured,sendSecurityMail} from './email-smtp.js';
-import {registerMailAdmin} from './mail-admin.js';
+import {rotateRecoveryCodes,consumeRecoveryCode,recoveryRemaining,rotateEmergencyKit,verifyEmergencyKit} from './recovery-secrets.js';
 
 const COOKIE='facturacr_session';
 const TOKEN_TTL=12*60*60*1000;
@@ -79,9 +77,7 @@ export function registerAuth(app,getDb,options={}){
     if(!user?.is_active){sessions.delete(key);return null;}
     return {key,session:s,user};
   };
-  const smtpConfigured=options.mailConfigured||(()=>{try{return options.mailStore?!!options.mailStore.read():isMailConfigured()}catch{return false}});
-  const smtpMailer=options.sendMail||((mail,cfg)=>sendSecurityMail(mail,cfg||options.mailStore?.read()));
-  const publicState=()=>({setupRequired:ownerCount()===0,emailRecoveryAvailable:smtpConfigured(),...settings()});
+  const publicState=()=>({setupRequired:ownerCount()===0,recoveryMethod:'offline-codes',...settings()});
   const userCompanies=userId=>db.prepare('SELECT company_id,role FROM access_company_roles WHERE user_id=?').all(userId);
   const delegatedCashiers=user=>user.is_owner?[]:db.prepare("SELECT r.company_id FROM access_company_roles r JOIN access_permission_overrides o ON o.user_id=r.user_id AND o.company_id=r.company_id AND o.permission='users.manage_cashiers' AND o.allowed=1 WHERE r.user_id=? AND r.role='supervisor'").all(user.id).map(x=>x.company_id);
   const displayUser=user=>({id:user.id,username:user.username,displayName:user.display_name,isOwner:!!user.is_owner,passwordChangeRequired:!!user.password_change_required,companies:user.is_owner?[]:userCompanies(user.id),delegatedCashierCompanies:delegatedCashiers(user)});
@@ -135,70 +131,103 @@ export function registerAuth(app,getDb,options={}){
       const displayName=String(req.body?.displayName||'').trim();
       if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username)||displayName.length<2||displayName.length>160)throw Error('Usuario o nombre inválido.');
       const hash=passwordHash(req.body?.password);
-      const recoveryCode=newRecoveryCode();
+      let recoveryCodes,emergencyKit;
       db.transaction(()=>{
         if(ownerCount())throw Error('La cuenta propietaria ya fue configurada.');
         const id=Number(db.prepare(`INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required)
           VALUES (?,?,?,'scrypt',1,1,0)`).run(username,displayName,hash).lastInsertRowid);
-        saveRecovery(id,recoveryCode);
+        recoveryCodes=rotateRecoveryCodes(db,id);
+        emergencyKit=rotateEmergencyKit(db,id);
         audit(id,'auth.owner_setup','user',id);
       })();
       // Se muestra una sola vez. SQLite conserva exclusivamente el hash SHA-256.
       res.setHeader('Cache-Control','no-store');
-      res.status(201).json({ok:true,recoveryCode});
+      res.status(201).json({ok:true,recoveryCodes,emergencyKit});
     }catch(e){res.status(400).json({error:e.message});}
   });
-  // Recuperación local sin cuenta oculta: código de alta entropía, un solo uso,
-  // contraseña nueva validada y revocación de todas las sesiones del propietario.
+  // Códigos personales FCR2 (3 usos independientes) y rescate propietario de dos partes.
+  // Nunca se envían correos y nunca se devuelve ningún secreto guardado.
   app.post('/api/auth/recovery/reset',localOriginOnly,(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     const username=typeof req.body?.username==='string'?req.body.username.trim().toLowerCase():'';
     const key=username.slice(0,80);
     const now=Date.now(),state=recoveryFailures.get(key)||{n:0,until:0};
-    if(state.until>now)return res.status(429).json({error:'Demasiados intentos de recuperación. Inténtalo más tarde.'});
+    if(state.until>now)return res.status(429).json({error:'Demasiados intentos. Inténtalo más tarde.'});
     const fail=()=>{
       const n=state.n+1;
       recoveryFailures.set(key,n>=RECOVERY_LIMIT?{n,until:now+RECOVERY_WINDOW}:{n,until:0});
-      return res.status(403).json({error:'No se pudo verificar el código de recuperación y la cuenta.'});
+      return res.status(403).json({error:'No se pudo verificar la cuenta ni el mecanismo de recuperación.'});
     };
     if(!/^[a-z0-9][a-z0-9._-]{2,79}$/.test(username))return fail();
-    const user=db.prepare('SELECT id,is_active FROM access_users WHERE username=? AND is_owner=1').get(username);
-    const stored=user?.is_active?db.prepare('SELECT code_hash FROM access_owner_recovery WHERE user_id=?').get(user.id):null;
-    if(!recoveryMatches(req.body?.recoveryCode,stored?.code_hash))return fail();
+    const user=db.prepare('SELECT id,is_owner,is_active,is_deleted FROM access_users WHERE username=?').get(username);
+    if(!user||!user.is_active||user.is_deleted)return fail();
+    const method=req.body?.method==='emergency'?'emergency':'code';
+    if(method==='emergency'&&!user.is_owner)return fail();
     let hash;
-    try{hash=passwordHash(req.body?.newPassword);}catch(e){return res.status(400).json({error:e.message});}
+    try{hash=passwordHash(req.body?.newPassword)}catch(e){return res.status(400).json({error:e.message})}
     try{
-      const nextCode=newRecoveryCode();
+      let rotated=null;
       db.transaction(()=>{
-        // Validación dentro de transacción: evita reutilizar el código en peticiones concurrentes.
-        const current=db.prepare('SELECT code_hash FROM access_owner_recovery WHERE user_id=?').get(user.id);
-        if(!current||!recoveryMatches(req.body?.recoveryCode,current.code_hash))throw Error('Código utilizado.');
-        db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_owner=1').run(hash,user.id);
-        saveRecovery(user.id,nextCode); // sustituye el código usado: no puede reutilizarse
-        audit(user.id,'auth.owner_recovered','user',user.id);
+        let verified=false;
+        if(method==='emergency'){
+          verified=verifyEmergencyKit(db,user.id,req.body?.fileContent,req.body?.emergencyKey);
+        }else{
+          verified=consumeRecoveryCode(db,user.id,req.body?.recoveryCode);
+          // Compatibilidad segura: el antiguo FCR1 del propietario continúa válido
+          // ÚNICAMENTE hasta el primer alta de sus tres códigos FCR2.
+          if(!verified&&user.is_owner&&recoveryRemaining(db,user.id)===0&&
+             !db.prepare('SELECT 1 FROM access_recovery_codes WHERE user_id=? LIMIT 1').get(user.id)){
+            const legacy=db.prepare('SELECT code_hash FROM access_owner_recovery WHERE user_id=?').get(user.id);
+            verified=recoveryMatches(req.body?.recoveryCode,legacy?.code_hash);
+            if(verified)db.prepare('DELETE FROM access_owner_recovery WHERE user_id=?').run(user.id);
+          }
+        }
+        if(!verified)throw Error('Recovery denied');
+        db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(hash,user.id);
+        if(method==='emergency'){
+          const recoveryCodes=rotateRecoveryCodes(db,user.id);
+          const emergencyKit=rotateEmergencyKit(db,user.id);
+          rotated={recoveryCodes,emergencyKit};
+        }
+        audit(user.id,method==='emergency'?'auth.owner_emergency_recovered':'auth.recovery_code_used','user',user.id);
       })();
       revokeUserSessions(user.id);
       failures.delete(username);recoveryFailures.delete(key);
-      res.json({ok:true,recoveryCode:nextCode});
-    }catch{return fail();}
+      res.json({ok:true,remaining:recoveryRemaining(db,user.id),...rotated});
+    }catch{return fail()}
   });
   app.get('/api/auth/recovery/status',(req,res)=>{
     const a=auth(req,res);if(!a?.session)return;
-    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario administra su recuperación.'});
-    const code=db.prepare('SELECT 1 AS enabled FROM access_owner_recovery WHERE user_id=?').get(a.user.id);
-    res.setHeader('Cache-Control','no-store');res.json({configured:!!code});
+    const count=recoveryRemaining(db,a.user.id);
+    const configured=!!db.prepare('SELECT 1 FROM access_recovery_codes WHERE user_id=? LIMIT 1').get(a.user.id);
+    const emergencyConfigured=!!(a.user.is_owner&&db.prepare('SELECT 1 FROM access_owner_emergency WHERE user_id=?').get(a.user.id));
+    const legacyAvailable=!!(a.user.is_owner&&!configured&&db.prepare('SELECT 1 FROM access_owner_recovery WHERE user_id=?').get(a.user.id));
+    res.setHeader('Cache-Control','no-store');
+    res.json({configured,remaining:count,total:3,isOwner:!!a.user.is_owner,emergencyConfigured,legacyAvailable});
   });
   app.post('/api/auth/recovery/rotate',localOriginOnly,(req,res)=>{
     const a=auth(req,res);if(!a?.session)return;
-    if(!a.user.is_owner)return res.status(403).json({error:'Solo el propietario administra su recuperación.'});
+    if(a.user.password_change_required)return res.status(403).json({error:'Cambia tu contraseña temporal antes de generar códigos.'});
     const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
     if(!row||!verifyPassword(req.body?.password,row.password_hash))return res.status(403).json({error:'La contraseña actual es incorrecta.'});
     try{
-      const code=newRecoveryCode();
-      db.transaction(()=>{saveRecovery(a.user.id,code);audit(a.user.id,'auth.recovery_rotated','user',a.user.id);})();
+      let codes;
+      db.transaction(()=>{codes=rotateRecoveryCodes(db,a.user.id);audit(a.user.id,'auth.recovery_codes_rotated','user',a.user.id)})();
       revokeUserSessions(a.user.id,a.key);
-      res.setHeader('Cache-Control','no-store');res.json({ok:true,recoveryCode:code});
-    }catch{return res.status(500).json({error:'No se pudo generar el código de recuperación.'});}
+      res.setHeader('Cache-Control','no-store');res.json({ok:true,recoveryCodes:codes,remaining:3});
+    }catch{return res.status(500).json({error:'No fue posible generar los códigos de recuperación.'})}
+  });
+  app.post('/api/auth/recovery/owner-kit/rotate',localOriginOnly,(req,res)=>{
+    const a=auth(req,res);if(!a?.session)return;
+    if(!a.user.is_owner||a.user.password_change_required)return res.status(403).json({error:'Operación exclusiva del propietario.'});
+    const row=db.prepare('SELECT password_hash FROM access_users WHERE id=?').get(a.user.id);
+    if(!verifyPassword(req.body?.password,row?.password_hash))return res.status(403).json({error:'Contraseña actual incorrecta.'});
+    try{
+      let emergencyKit;
+      db.transaction(()=>{emergencyKit=rotateEmergencyKit(db,a.user.id);audit(a.user.id,'auth.owner_kit_rotated','user',a.user.id)})();
+      revokeUserSessions(a.user.id,a.key);
+      res.setHeader('Cache-Control','no-store');res.json({ok:true,emergencyKit});
+    }catch{return res.status(500).json({error:'No fue posible renovar el kit extraordinario.'})}
   });
   app.post('/api/auth/login',localOriginOnly,(req,res)=>{
     const username=String(req.body?.username||'').trim().toLowerCase(),key=username.slice(0,80);
@@ -302,12 +331,14 @@ export function registerAuth(app,getDb,options={}){
       const existing=db.prepare('SELECT id,is_owner,is_deleted FROM access_users WHERE username=? COLLATE NOCASE').get(username);
       if(existing)return res.status(409).json(usernameConflict(a,existing,username));
       const hash=passwordHash(req.body?.password);
+      let recoveryCodes;
       const id=db.transaction(()=>{
         const id=Number(db.prepare("INSERT INTO access_users(username,display_name,password_hash,password_algorithm,is_owner,is_active,password_change_required) VALUES (?,?,?,'scrypt',0,1,1)").run(username,displayName,hash).lastInsertRowid);
         db.prepare('INSERT INTO access_company_roles(user_id,company_id,role,assigned_by) VALUES (?,?,?,?)').run(id,companyId,role,a.user.id);
+        recoveryCodes=rotateRecoveryCodes(db,id);
         audit(a.user.id,'users.create','user',id,companyId);return id;
       })();
-      res.status(201).json({ok:true,id});
+      res.setHeader('Cache-Control','no-store');res.status(201).json({ok:true,id,recoveryCodes});
     }catch(e){
       // La restricción UNIQUE sigue siendo la última defensa ante dos altas
       // simultáneas; no confundir cualquier error de base de datos con duplicado.
@@ -348,13 +379,14 @@ export function registerAuth(app,getDb,options={}){
     const temporaryPassword='FCR-9'+randomBytes(18).toString('hex');
     const hashed=passwordHash(temporaryPassword);
     try{
+      let recoveryCodes;
       db.transaction(()=>{
         db.prepare('UPDATE access_users SET password_hash=?,password_change_required=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_owner=0 AND is_active=1').run(hashed,targetId);
-        db.prepare('DELETE FROM access_email_tokens WHERE user_id=?').run(targetId);
+        recoveryCodes=rotateRecoveryCodes(db,targetId);
         audit(a.user.id,'auth.owner_assisted_recovery','user',targetId);
       })();
       revokeUserSessions(targetId);
-      return res.json({ok:true,temporaryPassword,message:'Contraseña temporal generada. Entrégala de forma privada. El usuario debe cambiarla al iniciar sesión.'});
+      return res.json({ok:true,temporaryPassword,recoveryCodes,message:'Contraseña temporal y tres códigos entregados una sola vez.'});
     }catch{return res.status(500).json({error:'No se pudo recuperar la cuenta.'});}
   });
   app.put('/api/auth/users/:userId',localOriginOnly,(req,res)=>{
@@ -430,8 +462,7 @@ export function registerAuth(app,getDb,options={}){
     if(!verifyPassword(req.body?.currentPassword,ownerRow?.password_hash))return res.status(403).json({error:'Contraseña actual incorrecta.'});
     db.transaction(()=>{
       db.prepare('UPDATE access_users SET is_active=0,is_deleted=1,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(id);
-      db.prepare('DELETE FROM access_email_tokens WHERE user_id=?').run(id);
-      db.prepare('DELETE FROM access_user_emails WHERE user_id=?').run(id);
+      db.prepare('DELETE FROM access_recovery_codes WHERE user_id=?').run(id);
       audit(a.user.id,'users.deleted','user',id);
     })();
     revokeUserSessions(id);
@@ -478,18 +509,22 @@ export function registerAuth(app,getDb,options={}){
     if(!verifyPassword(req.body?.oldPassword,row.password_hash))return res.status(403).json({error:'Contraseña actual incorrecta.'});
     try{
       const newHash=passwordHash(req.body?.newPassword);
+      let recoveryCodes=null;
       db.transaction(()=>{
         db.prepare('UPDATE access_users SET password_hash=?,password_change_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(newHash,a.user.id);
+        // Tras el primer cambio de contraseña se sustituyen los códigos
+        // entregados al creador de la cuenta: solo el usuario conoce los nuevos.
+        if(a.user.password_change_required){
+          recoveryCodes=rotateRecoveryCodes(db,a.user.id);
+          audit(a.user.id,'auth.recovery_codes_after_first_login','user',a.user.id);
+        }
         audit(a.user.id,'auth.password_change','user',a.user.id);
       })();
-      // Mantener solo la sesión que acredita la contraseña actual. Revocar otras
-      // sesiones evita que equipos antiguos sigan autorizados tras el cambio.
       for(const [key,s] of sessions)if(s.userId===a.user.id&&key!==a.key)sessions.delete(key);
-      res.json({ok:true});
+      res.setHeader('Cache-Control','no-store');res.json({ok:true,...(recoveryCodes?{recoveryCodes}:{})});
     }catch(e){res.status(400).json({error:e.message});}
   });
-  registerEmailRecovery(app,{db,auth,localOriginOnly,audit,verifyPassword,passwordHash,revokeUserSessions,mailer:smtpMailer,mailConfigured:smtpConfigured});
-  registerMailAdmin(app,{db,auth,localOriginOnly,audit,verifyPassword,mailStore:options.mailStore,sendMail:smtpMailer});
+
   // Es obligatorio validar todas las rutas /api restantes en el SERVIDOR.
   // La política por roles y empresas se activará después, ANTES de crear usuarios subordinados.
   app.use('/api',(req,res,next)=>{

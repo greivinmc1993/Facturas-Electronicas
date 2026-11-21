@@ -24,8 +24,8 @@ test('Proveedor visual envuelve la sesión y se comparte entre módulos',()=>{
 });
 test('Acciones sensibles conservan su confirmación y no se ejecutan al cancelar',()=>{
  assert.match(main,/if\(!await confirmAction\('Se cerrarán las sesiones/);
- assert.match(main,/if\(!await confirmAction\('El código de recuperación anterior/);
- assert.match(main,/if\(!await confirmAction\('Se desactivará la recuperación por correo/);
+ assert.match(main,/if\(!await confirmAction\('Los códigos anteriores/);
+ assert.match(main,/if\(!await confirmAction\('El kit extraordinario anterior dejará de funcionar/);
  assert.match(stock,/if\(!await confirmAction\(/);
  assert.match(people,/if\(!await confirmAction\(/);
 });

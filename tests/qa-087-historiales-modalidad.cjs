@@ -31,5 +31,5 @@ function check(description,fn){fn();count++;console.log('OK',description)}
   check('Tabla principal, crédito y exportaciones usan etiquetas consistentes',()=>{assert.match(ui,/<td>\{saleClientLabel\(s\)\}<\/td>/);assert.match(ui,/const reportRows=\(\)=>filteredSales\.map\(s=>\[s.id,saleLocalDateTime\(s.created_at\),saleClientLabel\(s\)/)});
   check('API de Ventas incluye TE y genérica con etiqueta de cliente',()=>{assert.match(server,/WHEN s.document_mode='TE' THEN 'Tiquete electrónico'/);assert.match(server,/WHEN s.document_mode='GENERICA' THEN 'Genérica'/)});
  } finally {if(oldTZ===undefined)delete process.env.TZ;else process.env.TZ=oldTZ;}
- console.log(`QA historiales y selector v0.6.87: ${count}/${count}`);
+ console.log(`QA historiales y selector v0.6.88: ${count}/${count}`);
 })().catch(e=>{console.error(e);process.exitCode=1});

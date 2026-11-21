@@ -1,3 +1,28 @@
+## [0.6.88] — Recuperación exclusivamente local con 3 códigos y kit del propietario (20/11/2026)
+
+- **Sin correo para recuperar contraseñas:** retirados formularios, rutas `/api/auth/email/*` y `/api/auth/mail/*`, módulos SMTP y almacén local `smtp-settings.secure` (limpieza best effort); no se modifican correos comerciales de clientes/empresas.
+- **Tres códigos FCR2 por usuario:** códigos individuales de 192 bits, de un uso, entregados una sola vez al configurar propietario, crear usuario, recuperar cuenta administrativamente o renovar. Al primer cambio de contraseña temporal del personal, los códigos iniciales se sustituyen para que la persona conserve solo sus propios secretos.
+- **Renovación:** cualquier usuario autenticado puede reemplazar sus tres códigos con contraseña actual. Los usados no se reutilizan; reiniciar contraseña con código revoca las sesiones anteriores. Cuenta existente sin códigos puede activarlos al iniciar sesión.
+- **Kit extraordinario exclusivo del propietario:** fichero `FacturaCR-Rescate.fcr` con una mitad aleatoria y clave FCRK por separado; ambos obligatorios. Rescate invalida el kit y códigos viejos, entrega tres códigos y kit nuevos. No hay puertas traseras ni contraseñas maestras.
+- **Compatibilidad con FCR1:** antiguos propietarios conservan temporalmente un código FCR1 hasta la activación de FCR2. Su uso consume el FCR1; su siguiente acceso debe generar los FCR2 y kit.
+- **SQLite:** tablas `access_recovery_codes` y `access_owner_emergency`, verificadores SHA-256 de secretos de alta entropía; retiro intencional de `access_email_tokens` y `access_user_emails`. Ventas, caja, roles y otros datos comerciales no se migran ni recalculan. **Obligatorio respaldar y verificar SQLite antes de reemplazar.**
+- **Interfaz:** entrega única con confirmación, copia y descarga `.fcr`, recuperación por código o kit, controles accesibles de mostrar/ocultar contraseñas y avisos descartables. No se incluyen secretos en CSV/PDF, logs ni auditoría.
+- **QA:** recuperación FCR2, rotación y kit, pruebas de migración legacy FCR1, permisos, revocación, rechazo SMTP, suites de regresión y 76/76 integración SQLite; `npm test` local aprobado. Servidor real Express, Vite y NSIS Windows pendientes de comprobación remota.
+- **Siguiente versión:** XSD oficiales de Hacienda FE/TE 4.4, catálogos CAByS y actividades, precisión fiscal, firma real, numeración y envío.
+
+## v0.6.88 — Ajuste de notificaciones y código de recuperación
+
+- Notificaciones transitorias cerrables mediante «×», con acceso por teclado y roles de anuncio.
+- Ajuste del botón del propietario a «Generar nuevo código», con anchura y texto legibles.
+- Pendiente documentado: recuperación sencilla mediante códigos individuales entregados una única vez al crear usuarios; sin cambiar todavía el flujo de autenticación ni la base SQLite.
+
+## [0.6.88] — Mostrar / Ocultar contraseñas de usuarios
+
+- Añadido un control reutilizable `PasswordInput` en acceso, desbloqueo, creación del propietario, cambio temporal, recuperación y gestión de usuarios. Oculto por defecto, opción reversible, accesible por teclado y `aria-pressed`.
+- Formatos de campo y botón simétricos en pantallas grandes y pequeñas. Mantiene validaciones, reglas de contraseña y sesión sin persistir visibilidad ni secretos.
+- QA nuevo de interfaz integrado al flujo `npm test`; resto de funciones y datos sin cambios.
+- La segunda solicitud del mensaje quedó inconclusa; no se implementan funcionalidades sin especificación.
+
 ## [0.6.87] — Corrección del selector y de la visibilidad de tiquetes en historial
 
 - Radios FE/TE/genérica con anchura fija de 18px y tres tarjetas simétricas, texto integrado, estados de selección y diseño adaptable.

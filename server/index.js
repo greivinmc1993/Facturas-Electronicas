@@ -28,7 +28,7 @@ import { pathToFileURL } from 'node:url';
 
 const APP_VERSION=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 
-export async function startServer({ dataDir = join(process.cwd(), 'data'), port = 3001, staticDir = null, mailSettingsStore = null } = {}) {
+export async function startServer({ dataDir = join(process.cwd(), 'data'), port = 3001, staticDir = null } = {}) {
   mkdirSync(dataDir, { recursive: true });
   const databasePath = join(dataDir, 'facturacr.sqlite');
   let db = new Database(databasePath);
@@ -246,7 +246,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({limit:'2mb'}));
-  const authentication=registerAuth(app,()=>db,{mailStore:mailSettingsStore});
+  const authentication=registerAuth(app,()=>db);
   registerSaleDraftRoutes(app,()=>db);
   // Limpieza tolerante a archivos temporalmente bloqueados en Windows.
   // Nunca permitir que una excepción en callbacks de descarga termine Electron.
