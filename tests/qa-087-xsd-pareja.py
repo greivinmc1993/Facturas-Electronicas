@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FacturaCR v0.6.89: QA estricto de XSD v4.4 locales (no transmite ni firma).
+"""FacturaCR v0.6.91: QA estricto de XSD v4.4 locales (no transmite ni firma).
 
 Validación de XML aportados por el operador contra sus XSD locales.
 NO garantiza que los XSD procedan de Hacienda, que estén vigentes ni
@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -168,6 +169,41 @@ class SchemaRootResolver(etree.Resolver):
         return self.resolve_filename(str(chosen), context)
 
 
+
+def inspect_pre_signature(xml_doc, errors, xsd_valid):
+    """Diagnóstico NO fiscal: identifica el único fallo de firma en el elemento raíz.
+
+    No agrega una firma ficticia, no altera el XML ni cambia la validación XSD
+    estricta. Solo diagnostica un error de libxml2 muy específico. Cuando hay
+    cualquier otro error, conserva la lista completa sin dar un falso positivo.
+    """
+    root = xml_doc.getroot()
+    signature_tag = f'{{{XMLDSIG_NAMESPACE}}}Signature'
+    signature_present = any(child.tag == signature_tag for child in root)
+    if signature_present:
+        return {'status': 'SIGNATURE_PRESENT', 'signaturePresent': True,
+                'onlySignatureMissing': False,
+                'note': 'Hay un elemento Signature; el XSD NO verifica su validez criptográfica.'}
+    if xsd_valid:
+        return {'status': 'NO_OTHER_XSD_ERRORS_DETECTED', 'signaturePresent': False,
+                'onlySignatureMissing': False,
+                'note': 'El XSD seleccionado aceptó el XML sin firma. No equivale a firma ni aceptación de Hacienda.'}
+    # El error de libxml2 debe apuntar explícitamente al nodo raíz y a ds:Signature
+    # como una de las alternativas esperadas. Un mensaje genérico que simplemente
+    # mencione Signature NO es suficiente para diagnosticar la estructura.
+    only_missing_signature = (len(errors) == 1
+        and errors[0].type_name == 'SCHEMAV_ELEMENT_CONTENT'
+        and errors[0].message.startswith(f"Element '{root.tag}': Missing child element(s).")
+        and re.search(r'\{http://www\.w3\.org/2000/09/xmldsig#\}Signature(?=[\s,.)]|$)',
+                      errors[0].message) is not None)
+    if only_missing_signature:
+        return {'status': 'ONLY_SIGNATURE_PENDING', 'signaturePresent': False,
+                'onlySignatureMissing': True,
+                'note': 'El único error XSD comunicado es la ausencia de Signature al final del documento. No equivale a una validación fiscal completa.'}
+    return {'status': 'OTHER_XSD_ERRORS', 'signaturePresent': False,
+            'onlySignatureMissing': False,
+            'note': 'Existen errores estructurales que deben corregirse antes de firmar. La lista XSD conserva los detalles.'}
+
 def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=None):
     if kind not in TYPES:
         raise ValidationInputError('Tipo de documento no permitido.')
@@ -197,6 +233,8 @@ def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=No
     except etree.XMLSchemaParseError as error:
         raise ValidationInputError(f'No se pudo compilar el XSD {kind}: {error}') from error
     valid = schema.validate(xml_doc)
+    schema_errors = list(schema.error_log)
+    pre_signature = inspect_pre_signature(xml_doc, schema_errors, valid)
     return {
         'documentType': kind,
         'validWithSuppliedSchema': valid,
@@ -208,8 +246,9 @@ def check_pair(kind, schema_path, xml_path, schema_root=None, expected_hashes=No
         'xmlSHA256': sha256_file(xml_path),
         'dependenciesSHA256': hashes,
         'localXmlDsigMapping': bool(redirects),
+        'preSignature': pre_signature,
         'errors': [{'line': e.line, 'column': e.column, 'field': e.path or '',
-                    'message': e.message} for e in list(schema.error_log)[:40]],
+                    'message': e.message} for e in schema_errors[:40]],
     }
 
 

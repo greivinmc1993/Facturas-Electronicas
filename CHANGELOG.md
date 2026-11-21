@@ -1,3 +1,11 @@
+## [0.6.91] — Diagnóstico estructural previo a firma XML FE/TE (21/11/2026)
+
+- Distingue mediante el XSD local si el único problema detectado en un borrador FE/TE es `ds:Signature` faltante al final de la raíz, si existen **otros errores XSD** o si el esquema acepta el XML sin firma.
+- Mantiene el resultado XSD estricto sin falsos positivos. No agrega firmas ficticias, no altera XSD ni XML, no verifica criptografía, no envía a Hacienda y mantiene los permisos y SQLite existentes.
+- Explica los resultados en la pantalla y conserva la lista de errores con línea y hashes SHA-256. Mantiene el arreglo controlado de `xmldsig-core-schema.xsd` de v0.6.90.
+- Nuevas pruebas: 18 casos sintéticos de pre-firma FE/TE y contrato local/UI, añadidos a QA y GitHub Actions.
+- Pendiente: comparar los XML con XSD oficiales vigentes descargados y comprobados; ejecutar el instalador NSIS y pruebas de interfaz reales en Windows.
+
 ## [0.6.90 · corrección XSD XMLDSIG] — Dependencia local de firma XML (21/11/2026)
 
 - Corrige el error `Dependencia XSD fuera de --schema-root: ../../xmldsig-core-schema.xsd` al validar un XSD v4.4 que importa el esquema estándar de firma XML. FacturaCR acepta **solo** esa referencia concreta como alias al `xmldsig-core-schema.xsd` que el usuario coloca junto a los demás XSD.

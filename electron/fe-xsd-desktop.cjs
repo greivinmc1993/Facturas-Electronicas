@@ -1,5 +1,5 @@
 'use strict';
-// v0.6.90. Laboratorio local de comprobación XSD sin conectarse a Hacienda.
+// v0.6.91. Laboratorio local de comprobación XSD sin conectarse a Hacienda.
 // El renderer aporta únicamente un borrador ya autorizado por la API y su tipo;
 // la carpeta XSD se elige con el diálogo nativo. No se reciben rutas arbitrarias.
 const fs=require('node:fs/promises');
@@ -71,6 +71,11 @@ async function validateDraftLocally({xml,documentType,schemaDir,pythonScript,run
    localXmlDsigMapping:report.localXmlDsigMapping===true,
    dependenciesSHA256:report.dependenciesSHA256||{},
    errors:Array.isArray(report.errors)?report.errors.slice(0,40):[],
+   preSignature:report.preSignature &&
+    ['SIGNATURE_PRESENT','NO_OTHER_XSD_ERRORS_DETECTED','ONLY_SIGNATURE_PENDING','OTHER_XSD_ERRORS'].includes(report.preSignature.status)
+     ? {status:report.preSignature.status,signaturePresent:report.preSignature.signaturePresent===true,
+        onlySignatureMissing:report.preSignature.onlySignatureMissing===true,note:String(report.preSignature.note||'').slice(0,700)}
+     : null,
    warning:'Solo se compara con el XSD elegido. Su origen y vigencia NO están verificados. El borrador no está firmado, usa claves ficticias y NO es un comprobante válido ante Hacienda.'
   };
  }finally{

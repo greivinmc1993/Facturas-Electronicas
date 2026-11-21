@@ -646,13 +646,15 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
      </section>}
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>
      <section className="feXsdLocalPanel" aria-label="Validación XSD local del borrador">
-      <h4>Comparar borrador con XSD 4.4 local</h4>
-      <p>Selecciona una carpeta con esquemas XSD y sus dependencias obtenidos de una fuente confiable. Si los XSD incluyen la referencia «../../xmldsig-core-schema.xsd», guarda también <code>xmldsig-core-schema.xsd</code> junto a ellos en la misma carpeta. FacturaCR resolverá únicamente esa dependencia conocida sin acceder a carpetas externas. <b>No verifica el origen o vigencia del XSD.</b></p>
+      <h4>Validación XSD 4.4 · diagnóstico previo a la firma</h4>
+      <p>Selecciona una carpeta con esquemas XSD y sus dependencias obtenidos de una fuente confiable. Si los XSD incluyen la referencia «../../xmldsig-core-schema.xsd», guarda también <code>xmldsig-core-schema.xsd</code> junto a ellos en la misma carpeta. FacturaCR resolverá únicamente esa dependencia conocida sin acceder a carpetas externas. El diagnóstico puede distinguir la única falta de firma de otros errores, pero <b>no elimina la obligación de validar el XML firmado completo ni verifica el origen o vigencia del XSD.</b></p>
       <button type="button" className="secondary" disabled={!xmlDraft.ready||xsdBusy} onClick={validateDraftWithLocalXsd}>{xsdBusy?'Validando XSD…':'Elegir carpeta XSD y validar borrador'}</button>
       {xsdResult?.status==='CANCELLED'&&<p role="status">Selección cancelada. No se alteró el XML.</p>}
       {xsdResult?.status==='CANNOT_VALIDATE'&&<p role="alert" className="feXsdLocalError">No se pudo validar: {xsdResult.error}</p>}
       {['MATCHES_LOCAL_XSD','DOES_NOT_MATCH_LOCAL_XSD'].includes(xsdResult?.status)&&<div className="feXsdLocalResult" role="status">
-       <strong>{xsdResult.status==='MATCHES_LOCAL_XSD'?'Coincide con el XSD local elegido':'El XML no coincide con el XSD local elegido'}</strong>
+       <strong>{xsdResult.preSignature?.status==='ONLY_SIGNATURE_PENDING'?'Borrador sin firmar: el único error XSD detectado es la firma pendiente':xsdResult.preSignature?.status==='NO_OTHER_XSD_ERRORS_DETECTED'?'Borrador sin firmar: el XSD local no detectó otros errores':xsdResult.status==='MATCHES_LOCAL_XSD'?'Coincide con el XSD local elegido':'El XML presenta diferencias con el XSD local elegido'}</strong>
+       <p><b>Validación XSD completa:</b> {xsdResult.status==='MATCHES_LOCAL_XSD'?'Coincide con el esquema seleccionado (no verifica la firma criptográfica ni la autorización fiscal).':'No coincide todavía con el esquema seleccionado.'}</p>
+       {xsdResult.preSignature?.note&&<p className={xsdResult.preSignature.status==='OTHER_XSD_ERRORS'?'feXsdLocalError':'feXsdPreSignNote'}><b>Diagnóstico previo a la firma:</b> {xsdResult.preSignature.note}</p>}
        <p>XSD: {xsdResult.xsdFile} · SHA-256: <code>{xsdResult.xsdSHA256}</code></p>
        <p>XML SHA-256: <code>{xsdResult.xmlSHA256}</code></p>
        {xsdResult.localXmlDsigMapping&&<p>Dependencia XMLDSIG resuelta desde la carpeta XSD seleccionada (sin acceso a rutas externas).</p>}

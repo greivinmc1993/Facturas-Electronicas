@@ -24,7 +24,7 @@ async function main(){
   await fs.rm(path.join(d,'TiqueteElectronico_V4.4.xsd'));
   const missing=await validateDraftLocally({documentType:'TE',schemaDir:d,pythonScript:path.resolve(__dirname,'qa-087-xsd-pareja.py'),xml:`<TiqueteElectronico xmlns="${NAMESPACE}tiqueteElectronico">100</TiqueteElectronico>`});
   assert.equal(missing.status,'CANNOT_VALIDATE',JSON.stringify(missing));
-  console.log('QA v0.6.90 puente Node/Python+lxml: 5/5 ensayos con XSD SINTÉTICOS. No acredita esquema oficial.');
+  console.log('QA puente Node/Python+lxml (v0.6.91): 5/5 ensayos con XSD SINTÉTICOS. No acredita esquema oficial.');
  }finally{await fs.rm(d,{recursive:true,force:true})}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

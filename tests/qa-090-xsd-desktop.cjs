@@ -5,7 +5,7 @@ const path=require('node:path');
 const {validateDraftLocally,validateRequest,choosePythonError}=require('../electron/fe-xsd-desktop.cjs');
 const base=path.resolve(__dirname,'..');
 const FE='<?xml version="1.0"?><FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica">100</FacturaElectronica>';
-const asResponse=valid=>JSON.stringify({reports:[{documentType:'FE',validWithSuppliedSchema:valid,schemaFile:'FacturaElectronica_V4.4.xsd',schemaSHA256:'a'.repeat(64),xmlSHA256:'b'.repeat(64),errors:valid?[]:[{line:1,message:'Incorrecto'}]}]});
+const asResponse=valid=>JSON.stringify({reports:[{documentType:'FE',validWithSuppliedSchema:valid,schemaFile:'FacturaElectronica_V4.4.xsd',schemaSHA256:'a'.repeat(64),xmlSHA256:'b'.repeat(64),preSignature:{status:valid?'NO_OTHER_XSD_ERRORS_DETECTED':'OTHER_XSD_ERRORS',signaturePresent:false,onlySignatureMissing:false,note:'Diagnóstico de ensayo'},errors:valid?[]:[{line:1,message:'Incorrecto'}]}]});
 let checks=0;
 const check=async(name,fn)=>{await fn();checks++;console.log('OK XSD escritorio:',name)};
 async function run(){
@@ -62,6 +62,6 @@ async function run(){
   assert.ok(pkg.build.asarUnpack.includes('tests/qa-087-xsd-pareja.py'));
   assert.match(JSON.stringify(pkg.scripts),/qa:xsd:desktop-real/);
  });
- console.log(`QA v0.6.90 XSD escritorio: ${checks}/${checks} controles aprobados con respuestas simuladas; sin XSD oficiales.`);
+ console.log(`QA XSD escritorio (v0.6.91): ${checks}/${checks} controles aprobados con respuestas simuladas; sin XSD oficiales.`);
 }
 run().catch(err=>{console.error(err);process.exitCode=1});

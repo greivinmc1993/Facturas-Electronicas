@@ -1,3 +1,82 @@
+# FacturaCR v0.6.91 — Diagnóstico XSD previo a la firma FE/TE
+
+**Objetivo:** distinguir un borrador XML 4.4 sin firma que solo presenta la ausencia de `ds:Signature` de otro que contiene **errores estructurales adicionales**. La aplicación nunca inventa, inserta ni simula una firma para lograr la validación.
+
+## 1. Novedades principales
+
+- El resultado de la comparación XSD muestra un bloque **«Diagnóstico previo a la firma»** separado del estado **«Validación XSD completa»**.
+- Si el esquema reporta exclusivamente que falta el elemento final `ds:Signature` en la raíz FE/TE, se explica que **ese es el único error detectado**. El estado estricto sigue siendo **NO coincide con XSD**; no se considera factura válida.
+- Si existen errores de contenido, datos, orden, nombres de campos o faltan otros elementos, el sistema los mantiene en el listado con línea y detalle. **Nunca** se ocultan esos errores afirmando que falta solamente la firma.
+- Si el XSD local permite un borrador sin firma, se indica que no detectó otros errores pero que **sigue sin firmar**. Si el XML contiene `Signature`, el XSD **no** demuestra que la firma sea criptográficamente válida.
+- Se preservan los controles anteriores: carpeta seleccionada por el operador, alias local conocido XMLDSIG, SHA-256, XSD intactos, XML temporal eliminado, sin acceso externo y sin transmisión a Hacienda.
+- Se conservan **todos** los cambios comerciales de v0.6.88–0.6.90: caja obligatoria y por cajero, venta e historial propios, impresión después del vuelto, PDF de cierres, tres códigos FCR2, permisos y respaldos. **No hay migraciones de SQLite.**
+
+## 2. Cómo probar y validar las novedades (Windows)
+
+**Antes de empezar:** realiza un respaldo **verificado** de SQLite, actualiza el proyecto con el ZIP v0.6.91, instala sus dependencias (`npm ci`) y usa Python con `lxml` (para MSYS2 UCRT64, `C:\msys64\usr\bin\pacman.exe -S mingw-w64-ucrt-x86_64-python-lxml`). Los XSD seleccionados deben proceder de una fuente confiable; el programa no verifica su origen ni vigencia. Conserva los XSD FE/TE 4.4 y `xmldsig-core-schema.xsd` en la misma carpeta si el esquema requiere esa dependencia.
+
+**A. Pruebas automáticas, sin archivos de Hacienda:**
+
+```powershell
+npm run qa:xsd:selftest
+npm run qa:xsd:desktop
+npm run qa:xsd:desktop-real
+npm run qa:xsd:pre-sign
+npm run qa:xsd:pre-sign-desktop
+npm test
+npm run qa:real-server
+```
+
+Resultados esperados: 25/25 XSD sintético, 14/14 puente simulado, 5/5 puente Node/Python, **18/18** ensayos de pre-firma FE/TE, **13/13** comprobaciones del puente y UI pre-firma, suite general aprobada y servidor HTTP real sin errores en Windows. Estas pruebas **NO** suponen verificación ante Hacienda.
+
+**B. Prueba visual de la novedad en FacturaCR (aplicación Electron):**
+
+1. Inicia sesión con un rol habilitado para ver ventas y selecciona una empresa de **prueba**.
+2. Ve a **Historial de ventas / Mis ventas** y abre una venta FE o TE de prueba.
+3. Pulsa **Borrador FE 4.4 (prueba)** o **Borrador TE 4.4**; debe estar disponible solo cuando se cumplen los requisitos previos del borrador.
+4. Pulsa **Elegir carpeta XSD y validar borrador** y selecciona tu carpeta XSD 4.4 junto con `xmldsig-core-schema.xsd`.
+5. Si el **único** diagnóstico del XSD es «Missing child element(s) … Signature», debe aparecer **«Borrador sin firmar: el único error XSD detectado es la firma pendiente»**, y la sección **«Validación XSD completa» seguirá indicando que NO coincide**.
+6. Si hay un error adicional de campo o estructura, se indicarán **otras diferencias** con línea y mensaje. No debería decir que solo falta firma.
+7. Comprueba que sigan apareciendo el nombre y las huellas SHA-256 del XML/XSD; cierra y vuelve a abrir la ventana. No se modifica el historial de ventas.
+
+**Resultado esperado:** tendrás un diagnóstico más comprensible para preparar las correcciones fiscales. **No se habilita firmar ni enviar XML reales**. Si el esquema local está desactualizado o es incorrecto, el resultado no demuestra cumplimiento fiscal. Para avanzar con los XSD vigentes se necesitan los archivos exactos con procedencia verificada.
+
+**C. Compilación e instalación Windows:**
+
+```powershell
+npm run dist:win
+```
+
+Instala y abre el `.exe` en un equipo de prueba para confirmar que el validador empaquetado encuentra Python y `lxml` y puede abrir la carpeta XSD. La compilación no sustituye esta comprobación.
+
+## 3. Estado de QA y limitaciones
+
+- Pruebas sintéticas nuevas: **18/18 FE/TE** aprobadas (incluye XML sin firma, errores de campos, elementos obligatorios, namespace de firma incorrecto y rechazo CLI estricto de borradores incompletos).
+- Integración de contrato local/UI: **13/13 comprobaciones**.
+- `npm test`: aprobado; integración SQLite: **77/77**.
+- **Pendiente:** comprobar esquema oficial actualizado en Windows, impresión física no afectada, HTTP real y el instalador NSIS generado desde esta versión. Aquí no se ha ejecutado el `.exe`.
+- **No es validación fiscal:** ni el XSD por sí solo demuestra identidad, firma XAdES-EPES, validez de claves/CAByS o recepción por Hacienda. Nunca se declara «comprobante fiscal válido» en el modo pre-firma.
+
+## 4. Instalación y GitHub
+
+Primero respalda y verifica SQLite. Luego:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run qa:xsd:pre-sign
+npm run dist:win
+
+git add -A
+git commit -m "feat: v0.6.91 diagnostico XSD previo a firma"
+git push
+```
+
+Realiza el commit solo después de validar los cambios y el instalador. GitHub Actions incluye los ensayos Python del diagnóstico, separados de la validación oficial de Hacienda.
+
+---
+
 # FacturaCR v0.6.90 — Validación XSD local de borradores FE/TE desde Electron
 
 **Alcance:** v0.6.90 permite validar un borrador XML FE o TE 4.4 directamente desde la aplicación de escritorio, eligiendo la carpeta de XSD con un diálogo nativo. **El XSD es proporcionado por el operador: el resultado NO demuestra que proceda de Hacienda, esté vigente, que el XML esté firmado, ni que sea apto para enviar.** Las ventas no se modifican y no se hace ninguna transmisión fiscal.

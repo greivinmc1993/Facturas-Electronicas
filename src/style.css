@@ -1823,3 +1823,6 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feXsdLocalResult code{font-size:.78rem;white-space:normal;overflow-wrap:anywhere}.feXsdLocalResult ol{margin:4px 0;padding-left:23px;max-height:220px;overflow:auto}
 .feXsdLocalResult li{margin:6px 0}.feXsdLocalError{color:#8d2e2e;font-weight:650;overflow-wrap:anywhere}
 @media(max-width:600px){.feXsdLocalPanel{padding:13px}.feXsdLocalPanel>button{width:100%;justify-self:stretch}}
+
+/* v0.6.91: lectura visible de diagnósticos previos a la firma, sin afirmar homologación. */
+.feXsdPreSignNote{margin:12px 0;padding:12px 14px;background:#eff8f5;border:1px solid #c9e5dd;border-radius:10px;color:#19574d;line-height:1.5}

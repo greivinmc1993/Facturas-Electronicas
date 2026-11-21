@@ -12,7 +12,7 @@ const users=read('src/UsersPanel.jsx');
 const css=read('src/style.css');
 const pkg=JSON.parse(read('package.json'));
 const lock=JSON.parse(read('package-lock.json'));
-check('Versión v0.6.88 coherente',()=>{assert.equal(pkg.version,'0.6.90');assert.equal(lock.version,pkg.version);assert.equal(lock.packages[''].version,pkg.version)});
+check('Versión v0.6.88 coherente',()=>{assert.equal(pkg.version,'0.6.91');assert.equal(lock.version,pkg.version);assert.equal(lock.packages[''].version,pkg.version)});
 check('El control permanece oculto inicialmente',()=>assert.match(component,/useState\(false\)/));
 check('Alterna exclusivamente el tipo de input',()=>assert.match(component,/type=\{visible&&!disabled\?'text':'password'\}/));
 check('El botón no envía formularios',()=>assert.match(component,/button type="button"/));
