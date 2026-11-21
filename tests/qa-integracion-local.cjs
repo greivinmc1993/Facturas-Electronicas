@@ -777,6 +777,18 @@ async function check(name,fn){try{await fn();passed++;console.log('OK ',name)}ca
    const badMode=await create('INVALIDO');assert.equal(badMode.status,400);
    const detail=await call('GET',`/api/companies/${a}/sales/${genId}`);
    assert.equal(detail.status,200);assert.equal(detail.body.document_mode,'GENERICA');
+   // TE y genérica no tienen client_id, pero DEBEN figurar en el mismo historial de ventas.
+   const history=await call('GET',`/api/companies/${a}/sales`);
+   assert.equal(history.status,200,JSON.stringify(history.body));
+   const historyById=new Map(history.body.map(s=>[s.id,s]));
+   assert.equal(historyById.get(teId).document_mode,'TE');
+   assert.equal(historyById.get(teId).client_name,'Tiquete electrónico');
+   assert.equal(historyById.get(genId).client_name,'Genérica');
+   assert.equal(historyById.get(feId).document_mode,'FE');
+   assert.equal(historyById.get(feId).client_name,(await call('GET',`/api/companies/${a}/clients`)).body.find(c=>c.id===clientId).name);
+   // El CSV histórico no debe etiquetar TE/GENERICA como «Consumidor final».
+   const csv=await call('GET',`/api/companies/${a}/sales/export.csv`);
+   assert.equal(csv.status,200);assert.match(csv.body,/Tiquete electrónico/);assert.match(csv.body,/Genérica/);
   });
   await check('v0.6.72: venta nueva conserva fotografía fiscal y XML exacto en SQLite',async()=>{
    const before=read();const stock=before.prepare('SELECT stock FROM products WHERE id=?').get(prodId).stock;before.close();

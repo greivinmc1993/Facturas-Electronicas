@@ -1,3 +1,11 @@
+## [0.6.87] — Corrección del selector y de la visibilidad de tiquetes en historial
+
+- Radios FE/TE/genérica con anchura fija de 18px y tres tarjetas simétricas, texto integrado, estados de selección y diseño adaptable.
+- Se evita que una venta nocturna deje de aparecer por comparar la fecha SQLite UTC contra una fecha local. Se corrige presentación de hora local sin alterar el valor persistido.
+- Filtro de modalidad para el historial y contador de TE aunque la sección esté contraída.
+- Columna Cliente y CSV/PDF: nombre para FE, «Tiquete electrónico» para TE y «Genérica» para modo interno. Los registros históricos sin modalidad no se reclasifican.
+- QA nuevo de fechas/formatos/estilos y pruebas de API: 76/76 integraciones SQLite y `npm test` completo. Instalador Windows pendiente.
+
 ## [0.6.87] — Ajuste adicional: modalidades de cliente en Ventas y secciones contraídas
 
 - Selector FE/TE/GENERICA con búsqueda de clientes condicionada a FE; genérica por defecto, sin XML ni emisión.

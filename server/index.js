@@ -1053,7 +1053,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   app.get('/api/companies/:companyId/sales',(req,res)=>{
     try{
       const companyId=saleCompany(req),q=String(req.query.q||'').trim().slice(0,120);
-      const rows=db.prepare(`SELECT s.*,c.name AS client_name FROM sales s LEFT JOIN clients c ON c.id=s.client_id
+      const rows=db.prepare(`SELECT s.*,CASE WHEN s.document_mode='TE' THEN 'Tiquete electrónico' WHEN s.document_mode='GENERICA' THEN 'Genérica' ELSE c.name END AS client_name FROM sales s LEFT JOIN clients c ON c.id=s.client_id
        WHERE s.company_id=? AND (?='' OR CAST(s.id AS TEXT) LIKE ? OR c.name LIKE ? OR s.created_at LIKE ?)
        ORDER BY s.id DESC LIMIT 500`).all(companyId,q,`%${q}%`,`%${q}%`,`%${q}%`);
       res.json(rows);
@@ -1247,7 +1247,7 @@ export async function startServer({ dataDir = join(process.cwd(), 'data'), port 
   app.get('/api/companies/:companyId/sales/export.csv',(req,res)=>{
     try{
       const companyId=saleCompany(req);
-      const rows=db.prepare(`SELECT s.*,COALESCE(c.name,'Consumidor final') AS client_name FROM sales s LEFT JOIN clients c ON c.id=s.client_id WHERE s.company_id=? ORDER BY s.id DESC`).all(companyId);
+      const rows=db.prepare(`SELECT s.*,CASE WHEN s.document_mode='TE' THEN 'Tiquete electrónico' WHEN s.document_mode='GENERICA' THEN 'Genérica' ELSE COALESCE(c.name,'Sin cliente registrado') END AS client_name FROM sales s LEFT JOIN clients c ON c.id=s.client_id WHERE s.company_id=? ORDER BY s.id DESC`).all(companyId);
       const columns=['Venta','Fecha','Cliente','Tipo','Estado','Subtotal CRC','Descuento CRC','Impuesto CRC','Total CRC','Pagado CRC','Saldo CRC','Motivo anulación'];
       const cell=formattedCsvCell;
       const csv='sep=;\r\n'+[columns,...rows.map(r=>[r.id,r.created_at,r.client_name,r.sale_type,r.status,r.subtotal_cents/100,r.discount_cents/100,r.tax_cents/100,r.total_cents/100,r.paid_cents/100,r.balance_cents/100,r.annul_reason||''])].map(row=>row.map(cell).join(';')).join('\r\n');

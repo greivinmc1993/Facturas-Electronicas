@@ -1,3 +1,12 @@
+## v0.6.87 — Corrección de tarjetas e historiales FE/TE/genérica (21-11-2026)
+
+- **Selector simétrico:** se corrige el estilo `input{width:100%}` heredado por los radios, que expandía los círculos y desplazaba los títulos. Tres tarjetas de altura uniforme, alineación centrada, radio de tamaño fijo, descripción legible, foco de teclado y adaptación a dos o una columna.
+- **Historial visible y buscable:** las ventas de tiquete electrónico `TE` permanecen junto a las demás ventas en Historial de ventas; incluye un filtro de **modalidad** FE / TE / genérica, y contador de tiquetes en el encabezado contraído. No se crea un historial separado ni se omiten ventas sin receptor.
+- **Fecha de SQLite:** `CURRENT_TIMESTAMP` se almacena en UTC. Ahora el filtro «Hoy / Esta semana / Este mes» utiliza la **fecha local del equipo**, para no ocultar ventas del final del día en Costa Rica cuyo día UTC ya cambió. La presentación y los CSV/PDF filtrados muestran fecha local, sin modificar el valor original en SQLite.
+- **Columna Cliente:** FE muestra el nombre registrado; TE «Tiquete electrónico»; genérica «Genérica»; en registros históricos sin modalidad no se inventa una clasificación. Se unificó también el CSV general y se mantienen los historiales de crédito, sus permisos y la impresión del vuelto.
+- **QA:** 16/16 controles nuevos de fechas, etiquetas, estilos y filtro; `npm test` completo y 76/76 integraciones SQLite, con verificación HTTP simulado de FE/TE/genérica y CSV. Validación visual y NSIS **pendientes de Windows y GitHub Actions**.
+- **Seguridad de datos:** sin nuevas migraciones y sin modificaciones de ventas ya guardadas. **Crear y verificar respaldo SQLite antes de instalar.** Firma fiscal y envío siguen bloqueados.
+
 ## v0.6.87 — Ajuste adicional de Ventas: modalidades FE / TE / genérica y historiales contraídos (20-11-2026)
 
 - **Tipo de cliente y comprobante en Punto de venta:** se elige explícitamente **Cliente con datos · Factura electrónica**, **Sin datos · Tiquete electrónico**, o **Genérica · Factura interna**. El modo inicial es genérico; ninguna modalidad envía documentos a Hacienda en esta etapa.
