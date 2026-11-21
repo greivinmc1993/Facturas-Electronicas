@@ -1,3 +1,82 @@
+# FacturaCR v0.6.90 — Validación XSD local de borradores FE/TE desde Electron
+
+**Alcance:** v0.6.90 permite validar un borrador XML FE o TE 4.4 directamente desde la aplicación de escritorio, eligiendo la carpeta de XSD con un diálogo nativo. **El XSD es proporcionado por el operador: el resultado NO demuestra que proceda de Hacienda, esté vigente, que el XML esté firmado, ni que sea apto para enviar.** Las ventas no se modifican y no se hace ninguna transmisión fiscal.
+
+## Novedades
+
+1. **Validación desde Historial de ventas / Mis ventas.** Abre el detalle de una venta FE o TE admisible, selecciona «Borrador FE 4.4 (prueba)» o «Borrador TE 4.4 · consumidor final», y en la ventana usa **«Elegir carpeta XSD y validar borrador»**. La selección se realiza en un diálogo de Windows/Electron, sin exponer rutas de archivos al navegador.
+2. **Diagnóstico visible.** Se distingue «Coincide con el XSD local elegido», «El XML no coincide» y «No se pudo validar». Cuando existen diferencias se muestran líneas y mensajes; se muestran huellas SHA-256 del XSD y del XML. Ninguno de estos estados significa autorización de Hacienda.
+3. **Seguridad.** Se admite únicamente FE/TE en esta pantalla; la matriz CLI de NC/ND se mantiene. El XML se escribe en una carpeta temporal y se elimina al terminar; el validador no descarga archivos, no permite DTD ni importaciones XSD externas y no modifica SQLite. Se ejecuta Python sin shell, con límite de 8 MB, tope de salida y tiempo máximo de 20 s.
+4. **Distribución.** El empaquetado Windows incluye el validador Python en `app.asar.unpacked` (se sigue requiriendo Python con `lxml` instalado en la máquina). No se incluye ningún supuesto XSD oficial ni se descarga uno de terceros automáticamente.
+5. **QA.** Nueva batería de 14 comprobaciones del puente local sin dependencia Python y 5 casos de integración Node→Python+lxml con XSD **sintéticos** (válido, inválido, esquema faltante). GitHub Actions ejecuta la integración independiente cuando instala `lxml`.
+
+## Cómo probar y validar las novedades (Windows, paso a paso)
+
+**Prerrequisitos:** respaldo verificado de tu base SQLite; copia del proyecto v0.6.90; Python instalado y disponible con `python` (para MSYS2 UCRT64, instala `mingw-w64-ucrt-x86_64-python-lxml` mediante pacman); XSD 4.4 descargados manualmente desde una fuente confiable y colocados con sus dependencias en la misma carpeta de esquemas. Los esquemas **no** están en el ZIP.
+
+**A. Comprobar que el validador funciona (sin Hacienda):**
+
+```powershell
+npm run qa:xsd:selftest
+npm run qa:xsd:desktop
+npm run qa:xsd:desktop-real
+```
+
+Esperado: `21/21` ensayos sintéticos de la matriz; `14/14` comprobaciones del puente y `5/5` casos reales Node/Python con XSD **sintéticos**. Ninguno equivale a validación fiscal oficial.
+
+**B. Probar en la interfaz de Electron:**
+
+1. Entra con un usuario autorizado para ver sus ventas. Selecciona una empresa de pruebas y una venta FE/TE de prueba en **Punto de venta → Historial de ventas** (o **Mis ventas** para cajero).
+2. Abre **Ver** y, según la modalidad, elige **Borrador FE 4.4 (prueba)** o **Borrador TE 4.4 · consumidor final**.
+3. Si faltan datos fiscales, CAByS o medios de pago, el módulo indicará los problemas y el botón XSD quedará deshabilitado; no inventes información para forzar el borrador.
+4. Si el borrador está listo, pulsa **Elegir carpeta XSD y validar borrador**; selecciona la carpeta que contenga `FacturaElectronica_V4.4.xsd` o `TiqueteElectronico_V4.4.xsd` junto con sus esquemas dependientes.
+5. Esperado: estado de coincidencia o diferencias de esquema, línea y detalle de los errores. Los borradores **tienen claves y consecutivos ficticios, y no están firmados**; por ello pueden fallar ante XSD oficiales. Esa diferencia es informativa y no se corrige automáticamente.
+6. Cancela una selección y comprueba que no cambia el borrador. Cierra y vuelve a abrir el detalle: ninguna venta, impuesto, recibo ni dato SQLite debe haber cambiado.
+
+**C. Validar archivos XML externos FE/TE/NC/ND:** sigue disponible el comando de la v0.6.89, por ejemplo:
+
+```powershell
+python tests/qa-087-xsd-pareja.py --schema-dir "C:\EsquemasHacienda\v4.4" --fe-xml "C:\Pruebas\FE.xml" --json-out "C:\Pruebas\resultado-xsd.json"
+```
+
+Para NC, ND o TE usa `--nc-xml`, `--nd-xml` o `--te-xml` respectivamente. Si aparecen errores, consulta los nombres y líneas del informe JSON. En CLI `0` indica coincidencia con el XSD proporcionado, `1` indica diferencias y `2` que la validación no fue posible.
+
+**Origen y vigencia:** el catálogo histórico ATV muestra enlaces a XSD 4.4, pero algunos no responden y existen modificaciones publicadas en 2026. Confirma los archivos con la documentación publicada oficialmente por Hacienda/TRIBU-CR antes de utilizarlos. Una huella SHA-256 solo permite comparar archivos, no demostrar el origen de un XSD.
+
+- Portal institucional: https://atv.hacienda.go.cr/ATV/ComprobanteElectronico/frmAnexosyEstructuras.aspx
+- Portal TRIBU-CR: https://ovitribucr.hacienda.go.cr/comprobantes-electronicos
+
+## Resultados y pendientes de v0.6.90
+
+- `npm test` en entorno Linux: aprobado, incluidos 77/77 controles locales SQLite y pruebas de regresión de caja, permisos y ventas.
+- `npm run qa:xsd:selftest`: 21/21 con esquemas sintéticos.
+- `npm run qa:xsd:desktop`: 14/14, puente probado con respuestas simuladas.
+- `npm run qa:xsd:desktop-real`: 5/5 usando Python+lxml y XSD sintéticos.
+- **Pendiente:** ejecutar y comprobar compilación e instalación real NSIS en Windows, validar con XSD 2026 oficiales verificables, probar el flujo visual en Electron Windows, reejecutar `npm run qa:real-server` en la nueva versión y comprobar cualquier respuesta oficial de Hacienda. La v0.6.90 no habilita emisión fiscal.
+
+## Instalación y GitHub
+
+Antes de reemplazar la aplicación, **crear y verificar respaldo completo de la base SQLite** (`userData` en Electron, o `data/` en desarrollo). Conservar toda la información real; nunca sustituir el SQLite productivo por uno de prueba. A continuación, dentro de la raíz del proyecto:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run qa:xsd:selftest
+npm run qa:xsd:desktop-real
+npm run dist:win
+```
+
+Tras verificar instalación y funcionamiento en Windows, actualiza GitHub:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.90 validacion XSD local FE TE desde Electron"
+git push
+```
+
+---
+
 # FacturaCR v0.6.89 — Matriz de validación XSD 4.4 y seguridad de esquemas locales
 
 **Alcance de esta versión:** amplía el laboratorio de validación de XML de comprobantes FE, TE, NC y ND con los XSD locales del operador. **No habilita emisión electrónica, numeración fiscal, firma XAdES-EPES de producción ni envío a Hacienda.** El POS, los tres códigos FCR2, las ventas de cada cajero, el bloqueo sin caja, el tiquete posterior al vuelto y el doble guardado de los cierres permanecen como en v0.6.88.

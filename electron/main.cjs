@@ -1,6 +1,7 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell} = require('electron');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
 const {createCashClosureFiles}=require('./cash-closure-files.cjs');
+const {validateDraftLocally}=require('./fe-xsd-desktop.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const {runXmlProof,runXmlVariantsProof}=require('./fe-xades-xml-lab.cjs');
@@ -55,6 +56,7 @@ async function runPackagedSmoke(){
        typeof window.facturacrSignature?.chooseP12==='function'&&
        typeof window.facturacrSignature?.clearP12==='function',
      preloadIntegratedXades:typeof window.facturacrSignature?.runIntegratedXadesLab==='function',
+     preloadXsd:typeof window.facturacrXsd?.validateDraft==='function',
      preloadBackupPicker:typeof window.facturacrBackups?.chooseFolder==='function'
    };
  })()`;
@@ -156,6 +158,23 @@ async function runPackagedSmoke(){
 const certificateSelection=createP12SelectionManager();
 const authorizedCertificateFrame=event=>event.sender===mainWindow?.webContents &&
   event.senderFrame===mainWindow?.webContents.mainFrame;
+// XSD v0.6.90: solo vía diálogo nativo, jamás por ruta suministrada en el renderer.
+ipcMain.handle('facturacr:validate-local-xsd',async(event,payload)=>{
+ if(!authorizedCertificateFrame(event))return {status:'CANNOT_VALIDATE',error:'Ventana no autorizada.'};
+ try{
+  const picked=await dialog.showOpenDialog(mainWindow,{
+   title:'Elegir carpeta de esquemas XSD 4.4 locales',properties:['openDirectory']
+  });
+  if(picked.canceled||!picked.filePaths?.length)return {status:'CANCELLED'};
+  const scriptInAsar=path.join(app.getAppPath(),'tests','qa-087-xsd-pareja.py');
+  const script=scriptInAsar.replace(/app\.asar(?=[\\/]|$)/,'app.asar.unpacked');
+  return await validateDraftLocally({
+   xml:payload?.xml,documentType:payload?.documentType,
+   schemaDir:picked.filePaths[0],pythonScript:script
+  });
+ }catch(error){return {status:'CANNOT_VALIDATE',error:error?.message||'No fue posible validar el borrador.'};}
+});
+
 ipcMain.handle('facturacr:choose-p12',async(event,companyId)=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{

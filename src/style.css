@@ -1815,3 +1815,11 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .posCashRequired{width:min(100%,960px);margin:16px auto;border:1px solid #c99f4a;border-radius:14px;background:rgba(201,159,74,.12);padding:18px 20px;display:flex;flex-wrap:wrap;gap:14px 18px;align-items:center;justify-content:space-between}.posCashRequiredText{display:grid;gap:8px;flex:1 1 540px;min-width:0}.posCashRequired strong{font-weight:750;color:inherit}.posCashRequired p{margin:0;line-height:1.5}.posCashRequiredActions{display:flex;justify-content:flex-end;align-items:center;flex:0 0 auto}.posCashRequired button{margin-left:0;min-width:190px}.salesModule .posCashRequired{text-align:left}@media(max-width:760px){.posCashRequired{padding:16px}.posCashRequiredActions{width:100%}.posCashRequired button{width:100%}}
 
 .posChangeActions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;align-items:stretch}.posChangeActions button{flex:1 1 190px;min-width:0}
+
+/* v0.6.90 · comparador XSD local de solo lectura en ventana FE/TE */
+.feXsdLocalPanel{display:grid;gap:10px;margin:16px 0;padding:17px;border:1px solid #b8d9d1;background:#f4faf7;border-radius:14px;min-width:0}
+.feXsdLocalPanel h4{margin:0;color:#12584d}.feXsdLocalPanel p{margin:0;line-height:1.55}
+.feXsdLocalPanel>button{justify-self:start;min-height:44px}.feXsdLocalResult{display:grid;gap:8px;border-top:1px solid #b8d9d1;padding-top:12px;overflow-wrap:anywhere}
+.feXsdLocalResult code{font-size:.78rem;white-space:normal;overflow-wrap:anywhere}.feXsdLocalResult ol{margin:4px 0;padding-left:23px;max-height:220px;overflow:auto}
+.feXsdLocalResult li{margin:6px 0}.feXsdLocalError{color:#8d2e2e;font-weight:650;overflow-wrap:anywhere}
+@media(max-width:600px){.feXsdLocalPanel{padding:13px}.feXsdLocalPanel>button{width:100%;justify-self:stretch}}

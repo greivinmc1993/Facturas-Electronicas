@@ -91,3 +91,7 @@ coverage/
 
 # Configuración local de Electron
 .electron/
+
+# Validador Python / QA XSD
+__pycache__/
+*.pyc

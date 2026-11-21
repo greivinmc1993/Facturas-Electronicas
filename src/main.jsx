@@ -167,6 +167,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
  const [historyOpen,setHistoryOpen]=useState(false),[creditsOpen,setCreditsOpen]=useState(false);
  const [details,setDetails]=useState(null),[annulReason,setAnnulReason]=useState('');
  const [xmlDraft,setXmlDraft]=useState(null),[xmlDraftBusy,setXmlDraftBusy]=useState(false);
+ const [xsdResult,setXsdResult]=useState(null),[xsdBusy,setXsdBusy]=useState(false);
  const [abonoAmount,setAbonoAmount]=useState(''),[abonoMethod,setAbonoMethod]=useState('Efectivo');
  const [creditSales,setCreditSales]=useState([]),[creditPayments,setCreditPayments]=useState([]),[creditFilter,setCreditFilter]=useState('todas'),[creditSearch,setCreditSearch]=useState(''),[creditTab,setCreditTab]=useState('ventas');
  const [ticketSettings,setTicketSettings]=useState(ticketDefaults),[ticketDraft,setTicketDraft]=useState(ticketDefaults),[ticketSavedMessage,setTicketSavedMessage]=useState(''),[ticketPreview,setTicketPreview]=useState(''),[ticketConfigOpen,setTicketConfigOpen]=useState(false);
@@ -464,7 +465,7 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
  };
  const showSale=async id=>{try{setXmlDraft(null);setDetails(await api(`/api/companies/${companyId}/sales/${id}`))}catch(e){setNotice(e.message)}};
  const previewFeXml=async (saleId,documentType='FE')=>{
-  setXmlDraftBusy(true);setXmlDraft(null);
+  setXmlDraftBusy(true);setXmlDraft(null);setXsdResult(null);
   try{
    const response=await fetch(`/api/companies/${companyId}/sales/${saleId}/fe/xml-draft?documentType=${documentType==='TE'?'TE':'FE'}`,{credentials:'same-origin'});
    const data=await response.json();
@@ -472,6 +473,18 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
    if(!response.ok)throw Error(data.error||'No se pudo crear el borrador.');
    setXmlDraft(data);
   }catch(e){setNotice(e.message)}finally{setXmlDraftBusy(false)}
+ };
+ const validateDraftWithLocalXsd=async()=>{
+  if(!xmlDraft?.ready||!xmlDraft.xml||xsdBusy)return;
+  setXsdResult(null);setXsdBusy(true);
+  try{
+   if(typeof window.facturacrXsd?.validateDraft!=='function'){
+    setXsdResult({status:'CANNOT_VALIDATE',error:'La validación XSD desde la pantalla requiere abrir FacturaCR en Electron. En navegador puedes usar: npm run qa:xsd:local -- --schema-dir "RUTA_XSD" --fe-xml "RUTA_XML".'});return;
+   }
+   const result=await window.facturacrXsd.validateDraft(xmlDraft.xml,xmlDraft.documentType);
+   setXsdResult(result||{status:'CANNOT_VALIDATE',error:'El validador no devolvió un resultado.'});
+  }catch(error){setXsdResult({status:'CANNOT_VALIDATE',error:error.message||'No se pudo realizar la prueba XSD.'})}
+  finally{setXsdBusy(false)}
  };
  const downloadFeXml=()=>{
   if(!xmlDraft?.ready||!xmlDraft.xml||!details)return;
@@ -632,7 +645,21 @@ function SalesPanel({companyId,company,askConfirm,canReadHistory=true,isCashier=
        <p className="feDraftSchemaStatus">XSD 4.4: sin validar · Firma digital: sin validar · Emisión: bloqueada</p>
      </section>}
      <div className="feDraftWarnings"><strong>Limitaciones de esta etapa</strong><ul>{(xmlDraft.warnings||[]).map((warn,i)=><li key={i}>{warn}</li>)}</ul></div>
-     <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>setXmlDraft(null)}>Cerrar</button></div>
+     <section className="feXsdLocalPanel" aria-label="Validación XSD local del borrador">
+      <h4>Comparar borrador con XSD 4.4 local</h4>
+      <p>Selecciona una carpeta con esquemas XSD y sus dependencias obtenidos de una fuente confiable. La aplicación comparará el borrador FE/TE sin enviarlo a Hacienda ni cambiar SQLite. <b>No verifica el origen o vigencia del XSD.</b></p>
+      <button type="button" className="secondary" disabled={!xmlDraft.ready||xsdBusy} onClick={validateDraftWithLocalXsd}>{xsdBusy?'Validando XSD…':'Elegir carpeta XSD y validar borrador'}</button>
+      {xsdResult?.status==='CANCELLED'&&<p role="status">Selección cancelada. No se alteró el XML.</p>}
+      {xsdResult?.status==='CANNOT_VALIDATE'&&<p role="alert" className="feXsdLocalError">No se pudo validar: {xsdResult.error}</p>}
+      {['MATCHES_LOCAL_XSD','DOES_NOT_MATCH_LOCAL_XSD'].includes(xsdResult?.status)&&<div className="feXsdLocalResult" role="status">
+       <strong>{xsdResult.status==='MATCHES_LOCAL_XSD'?'Coincide con el XSD local elegido':'El XML no coincide con el XSD local elegido'}</strong>
+       <p>XSD: {xsdResult.xsdFile} · SHA-256: <code>{xsdResult.xsdSHA256}</code></p>
+       <p>XML SHA-256: <code>{xsdResult.xmlSHA256}</code></p>
+       <p>{xsdResult.warning}</p>
+       {xsdResult.errors?.length>0&&<ol>{xsdResult.errors.map((problem,i)=><li key={i}>Línea {problem.line||'?'}{problem.field?` · ${problem.field}`:''}: {problem.message}</li>)}</ol>}
+      </div>}
+     </section>
+     <div className="actions"><button type="button" disabled={!xmlDraft.ready} onClick={downloadFeXml}>Descargar XML de prueba</button><button type="button" className="secondary" onClick={()=>{setXmlDraft(null);setXsdResult(null)}}>Cerrar</button></div>
     </div>
   </div>}
   {ticketPreview&&<div className="ticketOverlay" role="dialog" aria-modal="true" aria-label="Vista previa de tiquete"><div className="ticketModal"><h3>Vista previa del tiquete</h3><iframe title="Tiquete" sandbox="allow-same-origin" srcDoc={ticketPreview}/><div className="actions"><button type="button" onClick={async()=>{try{if(!window.facturacrPrinter)throw Error('La impresión requiere la aplicación de escritorio.');await printHtml(ticketPreview)}catch(e){setNotice(e.message)}}}>Imprimir con Windows</button><button type="button" className="secondary" onClick={()=>setTicketPreview('')}>Cerrar</button></div></div></div>}

@@ -19,7 +19,12 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from lxml import etree
+try:
+    from lxml import etree
+except ImportError:
+    print('Falta lxml. En MSYS2 UCRT64 instala mingw-w64-ucrt-x86_64-python-lxml con pacman; '
+          'en Python convencional usa python -m pip install lxml.', file=sys.stderr)
+    sys.exit(2)
 
 NAMESPACE = 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/'
 TYPES = {

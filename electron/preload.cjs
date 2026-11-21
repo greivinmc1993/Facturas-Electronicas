@@ -29,3 +29,9 @@ contextBridge.exposeInMainWorld('facturacrSignature',{
  checkXadesEngine:()=>ipcRenderer.invoke('facturacr:check-xades-engine'),
  runIntegratedXadesLab:()=>ipcRenderer.invoke('facturacr:xades-integrated-lab')
 });
+
+// v0.6.90: el usuario elige carpeta XSD en un diálogo de Electron.
+// No se exponen rutas locales ni permisos de archivos al navegador.
+contextBridge.exposeInMainWorld('facturacrXsd',{
+ validateDraft:(xml,documentType)=>ipcRenderer.invoke('facturacr:validate-local-xsd',{xml,documentType})
+});

@@ -48,6 +48,8 @@ jobs:
         run: python tests/qa-086-xsd-official.py --self-test
       - name: Matriz XSD FE/TE/NC/ND v4.4 (21 controles sintéticos, NO homologación)
         run: python tests/qa-087-xsd-pareja.py --self-test
+      - name: Puente escritorio Node/Python para FE/TE (XSD sintéticos, sin envío)
+        run: npm run qa:xsd:desktop-real
       - name: Firmar plantilla sintética (clave y certificado temporal)
         run: node -e "require('./electron/fe-xades-xml-lab.cjs').createXmlProof().then(p=>require('node:fs').writeFileSync(process.env.RUNNER_TEMP+'/facturacr-xmlsig-demo.xml',p.xml))"
       - name: Comprobar C14N, referencias, RSA-SHA256 y alteraciones con verificador externo

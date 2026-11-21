@@ -1,3 +1,11 @@
+## [0.6.90] — Comparación XSD desde escritorio para borradores FE/TE (21/11/2026)
+
+- Nuevo botón en el diálogo del borrador FE/TE: compara el XML con XSD seleccionados localmente mediante el selector de carpetas de Electron. La ventana presenta diferencias por línea y huellas SHA-256; nunca presenta un XSD local como certificado oficialmente.
+- Puente Electron → Python+lxml seguro (sin shell, archivos temporales que se eliminan, tipos FE/TE limitados, sin red ni cambios a SQLite), con mensajes comprensibles si faltan Python o lxml.
+- Validador Python incluido en el empaquetado NSIS mediante asarUnpack, sin incluir XSD externos; FE/TE se prueban desde la interfaz, NC/ND permanecen en la CLI.
+- Pruebas: 14/14 contrato del puente, 5/5 integración real con esquemas sintéticos, 21/21 matriz XSD sintética y `npm test` aprobado (77/77 controles locales SQLite). Integración XSD real en GitHub Actions añadida. No se ha demostrado la ejecución del instalador Windows ni la validación contra esquemas oficiales vigentes.
+- Metadatos 0.6.90. Sin migración SQLite ni cambios comerciales a ventas, caja, roles, auditoría o recuperación FCR2.
+
 ## [0.6.89] — Matriz XSD 4.4 FE/TE/NC/ND y endurecimiento local (20/11/2026)
 
 - Extensión del control de XSD de dos a cuatro tipos: factura, tiquete, nota de crédito y nota de débito, con comprobación estricta de namespace y raíz por tipo.
