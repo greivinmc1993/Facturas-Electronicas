@@ -49,9 +49,9 @@ check('El laboratorio XAdESjs mantiene controles de origen de ventana y concurre
  assert.match(main,/if\(!authorizedCertificateFrame\(event\)\)return/);
  assert.match(main,/if\(integratedXadesRunning\)return/)
 });
-check('El proyecto se identifica como v0.6.92',()=>{
+check('El proyecto se identifica como v0.6.93',()=>{
  const p=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
  const l=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url),'utf8'));
- assert.equal(p.version,'0.6.92');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version)
+ assert.equal(p.version,'0.6.93');assert.equal(l.version,p.version);assert.equal(l.packages[''].version,p.version)
 });
 console.log(`QA preparación XAdES v0.6.92: ${total}/${total} controles aprobados. SOLO laboratorio, sin firmas fiscales.`);

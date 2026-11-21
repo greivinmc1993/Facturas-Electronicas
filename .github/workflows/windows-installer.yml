@@ -33,6 +33,8 @@ jobs:
         run: node -e "require('node:fs').accessSync('tests/fixtures/FacturaCR_v0.6.34_baseline.zip')"
       - name: Ejecutar regresión de cálculos e integración SQLite
         run: npm test
+      - name: v0.6.93 cotejo de certificado X.509 y empresa (SOLO informativo)
+        run: npm run qa:certificate-company
       - name: Ensayo XAdESjs integrado en Windows (NO FISCAL)
         run: npm run qa:xades-engine
       - name: Auditar dependencias de producción

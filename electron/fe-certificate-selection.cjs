@@ -10,6 +10,7 @@ const path = require('node:path');
 const {inspectP12,MAX_P12_BYTES} = require('./fe-certificate-check.cjs');
 const {proveP12PrivateKey} = require('./fe-private-key-proof.cjs');
 const {signatureReadiness} = require('./fe-signature-gate.cjs');
+const {matchCertificateToCompany} = require('./fe-certificate-company.cjs');
 
 function companyKey(value){
  if(!Number.isSafeInteger(value)||value<=0)throw Error('Selecciona una empresa válida.');
@@ -42,7 +43,7 @@ function createP12SelectionManager({fileSystem=fs,inspector=inspectP12,proof=pro
   selected={filename,companyId,stat,token,reading:false};
   return {name:path.basename(filename).slice(0,180),token};
  };
- const inspect=async(token,companyId,passphrase)=>{
+ const inspect=async(token,companyId,passphrase,companyIdentification)=>{
   companyKey(companyId);
   if(typeof passphrase!=='string'||passphrase.length>512||passphrase.length===0)
    throw Error('Introduce la contraseña del certificado.');
@@ -74,6 +75,9 @@ function createP12SelectionManager({fileSystem=fs,inspector=inspectP12,proof=pro
      report.checks.push({key:'keyProof',ok:false,title:'No se pudo completar el ensayo criptográfico local; requiere comprobación adicional'});
     }
    }
+   // Comparación de solo lectura, informativa y sin guardar la identificación de la empresa.
+   // El dato viene de la ficha visible: no es una autorización de acceso ni de emisión.
+   report.companyMatch=matchCertificateToCompany(report.subject,companyIdentification);
    report.signatureReadiness=signatureReadiness(report);
    // Una comprobación satisfactoria consume el ticket; el archivo no queda asociado a la empresa.
    if(selected===current)selected=null;

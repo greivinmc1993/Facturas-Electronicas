@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 
 // v0.6.74: tres acciones visuales separadas: elegir archivo, introducir clave,
 // y Aceptar. El archivo y la contraseña NUNCA se guardan en SQLite.
-export default function FeSignatureReadiness({companyId}){
+export default function FeSignatureReadiness({companyId,companyIdentification=''}){
  const [secret,setSecret]=useState('');
  const [selection,setSelection]=useState(null);
  const [result,setResult]=useState(null);
@@ -46,7 +46,7 @@ export default function FeSignatureReadiness({companyId}){
    selectedToken.current=null;
    if(token)window.facturacrSignature?.clearP12?.(token)?.catch?.(()=>{});
   };
- },[companyId]);
+ },[companyId,companyIdentification]);
  const bridge=typeof window!=='undefined'?window.facturacrSignature:null;
  const available=typeof bridge?.chooseP12==='function'&&typeof bridge?.inspectP12==='function';
  const choose=async()=>{
@@ -74,7 +74,7 @@ export default function FeSignatureReadiness({companyId}){
   const token=selection.token;
   setSecret('');setResult(null);setError('');setChecking(true);
   try{
-   const response=await bridge.inspectP12(ephemeralSecret,companyId,token);
+   const response=await bridge.inspectP12(ephemeralSecret,companyId,token,companyIdentification);
    if(id!==generation.current)return;
    if(!response?.success)throw Error(response?.error||'No se pudo verificar el certificado.');
    setResult(response.report);
@@ -192,7 +192,7 @@ export default function FeSignatureReadiness({companyId}){
  };
  const busy=selecting||checking;
  return <section className="feSignatureReadiness" aria-labelledby="fe-signature-title">
-  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.92 · XAdESjs integrado en laboratorio (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
+  <div className="feSignatureIntro"><div><p className="companiesOverline">v0.6.93 · Certificado y cotejo fiscal informativo (sin emisión)</p><h4 id="fe-signature-title">Certificado digital de Hacienda (.p12 / .pfx)</h4><p className="hint">Selecciona el certificado, escribe su contraseña y pulsa «Aceptar y verificar». El archivo y su contraseña no se guardan en el sistema.</p></div><span className="fePreparationStage">Verificación local</span></div>
   {available?<div className="feSignatureForm">
    <div className="feSignatureControls">
     <div className="feSignatureFileField">
@@ -216,6 +216,10 @@ export default function FeSignatureReadiness({companyId}){
   </div>:<p className="hint">La revisión del certificado está disponible en la aplicación de escritorio Electron. No se solicitan contraseñas desde el navegador web.</p>}
   {error&&<p className="fePreparationError" role="alert">{error}</p>}
   {result&&<div className="feSignatureResult" role="status"><strong>{result.technicallyReady?'Certificado técnicamente legible':'Se requiere revisar el certificado'}</strong><dl><div><dt>Titular declarado</dt><dd>{result.subject}</dd></div><div><dt>Emisor del certificado</dt><dd>{result.issuer}</dd></div><div><dt>Vigencia</dt><dd>{result.validFrom?.slice(0,10)} — {result.validTo?.slice(0,10)}</dd></div><div><dt>Clave pública</dt><dd>{result.publicKeyType}{result.rsaBits?` · ${result.rsaBits} bits`:''}</dd></div><div><dt>Huella SHA-256</dt><dd className="feSignatureFingerprint">{result.fingerprint256}</dd></div></dl>{result.checks?.map(c=><p key={c.key} className={c.ok?'feSignatureCheckOk':'feSignatureCheckWarn'}>{c.ok?'✓':'!'} {c.title}</p>)}<p className="hint">{result.note}</p>
+    {result.companyMatch&&<div className={`feCertificateCompanyCheck feCertificateCompanyCheck-${result.companyMatch.status.toLowerCase()}`} aria-label="Cotejo orientativo entre certificado y empresa">
+      <strong>{result.companyMatch.title}</strong><p>{result.companyMatch.detail}</p>
+      <small>Solo compara identificadores declarados. No comprueba poder de representación, cadena de confianza, revocación ni autoriza la firma electrónica.</small>
+    </div>}
     {result.signatureReadiness&&<div className="feSignatureProgress" aria-label="Etapas de firma electrónica"><div className="feSignatureProgressHeader"><strong>Preparación XAdES-EPES</strong><span className="fePreparationStage">Firma y envío bloqueados</span></div><p className="hint">La prueba local de la clave es independiente de la validación tributaria. Estas comprobaciones no firman ni envían XML.</p><ul>{result.signatureReadiness.checks.map(step=><li key={step.key} className={step.ok?'feSignatureStepOk':'feSignatureStepPending'}><span aria-hidden="true">{step.ok?'✓':'○'}</span>{step.title}</li>)}</ul></div>}
     {result.signatureReadiness&&<div className="feSignaturePolicy" aria-label="Cotejo del documento de política de firma">
       <div className="feSignaturePolicyHeading"><div><strong>Política oficial XAdES-EPES</strong><p className="hint">Comprueba localmente un PDF descargado de la fuente oficial de Hacienda. Es una comparación con la huella del ejemplo del Anexo 2, no una validación de vigencia ni una firma.</p></div>

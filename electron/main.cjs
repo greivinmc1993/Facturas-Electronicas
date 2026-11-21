@@ -188,10 +188,10 @@ ipcMain.handle('facturacr:choose-p12',async(event,companyId)=>{
   return {success:true,selection};
  }catch{return {success:false,error:'No se pudo seleccionar el certificado. Revisa el formato y tamaño (máximo 4 MB).'};}
 });
-ipcMain.handle('facturacr:inspect-p12',async(event,passphrase,companyId,token)=>{
+ipcMain.handle('facturacr:inspect-p12',async(event,passphrase,companyId,token,companyIdentification)=>{
  if(!authorizedCertificateFrame(event))return {success:false,error:'Ventana no autorizada.'};
  try{
-  const report=await certificateSelection.inspect(token,companyId,passphrase);
+  const report=await certificateSelection.inspect(token,companyId,passphrase,companyIdentification);
   return {success:true,report};
  }catch(err){
   // No comunicar rutas locales ni detalles de OpenSSL al proceso de interfaz.

@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.i
 // Elegir el archivo NO transmite la contraseña; Aceptar es una acción separada.
 contextBridge.exposeInMainWorld('facturacrSignature',{
  chooseP12:(companyId)=>ipcRenderer.invoke('facturacr:choose-p12',companyId),
- inspectP12:(passphrase,companyId,token)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase,companyId,token),
+ inspectP12:(passphrase,companyId,token,companyIdentification)=>ipcRenderer.invoke('facturacr:inspect-p12',passphrase,companyId,token,companyIdentification),
  clearP12:(token)=>ipcRenderer.invoke('facturacr:clear-p12',token),
  inspectXadesPolicy:()=>ipcRenderer.invoke('facturacr:inspect-xades-policy'),
  runXadesCryptoLab:()=>ipcRenderer.invoke('facturacr:xades-crypto-lab'),

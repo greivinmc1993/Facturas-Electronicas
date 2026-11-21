@@ -1,3 +1,75 @@
+# FacturaCR v0.6.93 — Cotejo orientativo del certificado con la empresa (NO fiscal)
+
+## 1. Objetivo y cambios
+
+Se conserva el selector de certificado `.p12` / `.pfx` de la v0.6.92, con **dos campos independientes** (archivo y contraseña), un botón separado **Aceptar y verificar**, y un resultado técnico de lectura, vigencia, algoritmo RSA y prueba local de clave. **Novedad:** al completar esta inspección, se compara *únicamente* el identificador nacional declarado en atributos específicos del asunto X.509 (`serialNumber` u `organizationIdentifier`, incluidos sus OID) con el número registrado en el **perfil de la empresa seleccionada**. El cotejo es informativo y no utiliza un servicio en línea.
+
+Se distinguen tres resultados:
+
+| Resultado | Interpretación | Qué debe hacer el usuario |
+|---|---|---|
+| **Coincidencia textual** | El atributo explícito del certificado coincide con la identificación visible de la empresa. | Continuar con revisión de titular/representante y de la cadena; **NO** habilita firma. |
+| **Identificaciones diferentes** | Se detecta un identificador explícito diferente. | Revisar empresa seleccionada, tipo de certificado y facultades del representante. |
+| **Identificación no concluyente** | No se dispone de un identificador explícito único, o el formato no permite compararlo. | Revisar certificado con documentación del emisor; no asumir coincidencia. |
+
+No se deduce identidad a partir de números dentro del nombre común (`CN`), ni se considera prueba de titularidad, representación, inscripción fiscal, autorización de Hacienda o cadena de confianza. Ante varios identificadores diferentes, el resultado es **no concluyente**. Ninguno de estos estados activa firma fiscal ni envío.
+
+## 2. Impacto técnico y seguridad
+
+- Se añadió `electron/fe-certificate-company.cjs`, un comparador local de solo lectura, con protección contra coincidencias parciales y datos mal formados.
+- El selector efímero de certificado y su ticket aleatorio permanecen vinculados a la empresa; el navegador no recibe ruta, clave privada ni archivo `.p12`.
+- El identificador que muestra la ficha fiscal se entrega al IPC únicamente para una **comparación orientativa**, no como credencial ni como autorización de acceso; no se añade a tablas de resultados ni habilita operaciones fiscales.
+- Se borran los bytes temporales del `.p12` una vez revisados, y la contraseña se limpia del formulario. El resultado solo contiene metadatos públicos y el diagnóstico; nunca se exporta la clave privada.
+- No se modificaron permisos existentes, SQLite, ventas, cierres, XML de borradores, impresión ni los laboratorios XAdESjs. **Sin migración de base de datos**.
+- **Pendientes obligatorios para emisión:** verificación de cadena y revocación, correspondencia legal del firmante con el emisor, política XAdES-EPES, firma real y verificación independiente, XSD oficial vigente y pruebas de Hacienda.
+
+## 3. Cómo probar y validar las novedades (Windows)
+
+**Primero:** crea y verifica una copia de respaldo SQLite. Prueba la lectura de un certificado de demostración o uno autorizado, **sin compartir el archivo ni su contraseña**.
+
+**A. QA automático (no necesita certificado propio):**
+
+```powershell
+npm ci
+npm run qa:certificate-company
+npm test
+npm run qa:real-server
+```
+
+La nueva batería ejecuta **16 controles si OpenSSL está disponible**; en ausencia de OpenSSL, ejecuta los controles restantes y señala expresamente que quedó pendiente el ensayo real de `.p12`. Comprueba igualdad exacta, diferencia, número dentro de `CN` ignorado, atributo ambiguo, ticket por empresa, eliminación del búfer y respuesta sin secretos.
+
+**B. Comprobación visual en la aplicación Electron:**
+
+1. Abre **Empresas → ficha fiscal / preparación FE 4.4** con una empresa de prueba. Comprueba su número de identificación.
+2. En **Certificado digital de Hacienda (.p12 / .pfx)**, pulsa **Examinar**, elige un archivo autorizado y escribe su contraseña en el campo separado.
+3. Pulsa **Aceptar y verificar certificado**. Busca el nuevo recuadro **Cotejo orientativo entre certificado y empresa** debajo de los datos técnicos.
+4. Comprueba uno de los tres resultados: **Coincidencia textual**, **Identificaciones diferentes** o **Identificación no concluyente**. El resultado depende de los atributos declarados en el certificado, no del nombre de la empresa.
+5. Cambia de empresa: la selección y el diagnóstico anterior deben borrarse. Selecciona de nuevo el certificado si corresponde.
+6. Intenta usar contraseña incorrecta: debe aparecer un error sin mostrar la contraseña ni conservarla en el formulario. No hagas múltiples intentos innecesarios con certificados reales.
+7. En cualquier caso comprueba **Firma y envío bloqueados**. La coincidencia textual **NO** debe permitir firmar XML comerciales ni enviar documentos.
+
+**C. Validación del instalador:**
+
+```powershell
+npm run dist:win
+```
+
+Después de compilar instala **en un entorno de prueba**, abre el módulo y repite el cotejo. Esta prueba visual y la instalación NSIS todavía necesitan confirmación en Windows; aprobar las pruebas automatizadas por sí solo no certifica el ejecutable.
+
+## 4. Resultados y límites de las pruebas
+
+La nueva batería `npm run qa:certificate-company` utiliza datos y certificados **ficticios generados en directorios temporales**, sin material del contribuyente. No valida cadena de confianza real, RUT, representación, revocación ni aceptación por Hacienda. No constituye certificación de firma XAdES-EPES.
+
+## 5. Instalación y GitHub
+
+Con respaldo SQLite comprobado, ejecutar `npm ci`, `npm test`, `npm run qa:certificate-company`, `npm run qa:real-server` y `npm run dist:win`. Tras comprobar el instalador y GitHub Actions, publicar el código con `git add -A`, `git commit -m "feat: v0.6.93 cotejo seguro certificado y empresa"` y `git push`.
+
+## 6. Siguiente versión
+
+Priorizar verificación independiente de la **cadena de confianza y el estado de revocación**, con una fuente confiable de certificados raíz y política de validación definida; hasta entonces la firma fiscal y el envío permanecen bloqueados.
+
+---
+
 ## FacturaCR v0.6.92 · Preparación de firma XAdES-EPES (laboratorio, NO fiscal)
 
 - En el modal de borrador FE/TE 4.4 hay un nuevo bloque **«Preparación de firma XAdES-EPES · laboratorio seguro»**. El botón **«Probar motor XAdESjs con XML ficticios»** ejecuta el laboratorio existente con tres XML sintéticos, verifica dos referencias por firma y que seis alteraciones sean rechazadas.

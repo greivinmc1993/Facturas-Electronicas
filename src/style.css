@@ -1837,3 +1837,12 @@ button.posClientChangeButton{font-size:12px;flex-shrink:0;padding:9px 12px}
 .feXadesLabResult{padding:13px;border:1px solid #c0d8e7;border-radius:10px;background:white;display:grid;gap:7px}
 .feXadesLabResult strong{color:#185a65}.feXadesNoIssue{color:#774416;background:#fff8eb;border:1px solid #f1d49f;padding:12px;border-radius:10px}
 @media(max-width:620px){.feXadesPreparation{padding:13px}.feXadesPreparation>button{width:100%;justify-self:stretch}}
+
+/* v0.6.93 - diagnóstico informativo entre identificación de empresa y asunto X.509. */
+.feCertificateCompanyCheck{margin:14px 0;padding:15px 17px;border-radius:12px;border:1px solid #cadfe3;background:#f4f8fb;color:#19384a;display:grid;gap:8px}
+.feCertificateCompanyCheck strong{font-size:.99rem;line-height:1.4}
+.feCertificateCompanyCheck p{margin:0;line-height:1.5}
+.feCertificateCompanyCheck small{color:#536b79;line-height:1.5}
+.feCertificateCompanyCheck-match{border-color:#a7d7cc;background:#eef8f5}
+.feCertificateCompanyCheck-mismatch{border-color:#e7c4a1;background:#fff6ed}
+@media(max-width:640px){.feCertificateCompanyCheck{padding:12px;width:100%}}

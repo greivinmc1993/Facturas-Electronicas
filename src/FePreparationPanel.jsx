@@ -41,7 +41,7 @@ export default function FePreparationPanel({company,onEditCompany,canEditProfile
     </form>}
    {saved&&<p className="fePreparationSuccess" role="status">{saved}</p>}
    {error&&<p className="fePreparationError" role="alert">{error}</p>}
-   <FeSignatureReadiness companyId={companyId}/>
+   <FeSignatureReadiness key={`${companyId}:${company?.identification||''}`} companyId={companyId} companyIdentification={company?.identification||''}/>
    <p className="fePreparationDisclaimer">Pendientes para emisión real: validación contra XSD y catálogos vigentes, numeración y clave, firma XAdES-EPES, credenciales y API de Hacienda, recepción y estados. Ningún dato se envía desde esta pantalla.</p>
   </>}
  </section>;

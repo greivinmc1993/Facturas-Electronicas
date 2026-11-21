@@ -1,3 +1,10 @@
+## [0.6.93] — Identidad declarada en X.509 frente a empresa (21/11/2026)
+
+- Nuevo cotejo **orientativo** por empresa del identificador explícito (`serialNumber`/`organizationIdentifier`) del asunto X.509, tras inspección efímera de `.p12` / `.pfx`. Coincidencia, diferencia y resultado no concluyente; no infiere identidad desde `CN` ni acepta coincidencia parcial.
+- El comparador no toma decisiones de permisos ni firma fiscal. Los checks de cadena, revocación, titularidad fiscal, política y Hacienda continúan pendientes; firma y envío bloqueados.
+- Preserva el selector nativo, límites de archivo, ticket temporal por empresa, borrado del búfer y formulario seguro. Sin cambios en SQLite, ventas, inventario, caja, API comercial o XML generado.
+- Nuevas pruebas de identidad/IPC/privacidad y ensayo con PKCS#12 ficticio; integradas en `npm test` y GitHub Actions Linux/Windows.
+
 ## v0.6.92 — Preparación XAdES-EPES verificable desde FE/TE (sin firma fiscal)
 - Nuevo panel y ensayo XAdESjs de documentos sintéticos desde la pantalla FE/TE; nunca envía XML comercial ni secretos a Electron.
 - Resumen estricto de evidencia del laboratorio y condiciones fiscales pendientes. La emisión continúa bloqueada.

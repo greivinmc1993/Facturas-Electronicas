@@ -23,6 +23,8 @@ jobs:
         run: node -e "require('node:fs').accessSync('tests/fixtures/FacturaCR_v0.6.34_baseline.zip')"
       - name: Cálculos, SQLite temporal, validaciones y sintaxis
         run: npm test
+      - name: v0.6.93 cotejo orientativo de certificado y empresa (sin habilitar emisión)
+        run: npm run qa:certificate-company
       - name: Contrato v0.6.92 de preparación de firma (solo XML ficticios)
         run: npm run qa:xades:preparation
       - name: Ensayo de motor XAdESjs integrado con dependencias reales (NO FISCAL)
