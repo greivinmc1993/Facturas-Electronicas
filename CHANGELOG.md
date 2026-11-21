@@ -1,3 +1,12 @@
+## [0.6.89] — Matriz XSD 4.4 FE/TE/NC/ND y endurecimiento local (20/11/2026)
+
+- Extensión del control de XSD de dos a cuatro tipos: factura, tiquete, nota de crédito y nota de débito, con comprobación estricta de namespace y raíz por tipo.
+- Huellas SHA-256 para XML, XSD y dependencias; manifiesto opcional de integridad, salida JSON, líneas/campos de error y códigos de salida diferenciados (0/1/2).
+- Procesamiento local seguro: deshabilita red y DTD, rechaza imports XSD remotos y ficheros fuera de raíz autorizada, límites de tamaño y máximo de dependencias. Mantiene soporte para dependencias relativas locales dentro de `--schema-root`.
+- 21 casos de QA con XSD **sintéticos**, agregados al flujo Linux independiente de GitHub Actions. **No se dispone aquí de archivos XSD oficiales verificados ni se han certificado borradores reales con Hacienda.**
+- Versión del programa y pruebas de metadatos actualizadas a 0.6.89; sin cambios a SQLite, a los cierres, ventas, roles, carritos ni recuperación FCR2.
+- Pendiente: validación contra el XSD v4.4 oficial vigente (incluida actualización de 2026), catálogos fiscales, numeración real, firma XAdES-EPES y transmisión.
+
 ## v0.6.88 — Corrección operativa multiusuario, caja e impresión (21/11/2026)
 
 - Corregido permiso de lectura de ventas de cajeros (`sales.read_own`): historial y tiquetes propios; las ventas ajenas permanecen privadas.

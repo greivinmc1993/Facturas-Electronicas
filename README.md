@@ -1,3 +1,55 @@
+# FacturaCR v0.6.89 — Matriz de validación XSD 4.4 y seguridad de esquemas locales
+
+**Alcance de esta versión:** amplía el laboratorio de validación de XML de comprobantes FE, TE, NC y ND con los XSD locales del operador. **No habilita emisión electrónica, numeración fiscal, firma XAdES-EPES de producción ni envío a Hacienda.** El POS, los tres códigos FCR2, las ventas de cada cajero, el bloqueo sin caja, el tiquete posterior al vuelto y el doble guardado de los cierres permanecen como en v0.6.88.
+
+## Qué se agregó
+
+1. `tests/qa-087-xsd-pareja.py`: valida independientemente FE/TE/NC/ND (uno o varios), comprobando raíz y espacio de nombres v4.4, usando `lxml` y XSD entregados por el operador.
+2. **Diagnóstico por campo/línea**: JSON con `validWithSuppliedSchema`, `errors`, SHA-256 de XML, XSD y todas sus dependencias; códigos de salida **0** válido, **1** XML inválido y **2** imposibilidad de validar (esquema faltante, DTD, namespace equivocado, etc.). Se admite `--json-out` para conservar el informe en disco, fuera de SQLite.
+3. **Lectura segura**: prohíbe DTD/DOCTYPE, entidades externas, URLs de importación, rutas fuera de `--schema-root`, archivos grandes y hashes alterados en manifiesto opcional. Acepta dependencias locales seguras (como `xmldsig-core-schema.xsd`) dentro del árbol autorizado.
+4. **QA**: `npm run qa:xsd:selftest` ejecuta pruebas sintéticas y la acción Linux `xmlsig-independent-lab` las verifica. **No son pruebas con los XSD oficiales** y nunca se presentan como homologación de Hacienda.
+5. **Metadatos v0.6.89** coherentes (`package.json`, lockfile, etiqueta visual y pruebas de versión). No hay migración de SQLite ni nuevos permisos.
+
+## Cómo usar los XSD vigentes para verificar XML reales
+
+Instala **Python 3.12+** y `lxml` (`python -m pip install 'lxml>=5,<7'`). Descarga los XSD v4.4 desde los enlaces oficiales de **TRIBU-CR / Hacienda**, manteniendo sus ficheros auxiliares y estructura de subcarpetas. Comprueba fecha y procedencia antes de validar; **FacturaCR no incluye ni descarga automáticamente los XSD, pues aquí no se verificó de forma independiente un paquete oficial vigente**.
+
+Prueba un FE y un TE, o agrega NC y ND según tengas archivos y XSD:
+
+```powershell
+python tests/qa-087-xsd-pareja.py --schema-dir "C:\EsquemasHacienda\2026\v4.4" --schema-root "C:\EsquemasHacienda" --fe-xml "C:\Pruebas\FE.xml" --te-xml "C:\Pruebas\TE.xml" --json-out "C:\Pruebas\reporte-xsd.json"
+```
+
+Para NC y ND sustituye las opciones XML por `--nc-xml` y `--nd-xml`. Los archivos XSD deben llamarse `FacturaElectronica_V4.4.xsd`, `TiqueteElectronico_V4.4.xsd`, `NotaCreditoElectronica_V4.4.xsd` y `NotaDebitoElectronica_V4.4.xsd`. El directorio `--schema-root` debe incluir todas las dependencias locales referidas por los XSD. El parámetro opcional `--sha256-manifest` recibe un JSON de `ruta/relativa.xsd` a SHA-256 (incluidas dependencias); comprueba integridad, **no demuestra origen oficial**.
+
+**Referencias para obtener los esquemas, sin sustituir la comprobación oficial:**
+- Portal de Hacienda: https://atv.hacienda.go.cr/ATV/ComprobanteElectronico/frmAnexosyEstructuras.aspx
+- Portal TRIBU-CR: https://ovitribucr.hacienda.go.cr/comprobantes-electronicos
+
+**Limitaciones deliberadas:** los borradores generados tienen clave/consecutivo ficticios y no están firmados; es normal que XSD reales detecten errores hasta que el emisor FE 4.4 esté completo. No se modifica el XML para forzar una aprobación ni se declara listo para emisión. Quedan pendientes las comprobaciones con esquemas oficiales actualizados, validación CABYS/actividad RUT, claves y consecutivos reales, firma real, integración con Hacienda y pruebas en Windows.
+
+## Actualización segura
+
+Antes de reemplazar cualquier archivo, crear y **verificar** un respaldo completo de la SQLite de producción. Instalar desde el ZIP en carpeta de código y mantener `data/` o `userData` del ejecutable sin sobrescribir. Después:
+
+```powershell
+npm ci
+npm test
+npm run qa:real-server
+npm run qa:xsd:selftest
+npm run dist:win
+```
+
+Si las pruebas y el instalador Windows funcionan, subir código a GitHub:
+
+```powershell
+git add -A
+git commit -m "feat: v0.6.89 matriz XSD 4.4 FE TE NC ND y QA de seguridad"
+git push
+```
+
+---
+
 ## Corrección adicional v0.6.88 — Ventas por cajero, impresión y caja obligatoria (21/11/2026)
 
 - **Ventas multiusuario:** el rol de cajero conserva `sales.create` y ahora puede usar `sales.read_own` para consultar el historial de **sus propias ventas** y recuperar sus detalles para imprimir tiquetes. Administradores y supervisores conservan los permisos más amplios según su rol. Un cajero no puede consultar ventas de otro cajero por API.
@@ -195,7 +247,7 @@ Se conservan `README.md`, `.gitignore`, `CHANGELOG.md` y `.github/workflows/`.
 ## 2. Prevalidación FE/TE y validación XSD
 
 - `server/fe-xml-draft.js` admite `documentType=FE|TE`; con `TE` omite receptor y utiliza el elemento principal y namespace de tiquete. `server/fe-xml-preflight.js` comprueba ambos tipos, las relaciones aritméticas y que TE no haya recibido datos de receptor. La ruta `GET /api/companies/:companyId/sales/:saleId/fe/xml-draft?documentType=TE` conserva autorización por empresa y nunca escribe datos.
-- `tests/qa-087-xsd-pareja.py` verifica **dos XML distintos** contra **dos archivos XSD locales** proporcionados por quien opera el sistema. Confirma namespace y raíz correspondiente a FE/TE y muestra errores con líneas, `SHA-256` de cada XSD y el resultado. El nombre del archivo no demuestra procedencia ni vigencia del esquema.
+- `tests/qa-087-xsd-pareja.py` verifica **hasta cuatro XML distintos** (FE, TE, NC y ND) contra **sus XSD locales** proporcionados por quien opera el sistema. Confirma namespace y raíz correspondiente a FE/TE y muestra errores con líneas, `SHA-256` de cada XSD y el resultado. El nombre del archivo no demuestra procedencia ni vigencia del esquema.
 - **NO hay XSD oficial verificado incorporado en este ZIP.** Se debe obtener la revisión vigente de ambos esquemas en el portal oficial de Hacienda/TRIBU-CR, incluyendo sus importaciones, antes de considerar la validación como fiscal. La autoprueba usa archivos XSD **sintéticos**, NO las estructuras oficiales.
 - Comandos: `npm run qa:fe44-preflight` y `npm run qa:xsd:selftest`. Para usar esquemas descargados y verificados manualmente:
 
