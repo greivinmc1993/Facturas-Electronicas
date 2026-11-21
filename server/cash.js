@@ -1,4 +1,5 @@
 import {csvDocument,csvExcelBuffer,reportHtml} from './report-format.js';
+import {createHash} from 'node:crypto';
 
 // Caja operativa: registra sesiones, gastos reales en efectivo y cobros de ventas activas.
 // No transforma ventas a crédito en efectivo hasta que existan pagos Efectivo registrados.
@@ -29,9 +30,21 @@ export function ensureCashSchema(db){
     amount_cents INTEGER NOT NULL CHECK(amount_cents>0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
-  CREATE INDEX IF NOT EXISTS idx_cash_expenses_session ON cash_expenses(session_id,id DESC);`);
+  CREATE INDEX IF NOT EXISTS idx_cash_expenses_session ON cash_expenses(session_id,id DESC);
+  CREATE TABLE IF NOT EXISTS cash_closure_pdfs (
+    session_id INTEGER PRIMARY KEY REFERENCES cash_sessions(id) ON DELETE CASCADE,
+    company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    pdf_data BLOB NOT NULL,
+    sha256 TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_cash_closure_company ON cash_closure_pdfs(company_id,session_id DESC);`);
   // Migración sin alterar los cierres históricos: sesiones antiguas sin operador.
   if(!db.prepare('PRAGMA table_info(cash_sessions)').all().some(c=>c.name==='opened_by_user_id'))db.exec('ALTER TABLE cash_sessions ADD COLUMN opened_by_user_id INTEGER REFERENCES access_users(id)');
+  // Identidad del operador al cerrar: foto histórica, no se modifica si renombra su cuenta.
+  const cols=db.prepare('PRAGMA table_info(cash_sessions)').all().map(c=>c.name);
+  if(!cols.includes('closed_by_user_id'))db.exec('ALTER TABLE cash_sessions ADD COLUMN closed_by_user_id INTEGER REFERENCES access_users(id)');
+  if(!cols.includes('closed_by_username'))db.exec("ALTER TABLE cash_sessions ADD COLUMN closed_by_username TEXT NOT NULL DEFAULT ''");
 }
 
 export function registerCashRoutes(app,db,companyFromRequest){
@@ -100,11 +113,77 @@ export function registerCashRoutes(app,db,companyFromRequest){
       if(roleOf(req)==='cashier'&&s.opened_by_user_id!==req.authUser.id)throw Error('No puedes cerrar la caja de otro usuario.');
       const watermark=db.prepare('SELECT COALESCE(MAX(p.id),0) AS id FROM sale_payments p JOIN sales v ON v.id=p.sale_id WHERE v.company_id=?').get(id).id;
       const totals=summary({...s,closing_payment_id:watermark});
-      db.prepare("UPDATE cash_sessions SET status='cerrada',closed_at=CURRENT_TIMESTAMP,counted_cents=?,expected_cents=?,difference_cents=?,closing_note=?,closing_payment_id=? WHERE id=? AND company_id=? AND status='abierta'")
-        .run(counted,totals.expected_cents,counted-totals.expected_cents,closingNote,watermark,s.id,id);
+      db.prepare("UPDATE cash_sessions SET status='cerrada',closed_at=CURRENT_TIMESTAMP,counted_cents=?,expected_cents=?,difference_cents=?,closing_note=?,closing_payment_id=?,closed_by_user_id=?,closed_by_username=? WHERE id=? AND company_id=? AND status='abierta'")
+        .run(counted,totals.expected_cents,counted-totals.expected_cents,closingNote,watermark,req.authUser?.id||null,req.authUser?.username||'usuario',s.id,id);
       return {...s,...totals,counted_cents:counted,difference_cents:counted-totals.expected_cents};
     })();
     res.json({closed:record,...payload(id,asUser(req))});
+  }));
+  // v0.6.88: PDFs de cierre guardados como fotografía inmutable dentro de SQLite.
+  // La copia opcional de Documentos se reconstruye a partir del PDF inmutable en SQLite.
+  const canReadSession=(req,s)=>s&&(
+    roleOf(req)!=='cashier'||Number(s.opened_by_user_id)===Number(req.authUser?.id));
+  const validSessionId=value=>{
+    const n=Number(value);
+    if(!Number.isSafeInteger(n)||n<1)throw Error('Sesión de caja inválida.');
+    return n;
+  };
+  app.get('/api/companies/:companyId/cash/closures',route((req,res)=>{
+    const id=companyFromRequest(req);
+    const offset=Number(req.query?.offset??0);
+    if(!Number.isSafeInteger(offset)||offset<0||offset>10000000)throw Error('Página de cierres inválida.');
+    const limit=30;
+    const cashier=roleOf(req)==='cashier';
+    const sql=`SELECT s.id,s.opened_at,s.closed_at,s.opened_by_user_id,
+      COALESCE(NULLIF(s.closed_by_username,''),u.username,'usuario') AS closing_username,
+      s.opening_cents,s.counted_cents,s.expected_cents,s.difference_cents,
+      d.created_at AS pdf_created_at,d.sha256 AS pdf_sha256
+      FROM cash_sessions s LEFT JOIN cash_closure_pdfs d
+        ON d.session_id=s.id AND d.company_id=s.company_id
+      LEFT JOIN access_users u ON u.id=s.opened_by_user_id
+      WHERE s.company_id=? AND s.status='cerrada' ${cashier?'AND s.opened_by_user_id=?':''}
+      ORDER BY s.id DESC LIMIT ? OFFSET ?`;
+    const values=cashier?[id,req.authUser.id,limit+1,offset]:[id,limit+1,offset];
+    const rows=db.prepare(sql).all(...values);
+    res.json({items:rows.slice(0,limit),hasMore:rows.length>limit,nextOffset:offset+Math.min(rows.length,limit)});
+  }));
+  // Metadatos para la copia local. Nunca se confía en una ruta o usuario
+  // proporcionado manualmente por el renderer: los datos salen de SQLite.
+  app.get('/api/companies/:companyId/cash/closures/:sessionId/metadata',route((req,res)=>{
+    const id=companyFromRequest(req),sessionId=validSessionId(req.params.sessionId),s=getSession(id,sessionId);
+    if(!s||!canReadSession(req,s))return res.status(404).json({error:'Cierre no encontrado.'});
+    if(s.status!=='cerrada')return res.status(409).json({error:'La caja todavía está abierta.'});
+    const username=db.prepare('SELECT username FROM access_users WHERE id=?').get(s.opened_by_user_id)?.username||'usuario';
+    const archived=db.prepare('SELECT sha256,created_at FROM cash_closure_pdfs WHERE company_id=? AND session_id=?').get(id,sessionId);
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({companyId:id,sessionId,closedAt:s.closed_at,closingUsername:s.closed_by_username||username,
+      sha256:archived?.sha256||null,archivedAt:archived?.created_at||null});
+  }));
+  app.post('/api/companies/:companyId/cash/closures/:sessionId/pdf',route((req,res)=>{
+    const id=companyFromRequest(req),sessionId=validSessionId(req.params.sessionId),s=getSession(id,sessionId);
+    if(!s||!canReadSession(req,s))return res.status(404).json({error:'Cierre no encontrado.'});
+    if(s.status!=='cerrada')throw Error('El PDF histórico solo se puede guardar después del cierre.');
+    const exists=db.prepare('SELECT sha256 FROM cash_closure_pdfs WHERE company_id=? AND session_id=?').get(id,sessionId);
+    if(exists)return res.json({saved:true,alreadyArchived:true,sha256:exists.sha256});
+    const raw=req.body?.pdfBase64;
+    if(typeof raw!=='string'||raw.length<40||raw.length>1700000||!/^[-A-Za-z0-9+/]+={0,2}$/.test(raw))
+      throw Error('El PDF es inválido o excede el tamaño máximo (1,2 MB).');
+    const pdf=Buffer.from(raw,'base64');
+    if(pdf.length<30||pdf.length>1200000||pdf.subarray(0,5).toString()!=='%PDF-'||!pdf.subarray(-2048).toString('latin1').includes('%%EOF'))
+      throw Error('No se recibió un PDF válido.');
+    const sha256=createHash('sha256').update(pdf).digest('hex');
+    const result=db.prepare('INSERT OR IGNORE INTO cash_closure_pdfs (session_id,company_id,pdf_data,sha256) VALUES(?,?,?,?)').run(sessionId,id,pdf,sha256);
+    res.status(result.changes?201:200).json({saved:true,alreadyArchived:!result.changes,sha256});
+  }));
+  app.get('/api/companies/:companyId/cash/closures/:sessionId/pdf',route((req,res)=>{
+    const id=companyFromRequest(req),sessionId=validSessionId(req.params.sessionId),s=getSession(id,sessionId);
+    if(!s||!canReadSession(req,s))return res.status(404).json({error:'Cierre no encontrado.'});
+    const archived=db.prepare('SELECT pdf_data FROM cash_closure_pdfs WHERE company_id=? AND session_id=?').get(id,sessionId);
+    if(!archived)return res.status(404).json({error:'Este cierre aún no tiene PDF archivado.'});
+    res.setHeader('Content-Type','application/pdf');
+    res.setHeader('Content-Disposition',`inline; filename="FacturaCR_Cierre_Caja_E${id}_S${sessionId}.pdf"`);
+    res.setHeader('Cache-Control','private, no-store');
+    res.send(Buffer.from(archived.pdf_data));
   }));
   const report=(req,res,format)=>{
     const id=companyFromRequest(req),sessionId=Number(req.query.sessionId),s=Number.isSafeInteger(sessionId)&&sessionId>0?getSession(id,sessionId):current(id)||db.prepare('SELECT * FROM cash_sessions WHERE company_id=? ORDER BY id DESC LIMIT 1').get(id);
@@ -116,7 +195,9 @@ export function registerCashRoutes(app,db,companyFromRequest){
     const rows=exp.map(e=>[e.created_at,e.category,e.description,(e.amount_cents/100).toFixed(2)]);
     const money=n=>'₡'+(Number(n)/100).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
     const stats=[['Fondo inicial',money(s.opening_cents)],['Cobros en efectivo',money(totals.received_cents)],['Gastos registrados',money(totals.expense_cents)],['Efectivo esperado',money(s.status==='cerrada'?s.expected_cents:totals.expected_cents)],['Estado',s.status]];
-    if(s.status==='cerrada')stats.push(['Efectivo contado',money(s.counted_cents)],['Diferencia',money(s.difference_cents)]);
+    if(s.status==='cerrada')stats.push(
+      ['Usuario que cerró',s.closed_by_username||db.prepare('SELECT username FROM access_users WHERE id=?').get(s.opened_by_user_id)?.username||'Histórico sin usuario'],
+      ['Efectivo contado',money(s.counted_cents)],['Diferencia',money(s.difference_cents)]);
     if(format==='csv'){
       // Una tabla de cuatro columnas estable, sin celdas combinadas ni símbolos
       // dentro de montos: Excel permite sumar importes y leer el contexto CRC.
@@ -145,6 +226,15 @@ export function registerCashRoutes(app,db,companyFromRequest){
     }
     res.type('html').send(reportHtml({title:'Reporte de caja y gastos',company:company.trade_name||company.legal_name,subtitle:`Sesión #${s.id} · Apertura UTC: ${s.opened_at} · ${s.closed_at?`Cierre UTC: ${s.closed_at}`:'Abierta'}`,headers,rows,summary:stats,note:'Los cobros en efectivo se calculan a partir de pagos de ventas actualmente activas. No es un estado contable ni incluye métodos de pago electrónicos. No sustituye un arqueo físico.'}));
   };
+  // Reporte interno SOLO de una caja ya cerrada y autorizada. Los cajeros
+  // no adquieren con ello acceso al exportador general de otras sesiones.
+  app.get('/api/companies/:companyId/cash/closures/:sessionId/report.html',route((req,res)=>{
+    const id=companyFromRequest(req),sessionId=validSessionId(req.params.sessionId),s=getSession(id,sessionId);
+    if(!s||!canReadSession(req,s))return res.status(404).json({error:'Cierre no encontrado.'});
+    if(s.status!=='cerrada')return res.status(409).json({error:'La caja todavía está abierta.'});
+    req.query={...req.query,sessionId:String(sessionId)};
+    return report(req,res,'html');
+  }));
   app.get('/api/companies/:companyId/cash/export.csv',route((req,res)=>report(req,res,'csv')));
   app.get('/api/companies/:companyId/cash/export.html',route((req,res)=>report(req,res,'html')));
 }

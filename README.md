@@ -1,3 +1,53 @@
+## Actualización v0.6.88 — Doble respaldo automático de cierres de caja
+
+Cuando confirmas **Cerrar caja**, FacturaCR crea un PDF de esa sesión y lo guarda primero en `cash_closure_pdfs` dentro de SQLite. Después Electron guarda una **segunda copia independiente** en tu carpeta Documentos. El cierre y su PDF de SQLite **no se pierden** si falla el guardado externo; aparecerá un mensaje y podrás hacer clic en **Guardar en PC** desde el historial.
+
+**Ruta predeterminada (Windows):**
+
+```text
+Documentos\FacturaCR\Cierres de caja\Empresa_1\2026\11-Noviembre\
+    FacturaCR_Cierre_2026-11-20_cajero1_E1_Caja18.pdf
+```
+
+El subdirectorio del mes se crea automáticamente. La **fecha del archivo es local de Costa Rica** aunque SQLite registre el cierre en UTC. El nombre incluye el **usuario que realizó el cierre** y un identificador de sesión único. Los cierres previos que no conserven el usuario de cierre utilizan el operador de apertura, cuando esté disponible.
+
+En **Caja y gastos → Historial de PDF de cierres de caja** están las opciones **Consultar PDF**, **Descargar PDF**, **Guardar en PC**, **Generar PDF pendiente**, **Elegir carpeta**, **Usar Documentos** y **Abrir carpeta**. La carpeta opcional se selecciona desde Electron, no escribiendo manualmente rutas. Si eliges USB, conéctala antes de cerrar caja. La ubicación personalizada es **por instalación** y se conserva en la configuración local de Electron.
+
+**Importante:** la copia del PDF en Documentos NO se agrega al respaldo SQLite como archivo de Windows, pero su PDF idéntico **sí está guardado como BLOB en SQLite**. Un respaldo de SQLite permite reconstruir la copia local desde el historial en una nueva PC. Al repetir «Guardar en PC», FacturaCR no sobrescribe archivos diferentes con el mismo nombre. Guarda tus respaldos SQLite en otra ubicación.
+
+**QA nuevo:** `node tests/qa-088-double-cash-copy.cjs`, `node tests/qa-088-cash-closure-pdfs.cjs`, `npm test`; después, en Windows: `npm ci`, `npm run qa:real-server`, `npm run dist:win` y probar cierre real/PDF desde el instalador. Se conservan todas las funciones FE/TE y recuperaciones de usuarios de v0.6.88.
+
+## Actualización de Caja y Seguridad · v0.6.88 (20/11/2026)
+
+### Paneles de recuperación y botones simétricos
+
+El panel de entrega única de tres códigos personales y el kit extraordinario permanece dentro de `<main>`, **centrado** y con máximo 960 px. «Copiar» y «Copiar clave» conservan las mismas medidas (126 × 42 px), sin saltos al pasar el cursor. «Guardar configuración» y «Cerrar» comparten tipografía y alturas. El menú lateral sigue fijo en escritorio y la interfaz se adapta a pantallas pequeñas.
+
+### PDF automático al cerrar una caja
+
+**Flujo:** Caja y gastos → «Cerrar caja» → introducir efectivo contado → «Revisar cierre» → «Confirmar cierre». La API guarda el cierre en SQLite y, después de confirmarlo, Electron crea el PDF automáticamente con el informe de esa sesión. El archivo se archiva en la nueva tabla `cash_closure_pdfs` (una copia por empresa/sesión, hash SHA-256, datos binarios PDF). No se solicita ubicación ni se pisa un cierre histórico; los PDF quedan incluidos en los respaldos de SQLite.
+
+**Historial:** «Caja y gastos» → «Historial de PDF de cierres de caja». Cierres ordenados del más reciente al más antiguo, por páginas de 30; columnas sesión, fecha UTC, contado, diferencia y estado de documento; botones «Consultar PDF» (visor del equipo), «Descargar PDF» y «Generar PDF pendiente». Si un cierre se guardó pero Electron no pudo crear el PDF, aparece un mensaje específico de error y se puede generar más adelante sin cerrar otra vez. Los cierres preexistentes se indican como pendientes.
+
+**Privacidad y permisos:** el historial es aislado por empresa. El cajero solo puede acceder a sesiones que abrió personalmente. Los PDF se obtienen por rutas autorizadas, nunca desde una ruta arbitraria suministrada por el usuario. Desde la corrección de doble guardado de esta misma versión, también se genera automáticamente una copia en Documentos de Windows; «Consultar» abre el PDF histórico con el visor configurado en Windows.
+
+**Integridad:** el primer PDF archivado es inmutable. Si una venta se anula después, no se reescribe ese documento. Los informes para cierres anteriores sin PDF se generan a partir de los datos aún disponibles y podrían reflejar las ventas actualmente activas, a diferencia de la fotografía original al cierre. El tamaño máximo por PDF archivado es 1,2 MB; si se excede, se avisa y queda pendiente. Esta función es un informe interno de caja, **no** una factura electrónica ni un comprobante enviado a Hacienda.
+
+**Compatibilidad:** migración SQLite únicamente aditiva (tabla `cash_closure_pdfs`), conservando las sesiones anteriores y todos los datos comerciales. Crea y verifica un respaldo independiente de SQLite antes de instalar. Para actualizar un repositorio antiguo en Git, ejecutar `npm run cleanup:legacy-email` y comprobar `git status --short` antes de `npm test`.
+
+**Pruebas:** `npm test` (incluye suites nuevas de PDF de caja y controles de interfaz), `npm run qa:real-server`, `npm run qa:fe44-preflight` y `npm run dist:win`. Se completaron pruebas locales de SQLite y diseño, pero la impresión/consulta PDF en el `.exe` final necesita verificación en Windows/GitHub Actions.
+
+### Ruta pendiente para v0.6.89
+
+1. Incorporar y comprobar los XSD **oficiales y vigentes** FE y TE versión 4.4.
+2. Verificar catálogo CAByS y actividades económicas contra fuentes de Hacienda/BCCR.
+3. Claves y consecutivos fiscales reales con aislamiento por empresa/sucursal/terminal.
+4. Validar tolerancias decimales sin dividir productos en varias líneas ni redondear artificialmente la base.
+5. Firma XAdES-EPES real con certificado y política vigente.
+6. Integración autenticada con Hacienda y recepción de respuestas, y notas NC/ND.
+
+---
+
 ## Ajuste visual de Seguridad — v0.6.88 (20/11/2026)
 
 La entrega única de tres códigos y el kit extraordinario del propietario se renderizan **dentro del área principal**, no encima del menú. El panel ocupa hasta 960 px; sus botones «Copiar» y «Copiar clave» miden 126 × 42 px, y los controles «Mostrar/Ocultar» permanecen centrados incluso al pasar el puntero. Los campos se adaptan a pantallas pequeñas y la entrega se desplaza a la vista cuando se generan códigos nuevos.

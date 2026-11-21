@@ -1,3 +1,25 @@
+## v0.6.88 — PDF de cierre de caja en SQLite Y Windows, por usuario y mes (20/11/2026)
+
+- **Doble guardado:** al confirmar el cierre, primero se conserva el PDF inmutable en SQLite y luego se guarda una **copia con idénticos bytes** en la carpeta `Documentos/FacturaCR/Cierres de caja/Empresa_N/AAAA/MM-Mes/`.
+- **Nombre comprensible:** `FacturaCR_Cierre_AAAA-MM-DD_usuario_EN_CajaSN.pdf`, con fecha de cierre en **America/Costa_Rica**, nombre de usuario que cerró la caja y sesión única. Se guarda `closed_by_username` en el cierre (migración aditiva) para que los nombres de PDF históricos no cambien si se renombra la cuenta.
+- **Carpeta opcional:** desde «Caja y gastos → Historial de PDF de cierres de caja» se puede elegir una carpeta mediante diálogo nativo, regresar a Documentos o abrir la carpeta. Si la unidad USB elegida no está conectada, no se redirige la copia silenciosamente a otra ubicación.
+- **Recuperación:** el botón «Guardar en PC» vuelve a copiar un documento SQLite ya archivado. Si el archivo existe y es idéntico no se reescribe; si contiene bytes distintos, se avisa y **nunca** se sobrescribe automáticamente.
+- **Integridad y permisos:** los bytes vienen de la ruta autenticada del PDF histórico, y Electron comprueba su SHA-256 antes de escribir. Cajeros conservan acceso solamente a cierres propios de su empresa. Si no se logra guardar la segunda copia, el cierre y SQLite permanecen intactos y se muestra un aviso con acción de reintento.
+- **QA:** pruebas de creación real en disco, SHA-256, fecha local, archivos repetidos, carpetas personalizadas y USB desconectada; pruebas del servidor para identidad de quien cerró y metadatos protegidos. `npm test` incluye las nuevas pruebas.
+- **Pendiente de confirmación:** construcción NSIS, PDF real en Electron Windows y verificación del flujo completo desde el instalador (GitHub Actions/PC).
+
+## v0.6.88 — Paneles centrados y PDF automático de cierres de caja (20/11/2026)
+
+- Se mantiene la versión `0.6.88`: entrega de tres códigos y kit extraordinario **centrada** en el área principal, ancho máximo 960 px, botones «Copiar» / «Copiar clave» con dimensiones iguales y alineación constante; no altera sidebar fijo.
+- «Guardar configuración» y «Cerrar» usan **la misma fuente, tamaño y peso**, con retícula simétrica y hover sin movimiento.
+- **Al confirmar el cierre de caja**, la aplicación Electron genera de manera automática un PDF A4 apaisado desde el reporte de esa sesión, sin preguntar por una carpeta. Archiva los bytes en `cash_closure_pdfs` dentro de **la misma SQLite**, con SHA-256 y una asociación única por sesión y empresa; forman parte de los respaldos de la base.
+- Nueva sección **«Historial de PDF de cierres de caja»** en Caja y gastos: paginación de 30 cierres, estado «Disponible/Pendiente», acciones «Consultar PDF», «Descargar PDF» y «Generar PDF pendiente» para cierres previos o fallos de impresión. El primer PDF archivado es inmutable y no se sobrescribe.
+- **Permisos reales**: servidor clasifica rutas nuevas; un cajero solo consulta y archiva sus propios cierres de su empresa; usuario con permiso `cash.open` puede listar/consultar, `cash.close_own` para guardar; no se abrió el exportador general a cajeros. El reporte auxiliar de generación está protegido y requiere caja cerrada.
+- **Fallback seguro**: si falla la impresión o el guardado del PDF, la caja **permanece correctamente cerrada** y aparece el aviso de PDF pendiente para recuperarlo desde el historial. No se repite el cierre ni se cambian conteos/inventario.
+- **SQLite aditiva**, sin borrar cierres, usuarios ni ventas existentes. Los cierres anteriores se muestran como pendientes hasta generarles el documento. Un reporte regenerado mucho después puede mostrar cobros recalculados por anulaciones posteriores; los PDF archivados al cierre no cambian.
+- **QA**: `tests/qa-088-cash-closure-pdfs.cjs` (aislamiento por empresa, permisos, validación, inmutabilidad) y `tests/qa-088-cash-closure-ui.cjs` (interfaz y puente Electron). `npm test` y 76/76 pruebas de integración; comprobación visual Chromium en 375, 600, 770, 1024 y 1536 px. La generación **real** mediante Electron y el instalador NSIS aún deben comprobarse en Windows/Actions.
+- **Siguiente v0.6.89**: validación XSD oficiales FE/TE 4.4, catálogos CAByS/actividades, consecutivos fiscales, firma XAdES-EPES y Hacienda. La impresión fiscal real continúa bloqueada.
+
 ## v0.6.88 — Corrección visual de entrega de códigos, sidebar y controles (20/11/2026)
 
 - **Se conserva v0.6.88**. La entrega única de tres códigos y el kit aparece ahora dentro del `<main>` de FacturaCR, no antes del menú lateral; por ello, no empuja ni desplaza el sidebar.

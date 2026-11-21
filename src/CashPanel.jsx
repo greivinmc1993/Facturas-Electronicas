@@ -1,4 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
+import CashClosuresArchive from './CashClosuresArchive.jsx';
+import {archiveCashClosure} from './cash-closure-archive.mjs';
 const currency=n=>'₡'+(Number(n||0)/100).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const categories=['Compra menor','Transporte','Servicios','Mantenimiento','Otros'];
 export default function CashPanel({companyId,company,isCashier=false}){
@@ -7,6 +9,7 @@ export default function CashPanel({companyId,company,isCashier=false}){
  const [expense,setExpense]=useState({category:'Compra menor',description:'',amount:''});
  const [counted,setCounted]=useState(''),[closingNote,setClosingNote]=useState('');
  const [confirmClose,setConfirmClose]=useState(false),[selected,setSelected]=useState('');
+ const [archiveRevision,setArchiveRevision]=useState(0);
  const submitting=useRef(false);
  const fetchCash=async(signal)=>{
    const r=await fetch(`/api/companies/${companyId}/cash`,{signal});const j=await r.json();
@@ -26,6 +29,21 @@ export default function CashPanel({companyId,company,isCashier=false}){
      const r=await fetch(`/api/companies/${companyId}/cash/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
      const j=await r.json();if(!r.ok)throw Error(j.error||'No se pudo completar la operación.');
      setData(j);setSelected('');setConfirmClose(false);setNotice(success);
+     if(path==='close'&&j.closed?.id){
+      try{
+       const file=await archiveCashClosure(companyId,j.closed.id);
+       if(file.computerSaved){
+        setNotice('Caja cerrada. PDF archivado en SQLite y guardado automáticamente en tu computadora: '+file.computerPath);
+       }else{
+        setNotice('Caja cerrada. PDF archivado en SQLite.');
+        setError('No se pudo crear la copia independiente en la computadora: '+file.computerError+'. Puedes reintentar desde el historial.');
+       }
+      }catch(archiveError){
+       setNotice('Caja cerrada y guardada correctamente.');
+       setError('El cierre se registró, pero el PDF quedó pendiente: '+archiveError.message+' Puedes generarlo desde el historial sin volver a cerrar la caja.');
+      }
+      setArchiveRevision(n=>n+1);
+     }
      if(path==='expenses')setExpense({category:'Compra menor',description:'',amount:''});
      if(path==='close'){setCounted('');setClosingNote('')}
    }catch(e){setError(e.message)}finally{submitting.current=false;setBusy(false)}
@@ -89,6 +107,7 @@ export default function CashPanel({companyId,company,isCashier=false}){
     <div className="cashSessionStats"><span>Apertura: {chosen?.opened_at} UTC</span><span>Estado: <strong>{chosen?.status}</strong></span>{chosen?.status==='cerrada'&&<><span>Contado: <strong>{currency(chosen.counted_cents)}</strong></span><span>Diferencia guardada: <strong>{currency(chosen.difference_cents)}</strong></span></>}</div>
     {chosen?.id!==data.selected_id?<p className="hint">Selecciona la sesión activa o la última sesión para consultar los gastos en pantalla. Las exportaciones incluyen los gastos de cualquier sesión seleccionada.</p>:<div className="movementHistory"><table><thead><tr><th>Fecha UTC</th><th>Categoría</th><th>Descripción</th><th>Importe</th></tr></thead><tbody>{exp.map(e=><tr key={e.id}><td>{e.created_at}</td><td>{e.category}</td><td>{e.description}</td><td>{currency(e.amount_cents)}</td></tr>)}{!exp.length&&<tr><td colSpan="4">Sin gastos registrados en esta sesión.</td></tr>}</tbody></table></div>}
    </section>}
+   <CashClosuresArchive companyId={companyId} revision={archiveRevision}/>
    <p className="hint">Nota: anulaciones posteriores pueden cambiar el cálculo de cobros históricos activos. El importe y la diferencia de cierre se conservan como fotografía al cerrar. Para una conciliación contable completa deben registrarse también devoluciones de efectivo.</p>
  </div>;
 }

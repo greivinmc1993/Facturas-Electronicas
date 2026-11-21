@@ -115,6 +115,12 @@ export function registerAuth(app,getDb,options={}){
     if(/^\/companies\/\d+\/inventory\/movements$/.test(p)){if(method==='GET')return 'inventory.kardex.read';if(method==='POST')return reqMovementPermission;return null;}
     if(/^\/companies\/\d+\/inventory\/.*$/.test(p)&&method==='GET')return 'inventory.kardex.read';
     if(/^\/companies\/\d+\/(?:dashboard|reports|valuation|kardex|credit-history)(?:\/.*)?$/.test(p)&&method==='GET')return 'reports.operational';
+    // PDF de cierres: acceso siempre por empresa; cajeros solo a sus turnos
+    // (la ruta vuelve a comprobar opened_by_user_id antes de responder).
+    if(/^\/companies\/\d+\/cash\/closures$/.test(p)&&method==='GET')return 'cash.open';
+    if(/^\/companies\/\d+\/cash\/closures\/\d+\/report\.html$/.test(p)&&method==='GET')return 'cash.open';
+    if(/^\/companies\/\d+\/cash\/closures\/\d+\/metadata$/.test(p)&&method==='GET')return 'cash.open';
+    if(/^\/companies\/\d+\/cash\/closures\/\d+\/pdf$/.test(p))return method==='GET'?'cash.open':method==='POST'?'cash.close_own':null;
     if(/^\/companies\/\d+\/cash$/.test(p)&&method==='GET')return 'cash.open';
     if(/^\/companies\/\d+\/cash\/open$/.test(p)&&method==='POST')return 'cash.open';
     if(/^\/companies\/\d+\/cash\/close$/.test(p)&&method==='POST')return 'cash.close_own';

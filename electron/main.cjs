@@ -1,5 +1,6 @@
 const {app, BrowserWindow, Menu, ipcMain, dialog, shell} = require('electron');
 const {createP12SelectionManager}=require('./fe-certificate-selection.cjs');
+const {createCashClosureFiles}=require('./cash-closure-files.cjs');
 const {inspectPolicyPdf}=require('./fe-xades-policy.cjs');
 const {runLocalCryptoLab}=require('./fe-xades-crypto-lab.cjs');
 const {runXmlProof,runXmlVariantsProof}=require('./fe-xades-xml-lab.cjs');
@@ -314,6 +315,79 @@ ipcMain.handle('facturacr:save-sales-pdf',async(event,html,filename,options={})=
   return {success:true,path:result.filePath};
  }catch(error){return {success:false,error:String(error.message||error)}}
  finally{if(!reportWindow.isDestroyed())reportWindow.destroy()}
+});
+// Cierre de caja: PDF automático sin diálogo, archivado por la API en SQLite.
+// El documento histórico que se consulta se recupera desde una ruta autenticada.
+ipcMain.handle('facturacr:render-cash-closure-pdf',async(event,html)=>{
+ if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
+ if(typeof html!=='string'||html.length<60||html.length>5000000)return {success:false,error:'Reporte de caja inválido'};
+ const reportWindow=new BrowserWindow({show:false,width:1120,height:800,parent:mainWindow,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ try{
+  await reportWindow.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(html));
+  await reportWindow.webContents.executeJavaScript('document.fonts.ready.then(()=>true)');
+  const pdf=await reportWindow.webContents.printToPDF({pageSize:'A4',landscape:true,printBackground:true,margins:{top:0.5,bottom:0.5,left:0.5,right:0.5}});
+  if(!pdf.subarray(0,5).equals(Buffer.from('%PDF-')))throw Error('La impresión no devolvió un PDF');
+  return {success:true,pdfBase64:pdf.toString('base64')};
+ }catch(e){return {success:false,error:String(e.message||e)};}
+ finally{if(!reportWindow.isDestroyed())reportWindow.destroy();}
+});
+ipcMain.handle('facturacr:open-cash-closure-pdf',async(event,pdfBase64,companyId,sessionId)=>{
+ if(event.sender!==mainWindow?.webContents)return {success:false,error:'Ventana no autorizada'};
+ if(!Number.isSafeInteger(companyId)||companyId<1||!Number.isSafeInteger(sessionId)||sessionId<1)
+  return {success:false,error:'Identificador de cierre inválido'};
+ if(typeof pdfBase64!=='string'||pdfBase64.length>1700000||pdfBase64.length<40)
+  return {success:false,error:'Documento inválido'};
+ const pdf=Buffer.from(pdfBase64,'base64');
+ if(pdf.length>1200000||pdf.subarray(0,5).toString()!=='%PDF-'||!pdf.subarray(-2048).toString('latin1').includes('%%EOF'))
+  return {success:false,error:'Archivo no reconocido como PDF'};
+ try{
+  const targetDir=path.join(app.getPath('temp'),'FacturaCR','cierres-consulta');
+  await fs.mkdir(targetDir,{recursive:true});
+  const target=path.join(targetDir,`FacturaCR_Cierre_Caja_E${companyId}_S${sessionId}.pdf`);
+  await fs.writeFile(target,pdf,{mode:0o600});
+  const err=await shell.openPath(target);
+  return err?{success:false,error:err}:{success:true};
+ }catch(e){return {success:false,error:String(e.message||e)};}
+});
+// Doble guardado de cierres. El proceso principal controla la ubicación y valida
+// SHA-256 contra el documento inmutable que devuelve la API autenticada.
+const cashClosureFileService=()=>createCashClosureFiles({documentsDir:app.getPath('documents'),userDataDir:app.getPath('userData')});
+const authorizedCashEvent=event=>event.sender===mainWindow?.webContents;
+ipcMain.handle('facturacr:cash-closure-folder',async event=>{
+ if(!authorizedCashEvent(event))return {success:false,error:'Ventana no autorizada'};
+ try{return {success:true,...await cashClosureFileService().settings()}}
+ catch(e){return {success:false,error:String(e.message||e)}}
+});
+ipcMain.handle('facturacr:choose-cash-closure-folder',async event=>{
+ if(!authorizedCashEvent(event))return {success:false,error:'Ventana no autorizada'};
+ try{
+  const current=await cashClosureFileService().settings();
+  const chosen=await dialog.showOpenDialog(mainWindow,{title:'Seleccionar carpeta de PDF de cierres de caja',
+   defaultPath:current.directory,properties:['openDirectory','createDirectory']});
+  if(chosen.canceled||!chosen.filePaths?.[0])return {success:false,cancelled:true};
+  return {success:true,...await cashClosureFileService().setCustomDirectory(chosen.filePaths[0])};
+ }catch(e){return {success:false,error:String(e.message||e)}}
+});
+ipcMain.handle('facturacr:default-cash-closure-folder',async event=>{
+ if(!authorizedCashEvent(event))return {success:false,error:'Ventana no autorizada'};
+ try{return {success:true,...await cashClosureFileService().useDefaultDirectory()}}
+ catch(e){return {success:false,error:String(e.message||e)}}
+});
+ipcMain.handle('facturacr:save-cash-closure-copy',async(event,details)=>{
+ if(!authorizedCashEvent(event))return {success:false,error:'Ventana no autorizada'};
+ try{
+  if(!details||typeof details!=='object')throw Error('Datos del cierre inválidos.');
+  return await cashClosureFileService().savePdf(details);
+ }catch(e){return {success:false,error:String(e.message||e)}}
+});
+ipcMain.handle('facturacr:open-cash-closure-folder',async event=>{
+ if(!authorizedCashEvent(event))return {success:false,error:'Ventana no autorizada'};
+ try{
+  const cfg=await cashClosureFileService().settings();
+  if(cfg.mode==='default')await fs.mkdir(cfg.directory,{recursive:true});
+  const error=await shell.openPath(cfg.directory);
+  return error?{success:false,error}:{success:true,path:cfg.directory};
+ }catch(e){return {success:false,error:String(e.message||e)}}
 });
 // El renderer nunca elige una ruta por texto. Electron muestra el explorador nativo.
 async function activeBackupFolder(){

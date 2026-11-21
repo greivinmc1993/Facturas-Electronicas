@@ -1,7 +1,16 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('facturacrPrinter',{print:(html,settings)=>ipcRenderer.invoke('facturacr:print-ticket',html,settings),list:()=>ipcRenderer.invoke('facturacr:list-printers')});
 
-contextBridge.exposeInMainWorld('facturacrReports',{savePdf:(html,filename,options)=>ipcRenderer.invoke('facturacr:save-sales-pdf',html,filename,options)});
+contextBridge.exposeInMainWorld('facturacrReports',{
+ savePdf:(html,filename,options)=>ipcRenderer.invoke('facturacr:save-sales-pdf',html,filename,options),
+ renderCashClosurePdf:html=>ipcRenderer.invoke('facturacr:render-cash-closure-pdf',html),
+ openCashClosurePdf:(pdfBase64,companyId,sessionId)=>ipcRenderer.invoke('facturacr:open-cash-closure-pdf',pdfBase64,companyId,sessionId),
+ cashClosureFolder:()=>ipcRenderer.invoke('facturacr:cash-closure-folder'),
+ chooseCashClosureFolder:()=>ipcRenderer.invoke('facturacr:choose-cash-closure-folder'),
+ defaultCashClosureFolder:()=>ipcRenderer.invoke('facturacr:default-cash-closure-folder'),
+ saveCashClosureCopy:details=>ipcRenderer.invoke('facturacr:save-cash-closure-copy',details),
+ openCashClosureFolder:()=>ipcRenderer.invoke('facturacr:open-cash-closure-folder')
+});
 
 contextBridge.exposeInMainWorld('facturacrBackups',{openFolder:()=>ipcRenderer.invoke('facturacr:open-backups-folder'),chooseFolder:()=>ipcRenderer.invoke('facturacr:choose-backups-folder')});
 

@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=x=>fs.readFileSync(path.join(root,x),'utf8');
+const cash=read('src/CashPanel.jsx'),history=read('src/CashClosuresArchive.jsx'),api=read('src/cash-closure-archive.mjs'),css=read('src/style.css'),secrets=read('src/RecoverySecretsPanel.jsx'),main=read('electron/main.cjs'),preload=read('electron/preload.cjs');
+let n=0;function check(title,fn){fn();console.log('OK',title);n++}
+check('Cierre dispara archivado automático después de respuesta HTTP',()=>{assert.match(cash,/if\(path==='close'&&j\.closed\?\.id\)/);assert.match(cash,/await archiveCashClosure\(companyId,j.closed.id\)/)});
+check('Error de PDF permite reintento sin cerrar caja',()=>assert.match(cash,/El cierre se registró, pero el PDF quedó pendiente/));
+check('PDF automático consulta ruta protegida de una sola sesión',()=>assert.match(api,/base\(companyId,id\)\+'\/report\.html'/));
+check('Nueva sección de historial separada en Caja',()=>assert.match(cash,/<CashClosuresArchive companyId=\{companyId\}/));
+check('El historial incluye consultar, descargar, generar PDF pendiente y más cierres',()=>{for(const v of ['Consultar PDF','Descargar PDF','Generar PDF pendiente','Mostrar más cierres'])assert.ok(history.includes(v),v)});
+check('UI no almacena secretos ni PDF en localStorage',()=>{assert.doesNotMatch(history,/localStorage|sessionStorage/);assert.doesNotMatch(api,/localStorage|sessionStorage/)});
+check('Electron crea PDF sin diálogo y permite abrir desde visor del sistema',()=>{assert.ok(main.includes('facturacr:render-cash-closure-pdf'));assert.ok(main.includes('facturacr:open-cash-closure-pdf'));assert.ok(main.includes('shell.openPath(target)'));assert.ok(!main.slice(main.indexOf("ipcMain.handle('facturacr:render-cash-closure-pdf'"),main.indexOf("ipcMain.handle('facturacr:open-cash-closure-pdf'")).includes('showSaveDialog'))});
+check('Preload expone funciones separadas para cierres',()=>assert.match(preload,/renderCashClosurePdf/));
+check('Panel de códigos centrado y simétrico, kit separado',()=>{assert.match(css,/margin:16px auto 24px!important/);assert.match(css,/\.recoverySecretsPanel \.recoveryKitContents\{/);assert.match(secrets,/Copiar clave/)});
+check('Botones de configuración y cierre comparten tipografía',()=>assert.match(css,/\.securitySettingsActions button\{[\s\S]*?font-family:inherit!important/));
+check('PDF archivado en SQLite es fuente del historial; copia extra separada',()=>{assert.match(read('server/cash.js'),/CREATE TABLE IF NOT EXISTS cash_closure_pdfs/);assert.match(read('server/cash.js'),/INSERT OR IGNORE INTO cash_closure_pdfs/)});
+check('Preload ofrece doble guardado y selector de carpeta de PDF',()=>{for(const v of ['saveCashClosureCopy','chooseCashClosureFolder','cashClosureFolder'])assert.ok(preload.includes(v),v)});
+check('Electron utiliza helper sin rutas externas aportadas por renderer',()=>{assert.ok(main.includes('createCashClosureFiles'));assert.ok(main.includes('facturacr:save-cash-closure-copy'))});
+check('Historial permite guardar en PC y cambiar carpeta',()=>{for(const v of ['Guardar en PC','Elegir carpeta','Usar Documentos','Abrir carpeta'])assert.ok(history.includes(v),v)});
+check('Al cerrar se distingue PDF en SQLite y en PC',()=>assert.ok(cash.includes('file.computerSaved')));
+console.log(`QA interfaz y PDF de cierre: ${n}/${n}`);
